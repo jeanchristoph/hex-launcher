@@ -38,7 +38,8 @@ $shell       = New-Object -ComObject WScript.Shell
 
 function Read-LocaleCatalog([string]$Path) {
     if (-not (Test-Path $Path)) { throw "locales.json introuvable : $Path" }
-    return @(Get-Content -Path $Path -Raw -Encoding UTF8 | ConvertFrom-Json)
+    # ForEach-Object déplie le tableau que ConvertFrom-Json (PS 5.1) renvoie comme un seul objet
+    return @(Get-Content -Path $Path -Raw -Encoding UTF8 | ConvertFrom-Json | ForEach-Object { $_ })
 }
 
 # ja_JP → "League of Legends JP"

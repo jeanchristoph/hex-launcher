@@ -43,7 +43,8 @@ function Read-LaunchConfig([string]$Path) {
 # Libellé affiché dans le splash, depuis locales.json ; repli sur le code si absent
 function Get-LocaleLabel([string]$Code, [string]$CatalogPath) {
     if (-not (Test-Path $CatalogPath)) { return $Code }
-    $entry = @(Get-Content -Path $CatalogPath -Raw -Encoding UTF8 | ConvertFrom-Json) | Where-Object { $_.code -eq $Code }
+    # ForEach-Object déplie le tableau que ConvertFrom-Json (PS 5.1) renvoie comme un seul objet
+    $entry = Get-Content -Path $CatalogPath -Raw -Encoding UTF8 | ConvertFrom-Json | ForEach-Object { $_ } | Where-Object { $_.code -eq $Code }
     if ($entry) { return $entry.label }
     return $Code
 }
