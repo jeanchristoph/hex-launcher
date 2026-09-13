@@ -1,0 +1,104 @@
+[
+  {
+    "id": "porofessor",
+    "name": "Porofessor",
+    "signer": { "organization": "Overwolf Ltd", "country": "IL" },
+    "processNames": [],
+    "launch": {
+      "path": "%ProgramFiles(x86)%\\Overwolf\\OverwolfLauncher.exe",
+      "arguments": "-launchapp pibhbkkgefgheeglaeemkkfjlhidhcedalapdggh -from-startmenu"
+    },
+    "detect": {
+      "registryDisplayNamePattern": "^Porofessor",
+      "path": "%LOCALAPPDATA%\\Overwolf\\Extensions\\pibhbkkgefgheeglaeemkkfjlhidhcedalapdggh"
+    },
+    "install": {
+      "strategy": "download",
+      "url": "https://download.overwolf.com/install/Download?Name=Porofessor.gg&ExtensionId=pibhbkkgefgheeglaeemkkfjlhidhcedalapdggh&Channel=web_dl_btn",
+      "arguments": "/S",
+      "timeoutSeconds": 300,
+      "notice": "Si Overwolf n'est pas encore installé, son installeur affiche sa fenêtre : suivez ses étapes (environ 1 min).",
+      "fallback": "browser",
+      "browserUrl": "https://www.overwolf.com/app/trebonius-porofessor.gg"
+    },
+    "uninstall": {
+      "mode": "interactive",
+      "dialogProcessNames": ["OWUninstallMenu"],
+      "notice": "Overwolf va ouvrir son menu de désinstallation avec Overwolf ET Porofessor cochés. Décochez Overwolf si vous l'utilisez pour d'autres applications, puis cliquez sur Uninstall."
+    }
+  },
+  {
+    "id": "blitz",
+    "name": "Blitz",
+    "signer": { "organization": "Swift Media Entertainment, Inc.", "country": "US" },
+    "processNames": ["Blitz"],
+    "launch": {
+      "path": "%LOCALAPPDATA%\\Programs\\Blitz\\Blitz.exe",
+      "arguments": ""
+    },
+    "detect": {
+      "registryDisplayNamePattern": "^Blitz$",
+      "path": "%LOCALAPPDATA%\\Programs\\Blitz\\Blitz.exe"
+    },
+    "install": {
+      "strategy": "winget",
+      "wingetId": "Blitz.Blitz",
+      "timeoutSeconds": 180,
+      "fallback": "browser",
+      "browserUrl": "https://blitz.gg/download"
+    },
+    "uninstall": {
+      "mode": "silent"
+    }
+  },
+  {
+    "id": "opgg",
+    "name": "OP.GG",
+    "signer": { "organization": "OP.GG", "country": "KR" },
+    "processNames": ["OP.GG"],
+    "launch": {
+      "path": "%LOCALAPPDATA%\\Programs\\OP.GG\\OP.GG.exe",
+      "arguments": ""
+    },
+    "detect": {
+      "registryDisplayNamePattern": "^OP\\.GG",
+      "path": "%LOCALAPPDATA%\\Programs\\OP.GG\\OP.GG.exe"
+    },
+    "install": {
+      "strategy": "download",
+      "url": "https://op.gg/desktop/download/latest",
+      "arguments": "/S /currentuser",
+      "timeoutSeconds": 180,
+      "fallback": "browser",
+      "browserUrl": "https://op.gg/desktop"
+    },
+    "uninstall": {
+      "mode": "silent"
+    }
+  },
+  {
+    "id": "mobalytics",
+    "name": "Mobalytics",
+    "signer": { "organization": "GAMERS NET, INC.", "country": "US" },
+    "processNames": ["Mobalytics"],
+    "launch": {
+      "path": "%LOCALAPPDATA%\\Programs\\mobalytics-desktop\\Mobalytics.exe",
+      "arguments": ""
+    },
+    "detect": {
+      "registryDisplayNamePattern": "^Mobalytics",
+      "path": "%LOCALAPPDATA%\\Programs\\mobalytics-desktop\\Mobalytics.exe"
+    },
+    "install": {
+      "strategy": "download",
+      "url": "https://desktop-app.mobalytics.gg/production/Mobalytics-Setup-latest.exe",
+      "arguments": "/S",
+      "timeoutSeconds": 180,
+      "fallback": "browser",
+      "browserUrl": "https://mobalytics.gg/lol/glp/app-download/"
+    },
+    "uninstall": {
+      "mode": "silent"
+    }
+  }
+]
