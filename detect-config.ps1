@@ -5,7 +5,8 @@
 .DESCRIPTION
     - Riot Client : lu dans RiotClientInstalls.json (fichier officiel de Riot, à jour même après déplacement)
     - Fichier de langue : Metadata\league_of_legends.live\ sous ProgramData
-    - Application compagnon : première trouvée parmi Porofessor (Overwolf), Blitz, OP.GG — sinon désactivée
+    - Applications compagnon : toutes les applis de companion-apps.json présentes sur la machine (détection
+      par les clés Uninstall du registre, en lecture seule, exécutable de lancement présent) → liste companionApps
 
     Un config.json existant n'est jamais écrasé sans -Force : les réglages faits à la main sont conservés.
 
@@ -22,33 +23,12 @@ $RiotInstallsPath  = Join-Path $env:ProgramData 'Riot Games\RiotClientInstalls.j
 $RiotClientDefault = 'C:\Riot Games\Riot Client\RiotClientServices.exe'
 $ProductSettings   = Join-Path $env:ProgramData 'Riot Games\Metadata\league_of_legends.live\league_of_legends.live.product_settings.yaml'
 
-$OverwolfLauncher     = Join-Path ${env:ProgramFiles(x86)} 'Overwolf\OverwolfLauncher.exe'
-$PorofessorExtension  = 'pibhbkkgefgheeglaeemkkfjlhidhcedalapdggh'
-$PorofessorExtensionDir = Join-Path $env:LOCALAPPDATA "Overwolf\Extensions\$PorofessorExtension"
-
-# Ordre = priorité. Ajouter une entrée ici pour reconnaître une autre application.
-$CompanionCandidates = @(
-    @{
-        Name      = 'Porofessor'
-        Path      = $OverwolfLauncher
-        Arguments = "-launchapp $PorofessorExtension -from-startmenu"
-        Test      = { (Test-Path $OverwolfLauncher) -and (Test-Path $PorofessorExtensionDir) }
-    }
-    @{
-        Name      = 'Blitz'
-        Path      = Join-Path $env:LOCALAPPDATA 'Programs\Blitz\Blitz.exe'
-        Arguments = ''
-    }
-    @{
-        Name      = 'OP.GG'
-        Path      = Join-Path $env:LOCALAPPDATA 'Programs\OP.GG\OP.GG.exe'
-        Arguments = ''
-    }
-)
+. (Join-Path $PSScriptRoot 'lib\companion-app.lib.ps1')
+$CompanionCatalogPath = Join-Path $PSScriptRoot 'companion-apps.json'
 
 function Find-RiotClientPath {
     if (Test-Path $RiotInstallsPath) {
-        $installs = Get-Content -Path $RiotInstallsPath -Raw | ConvertFrom-Json
+        $installs = Get-Content -Path $RiotInstallsPath -Raw -Encoding UTF8 | ConvertFrom-Json
         foreach ($key in 'rc_live', 'rc_default') {
             $candidate = $installs.$key
             if ($candidate -and (Test-Path $candidate)) { return ($candidate -replace '/', '\') }
@@ -57,36 +37,22 @@ function Find-RiotClientPath {
     return $RiotClientDefault
 }
 
-function Test-CompanionCandidate([hashtable]$Candidate) {
-    if ($Candidate.Test) { return & $Candidate.Test }
-    return Test-Path $Candidate.Path
-}
-
-function Find-CompanionApp {
-    foreach ($candidate in $CompanionCandidates) {
-        if (Test-CompanionCandidate $candidate) {
-            return [ordered]@{
-                enabled   = $true
-                name      = $candidate.Name
-                path      = $candidate.Path
-                arguments = $candidate.Arguments
-            }
-        }
-    }
-    return [ordered]@{ enabled = $false; name = ''; path = ''; arguments = '' }
+# Ajouter une appli : une entrée dans companion-apps.json (voir README.md).
+# Une appli n'entre dans config.json que si son exécutable de lancement existe ; un catalogue absent ou
+# invalide ne bloque pas la détection des chemins Riot (l'appli compagnon est optionnelle).
+function Get-DetectedCompanionApps {
+    try { $catalog = Read-CompanionCatalog $CompanionCatalogPath }
+    catch { Write-Warning "Applis compagnon ignorées : $($_.Exception.Message)"; return @() }
+    $launchable = @(Get-InstalledCompanionApps $catalog | Where-Object { Test-Path (Expand-CompanionPath $_.App.launch.path) })
+    return @($launchable | ForEach-Object { ConvertTo-LaunchCompanionEntry $_.App })
 }
 
 function New-LaunchConfig {
     return [ordered]@{
         riotClientPath      = Find-RiotClientPath
         productSettingsPath = $ProductSettings
-        companionApp        = Find-CompanionApp
+        companionApps       = @(Get-DetectedCompanionApps)
     }
-}
-
-function Write-LaunchConfig([hashtable]$Config, [string]$Path) {
-    $json = $Config | ConvertTo-Json -Depth 3
-    [System.IO.File]::WriteAllText($Path, $json + "`r`n", (New-Object System.Text.UTF8Encoding($false)))
 }
 
 # ---------------------------------------------------------------- Main
@@ -105,8 +71,8 @@ Write-LaunchConfig $config $OutputPath
 "config.json généré : $OutputPath"
 "  Riot Client        : $($config.riotClientPath)" + $(if (Test-Path $config.riotClientPath) { '' } else { '  [INTROUVABLE]' })
 "  Fichier de langue  : $($config.productSettingsPath)" + $(if (Test-Path $config.productSettingsPath) { '' } else { '  [INTROUVABLE — LoL est-il installé ?]' })
-if ($config.companionApp.enabled) {
-    "  Appli compagnon    : $($config.companionApp.name) ($($config.companionApp.path))"
+if ($config.companionApps.Count -gt 0) {
+    "  Applis compagnon   : $(($config.companionApps | ForEach-Object { $_.name }) -join ', ')"
 } else {
-    "  Appli compagnon    : aucune détectée (Porofessor, Blitz, OP.GG) — désactivée, éditable dans config.json"
+    "  Applis compagnon   : aucune détectée — choix possible à l'étape suivante"
 }
