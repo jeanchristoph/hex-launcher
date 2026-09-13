@@ -11,16 +11,13 @@
     (Wait-WithAnimation, ou Invoke-SplashTick depuis un callback) : un Start-Sleep bloquant fige la barre.
 #>
 
-Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName System.Drawing
+. (Join-Path $PSScriptRoot 'theme.lib.ps1')
 
-$SplashColors = @{ Background = '#0A0E14'; Title = '#C8AA6E'; Text = '#FFFFFF'; Status = '#A09B8C' }
-
-function New-SplashLabel([string]$Text, [System.Drawing.Font]$Font, [string]$ColorHex, [string]$Dock, [int]$Height) {
+function New-SplashLabel([string]$Text, [System.Drawing.Font]$Font, [string]$ColorName, [string]$Dock, [int]$Height) {
     $label           = New-Object System.Windows.Forms.Label
     $label.Text      = $Text
     $label.Font      = $Font
-    $label.ForeColor = [System.Drawing.ColorTranslator]::FromHtml($ColorHex)
+    $label.ForeColor = Get-ThemeColor $ColorName
     $label.AutoSize  = $false
     $label.TextAlign = 'MiddleCenter'
     $label.Dock      = $Dock
@@ -43,13 +40,13 @@ function New-SplashWindow([string]$Subtitle, [string]$Title = 'LEAGUE OF LEGENDS
     $form.FormBorderStyle = 'None'
     $form.StartPosition   = 'CenterScreen'
     $form.Size            = New-Object System.Drawing.Size(420, 170)
-    $form.BackColor       = [System.Drawing.ColorTranslator]::FromHtml($SplashColors.Background)
+    $form.BackColor       = Get-ThemeColor 'Background'
     $form.TopMost         = $true
     $form.ShowInTaskbar   = $false
 
-    $title    = New-SplashLabel $Title    (New-Object System.Drawing.Font('Segoe UI', 16, [System.Drawing.FontStyle]::Bold)) $SplashColors.Title  'Top'  60
-    $subtitle = New-SplashLabel $Subtitle (New-Object System.Drawing.Font('Segoe UI', 12)) $SplashColors.Text   'Top'  30
-    $status   = New-SplashLabel ''        (New-Object System.Drawing.Font('Segoe UI', 9))  $SplashColors.Status 'Fill' 0
+    $title    = New-SplashLabel $Title    (New-ThemeFont 16 'Bold') 'Gold'  'Top'  60
+    $subtitle = New-SplashLabel $Subtitle (New-ThemeFont 12)        'Cream' 'Top'  30
+    $status   = New-SplashLabel ''        (New-ThemeFont 9)         'Muted' 'Fill' 0
 
     # Dock 'Top' empile dans l'ordre inverse d'ajout : on ajoute donc de bas en haut
     $form.Controls.AddRange(@($status, (New-SplashProgressBar), $subtitle, $title))

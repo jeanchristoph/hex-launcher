@@ -1,6 +1,10 @@
-# Hextech Launcher
+# hex-launcher
 
 [English](README.md) · [Français](README.fr.md) · **日本語**
+
+> **Riot Games とは無関係のプロジェクトです。** hex-launcher は Riot Games の[「Legal Jibber Jabber」](https://www.riotgames.com/en/legal)ポリシーのもとで作成されました。Riot Games はこのプロジェクトを支持・後援していません。League of Legends および Riot Games は Riot Games, Inc. の商標または登録商標です。このプロジェクトには Riot の画像素材は含まれず、アイコンはすべてオリジナルです。
+
+**現時点では Windows 専用です**（Windows 10/11、PowerShell 5.1 同梱 — macOS は非対応）。
 
 Windows 向け League of Legends 起動アシスタント：デスクトップのショートカットから、好きな言語（日本語、フランス語など）で
 ゲームを起動します。小さなアニメーション付きスプラッシュを表示し、黒いコンソール画面は出ません。
@@ -24,12 +28,12 @@ Windows 向け League of Legends 起動アシスタント：デスクトップ�
 | `lib/launch-config.lib.ps1` | 共通関数：`config.json` の読み書き、旧形式（単一アプリ）からの移行 |
 | `lib/splash.lib.ps1` | 共通のアニメーション付きスプラッシュ（ゲーム起動、補助アプリのインストール） |
 | `tests/` | Pester テスト（`Invoke-Pester -Path tests`） |
-| `make-flag-icons.ps1` | ツール：Riot のアイコンから `ico/` の国旗アイコンを再生成（通常の使用には不要） |
-| `ico/` | アイコン：Riot のオリジナル＋言語ごとの国旗バージョン（`league-of-legends-xx.ico`） |
+| `make-flag-icons.ps1` | ツール：オリジナルの基本アイコンから `ico/` の国旗アイコンを再生成（通常の使用には不要） |
+| `ico/` | アイコン：オリジナルの基本アイコン（H モノグラム）＋言語ごとの国旗バージョン（`hex-launcher-xx.ico`） |
 
 ## 新しい PC へのインストール
 
-1. このフォルダーを好きな場所にコピーします（例：`Documents\hextech-launcher`）。別の PC から持ってきた場合は、
+1. このフォルダーを好きな場所にコピーします（例：`Documents\hex-launcher`）。別の PC から持ってきた場合は、
    検出が正しく動くように **`config.json` を含めない**でください。
 2. **`install.bat`** をダブルクリックします（「管理者として実行」は不可：ツールは意図的に拒否します）。3 つのステップ：
    - **[1/3] 検出** — Riot Client を検出（Riot 公式のファイル `RiotClientInstalls.json` を使用）し、カタログの補助アプリのうち
@@ -52,7 +56,8 @@ Windows 向け League of Legends 起動アシスタント：デスクトップ�
 
 ## 補助アプリ
 
-複数の補助アプリを共存させられます。各ショートカットはゲームの後にそのうち 1 つだけを起動します。
+複数の補助アプリを共存させられます。各ショートカットはゲームの後にそのうち 1 つだけを起動し、**その前に他のアプリを閉じます**
+（オーバーレイが 2 つ同時だと競合します）— 補助アプリなしのショートカットはすべて閉じます。Porofessor の場合は Overwolf クライアントを閉じることになります。
 「アンインストール」のチェックを入れない限り（または `-UninstallOthers` を渡さない限り）、何もアンインストールされません。
 
 | アプリ | インストール | アンインストール |
@@ -157,8 +162,8 @@ ID：`porofessor`、`blitz`、`opgg`、`mobalytics`、`none`。終了コード�
 Riot が提供するすべての言語が `locales.json` にあり、インストール時に選択できます。ショートカット名は
 `League of Legends XX`（XX = コードの国部分：`ja_JP` → JP、`ko_KR` → KR）で、補助アプリが付く場合は ` - <補助アプリ>` が続きます。
 
-アイコン：`ico/league-of-legends-xx.ico`（xx は小文字）— カタログ内のすべての言語に国旗があります。
-アイコンがない場合は Riot のオリジナルアイコンが使われます。
+アイコン：`ico/hex-launcher-xx.ico`（xx は小文字）— カタログ内のすべての言語に国旗があります。
+アイコンがない場合は基本アイコンが使われます。
 
 カタログにない言語（Riot の新しいロケール）を追加するには：
 1. yaml ファイルの `available_locales` にある正確なコードで `locales.json` に 1 行追加；
@@ -174,7 +179,7 @@ Riot Client の「言語」設定はランチャーの言語を変えるだけ�
 1. Riot Client と LoL クライアントが起動していれば終了する（そうしないと変更が上書きされます）。
 2. `settings.locale` を指定の言語に書き換える（Riot が管理する `default_locale` は変更しません）。
 3. 念のため `--locale=xx_XX` を付けて Riot Client を起動する。
-4. `-Companion` で指定された補助アプリがあれば起動する。
+4. `config.json` の他の補助アプリを閉じてから、`-Companion` で指定された補助アプリがあれば起動する。
 
 ## テスト
 

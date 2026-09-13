@@ -32,9 +32,19 @@ function ConvertTo-CompanionId([string]$Name) {
     return ($Name -replace '[^A-Za-z0-9]', '').ToLowerInvariant()
 }
 
+# Nom de process déduit de l'exécutable (Blitz.exe → Blitz) pour une entrée qui n'en déclare pas
+function Get-LaunchCompanionProcessNames($Entry) {
+    $declared = @($Entry.processNames | Where-Object { $_ })
+    if ($declared.Count -gt 0) { return $declared }
+    if ([string]::IsNullOrWhiteSpace($Entry.path)) { return @() }
+    return @([IO.Path]::GetFileNameWithoutExtension($Entry.path))
+}
+
 function ConvertFrom-LegacyCompanionApp($Legacy) {
     if ($null -eq $Legacy -or -not [bool]$Legacy.enabled -or [string]::IsNullOrWhiteSpace($Legacy.path)) { return @() }
-    return @([pscustomobject]@{ id = ConvertTo-CompanionId $Legacy.name; name = $Legacy.name; path = $Legacy.path; arguments = [string]$Legacy.arguments })
+    $entry = [pscustomobject]@{ id = ConvertTo-CompanionId $Legacy.name; name = $Legacy.name; path = $Legacy.path; arguments = [string]$Legacy.arguments; processNames = @() }
+    $entry.processNames = Get-LaunchCompanionProcessNames $entry
+    return @($entry)
 }
 
 # Liste companionApps, quel que soit le format du fichier ; l'appelant enveloppe dans @() (un tableau vide se déroule au return)
@@ -61,9 +71,20 @@ function Find-LaunchCompanion($Config, [string]$Id) {
     return @($Config.companionApps) | Where-Object { $_.id -eq $Id } | Select-Object -First 1
 }
 
-# Deux listes companionApps décrivent la même chose si mêmes id, chemins et arguments dans le même ordre
+# BUSINESS_RULE : une seule appli compagnon active pendant la partie — process de toutes les applis
+# de config.json sauf celle demandée (toutes, si aucune n'est demandée)
+function Get-OtherCompanionProcessNames($Config, [string]$KeepId) {
+    $others = @($Config.companionApps | Where-Object { $_.id -ne $KeepId })
+    return @($others | ForEach-Object { Get-LaunchCompanionProcessNames $_ } | Select-Object -Unique)
+}
+
+function ConvertTo-LaunchCompanionKey($Entry) {
+    return "$($Entry.id)|$($Entry.path)|$($Entry.arguments)|$((Get-LaunchCompanionProcessNames $Entry) -join ',')"
+}
+
+# Deux listes companionApps décrivent la même chose si mêmes id, chemins, arguments et process dans le même ordre
 function Test-LaunchCompanionAppsEqual([object[]]$Left, [object[]]$Right) {
-    $left  = @($Left  | ForEach-Object { "$($_.id)|$($_.path)|$($_.arguments)" })
-    $right = @($Right | ForEach-Object { "$($_.id)|$($_.path)|$($_.arguments)" })
+    $left  = @($Left  | ForEach-Object { ConvertTo-LaunchCompanionKey $_ })
+    $right = @($Right | ForEach-Object { ConvertTo-LaunchCompanionKey $_ })
     return (($left -join "`n") -eq ($right -join "`n"))
 }

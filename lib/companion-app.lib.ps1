@@ -190,12 +190,14 @@ function Test-CompanionBinaryTrusted([string]$FilePath, $Signer) {
 
 # ---------------------------------------------------------------- Entrée companionApps de config.json
 
-# Entrée de la liste companionApps de config.json — lue par launch-lol.ps1 (-Companion <id>) et create-shortcuts.ps1
+# Entrée de la liste companionApps de config.json — lue par launch-lol.ps1 (-Companion <id>) et create-shortcuts.ps1.
+# processNames sert au lanceur à fermer les autres applis compagnon avant la partie.
 function ConvertTo-LaunchCompanionEntry($App) {
     return [ordered]@{
-        id        = $App.id
-        name      = $App.name
-        path      = Expand-CompanionPath $App.launch.path
-        arguments = [string]$App.launch.arguments
+        id           = $App.id
+        name         = $App.name
+        path         = Expand-CompanionPath $App.launch.path
+        arguments    = [string]$App.launch.arguments
+        processNames = @($App.processNames | Where-Object { $_ })
     }
 }

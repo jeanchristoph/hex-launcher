@@ -56,14 +56,16 @@ $DownloadTimeoutSeconds     = 900
 $WingetFailureProbeSeconds  = 10
 $WingetArguments            = '--exact --silent --source winget --accept-package-agreements --accept-source-agreements --disable-interactivity'
 
-# Splash affiché pendant les actions (null en dehors) ; SplashTick = une seconde d'attente qui entretient sa barre
+# Splash affiché pendant les actions (null en dehors) ; SplashTick = une seconde d'attente qui entretient sa barre.
+# CompanionUi : un hôte (install.ps1) peut recevoir les étapes (OnStep) et supprimer le splash (UseSplash)
 $script:CompanionSplash = $null
+$script:CompanionUi     = @{ OnStep = $null; UseSplash = $true }
 $SplashTick = { Wait-WithAnimation 1 }
 
-# Étape en cours : console + ligne de statut du splash
+# Étape en cours : console + hôte ou ligne de statut du splash
 function Write-CompanionStep([string]$Text) {
     Write-Host "  $Text"
-    Update-SplashStatus $script:CompanionSplash $Text
+    if ($script:CompanionUi.OnStep) { & $script:CompanionUi.OnStep $Text } else { Update-SplashStatus $script:CompanionSplash $Text }
 }
 
 # ---------------------------------------------------------------- Garde
@@ -395,7 +397,7 @@ function Write-CompanionConfig($Config, [string]$Path, [object[]]$SelectedApps) 
 
 # Retourne @{ UninstallFailed = [noms]; InstallFailed = [noms] } ; aucune installation si une désinstallation a échoué
 function Invoke-CompanionActions($Actions) {
-    $script:CompanionSplash = New-SplashWindow -Subtitle 'Applications compagnon'
+    $script:CompanionSplash = if ($script:CompanionUi.UseSplash) { New-SplashWindow -Subtitle 'Applications compagnon' } else { $null }
     $result = @{ UninstallFailed = @(); InstallFailed = @() }
     try {
         foreach ($item in $Actions.Uninstall) {

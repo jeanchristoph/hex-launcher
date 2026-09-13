@@ -1,41 +1,72 @@
 ﻿<#
 .SYNOPSIS
-    Génère ico\league-of-legends-xx.ico pour chaque langue de locales.json : icône LoL avec le drapeau en fond.
+    Génère le jeu d'icônes original hex-launcher : ico\hex-launcher.ico (base) et ico\hex-launcher-xx.ico (une par langue de locales.json).
 
 .DESCRIPTION
-    Part de l'icône officielle Riot (256 px), remplace les pixels à dominante bleue du fond par un
-    drapeau simplifié (lisible à 32 px), garde le L et l'anneau dorés, puis écrit un .ico multi-tailles.
+    Tout est dessiné par code GDI+, sans image source. La base est un carré aux quatre coins biseautés,
+    fond bleu nuit en léger dégradé, liseré or sombre doublé d'un fin liseré or, et un H monogramme
+    géométrique or au centre (montants évasés en biseaux droits). Les variantes langue composent un
+    drapeau simplifié dans la zone intérieure (entre les liserés), sous le H.
 
-    Le drapeau est composé dans la zone du fond réellement visible (entre le bord droit du L et le
-    bord droit du cercle intérieur) ; les couleurs de bord sont prolongées jusqu'aux bords de l'image.
+    Chaque taille du .ico (256, 128, 64, 48, 32, 16) est dessinée nativement, avec des traits
+    légèrement épaissis à 32 et 16 px pour rester lisibles.
 
 .EXAMPLE
     powershell -NoProfile -ExecutionPolicy Bypass -File make-flag-icons.ps1
+    powershell -NoProfile -ExecutionPolicy Bypass -File make-flag-icons.ps1 -Base
     powershell -NoProfile -ExecutionPolicy Bypass -File make-flag-icons.ps1 -Locales ja_JP,ko_KR -PreviewDir C:\tmp
 #>
 param(
-    # Codes à générer (défaut : tous ceux de locales.json)
+    # Codes à générer (défaut : tous ceux de locales.json ; aucun si -Base est donné seul)
     [string[]]$Locales,
 
-    # Si fourni, écrit aussi un PNG 256 px par drapeau dans ce dossier (pour contrôle visuel)
+    # Si fourni, écrit aussi un PNG 256 px par icône dans ce dossier (pour contrôle visuel)
     [string]$PreviewDir,
 
-    [string]$SourceIco = (Join-Path $env:ProgramData 'Riot Games\Metadata\league_of_legends.live\league_of_legends.live.ico')
+    # Génère l'icône de base hex-launcher.ico (implicite sans -Locales)
+    [switch]$Base
 )
 
 Add-Type -AssemblyName System.Drawing
 
-$folder     = $PSScriptRoot
-$icoFolder  = Join-Path $folder 'ico'
-$IconSizes  = @(256, 128, 64, 48, 32, 16)
+$folder       = $PSScriptRoot
+$icoFolder    = Join-Path $folder 'ico'
+$IconSizes    = @(256, 128, 64, 48, 32, 16)
+$BaseIconName = 'hex-launcher'
 
-# Zone du fond visible, en fraction de la taille (mesurée sur l'icône Riot)
-$Visible = @{ Left = 0.453; Right = 0.844; Top = 0.18; Bottom = 0.80 }
+$Palette = @{
+    Night     = '#0A0E14'
+    NightTop  = '#0F1620'
+    GoldDark  = '#785A28'
+    Gold      = '#C8AA6E'
+}
+
+# Géométrie de la base, en fraction du côté de l'icône
+$Shape = @{
+    Bevel        = 0.18    # coin coupé, mesuré le long du bord
+    Border       = 0.04    # liseré or sombre
+    InnerBorder  = 0.015   # fin liseré or, à l'intérieur du précédent
+    HHeight      = 0.52    # hauteur du H
+    HWidth       = 0.48    # largeur du H, évasements compris
+    Stem         = 0.105   # largeur d'un montant
+    Bar          = 0.085   # hauteur de la barre centrale
+    Flare        = 0.03    # débord de l'évasement de chaque côté du montant
+    FlareHeight  = 0.045   # hauteur sur laquelle le montant s'évase
+    VeilAlpha    = 46      # voile bleu nuit sur le drapeau (0-255) pour garder le H lisible sur les fonds clairs
+}
 
 # ---------------------------------------------------------------- Primitives de dessin
 
+function Get-Color([string]$Hex) {
+    return [System.Drawing.ColorTranslator]::FromHtml($Hex)
+}
+
 function Get-Brush([string]$Hex) {
-    return New-Object System.Drawing.SolidBrush([System.Drawing.ColorTranslator]::FromHtml($Hex))
+    return New-Object System.Drawing.SolidBrush((Get-Color $Hex))
+}
+
+function New-PointArray([object[]]$Pairs) {
+    return [System.Drawing.PointF[]]($Pairs | ForEach-Object { New-Object System.Drawing.PointF([float]$_[0], [float]$_[1]) })
 }
 
 # Bandes horizontales réparties dans la zone visible ; première et dernière prolongées aux bords
@@ -84,7 +115,7 @@ function Draw-Star($G, [string]$Color, [double]$Cx, [double]$Cy, [double]$Outer,
 }
 
 function Draw-Line($G, [string]$Color, [double]$Width, [double]$X1, [double]$Y1, [double]$X2, [double]$Y2) {
-    $pen = New-Object System.Drawing.Pen([System.Drawing.ColorTranslator]::FromHtml($Color), [float]$Width)
+    $pen = New-Object System.Drawing.Pen((Get-Color $Color), [float]$Width)
     $G.DrawLine($pen, [float]$X1, [float]$Y1, [float]$X2, [float]$Y2)
     $pen.Dispose()
 }
@@ -108,17 +139,15 @@ function Draw-Crescent($G, [string]$Color, [string]$Background, [double]$Cx, [do
 }
 
 # ---------------------------------------------------------------- Drapeaux (simplifiés)
-# Chaque scriptblock reçoit $G (Graphics) et $R (zone visible : Left/Right/Top/Bottom/Width/Height/Cx/Cy/Size)
+# Chaque scriptblock reçoit $G (Graphics) et $R (zone intérieure : Left/Right/Top/Bottom/Width/Height/Cx/Cy/Size).
+# Le tracé déborde librement : il est ensuite découpé à l'octogone intérieur de la base.
 
 $FlagDrawings = @{
     'ja_JP' = { param($G, $R)
         $G.Clear([System.Drawing.Color]::White)
         Draw-Disc $G '#BC002D' $R.Cx $R.Cy ($R.Width * 0.75)
     }
-    'fr_FR' = { param($G, $R)
-        # Bleu réduit : le biseau du L le fait paraître plus large
-        Draw-VerticalStripes $G $R @('#0055A4', '#FFFFFF', '#EF4135') @(0.75, 1.125, 1.125)
-    }
+    'fr_FR' = { param($G, $R) Draw-VerticalStripes $G $R @('#0055A4', '#FFFFFF', '#EF4135') }
     'en_US' = { param($G, $R)
         $stripes = @(); for ($i = 0; $i -lt 9; $i++) { $stripes += if ($i % 2 -eq 0) { '#B22234' } else { '#FFFFFF' } }
         Draw-HorizontalStripes $G $R $stripes
@@ -129,11 +158,11 @@ $FlagDrawings = @{
         } }
     }
     'en_GB' = { param($G, $R)
-        # Centré sur la zone visible, tracé sur toute l'image
+        # Centré sur la zone intérieure, tracé sur toute l'image
         Draw-UnionJack $G ($R.Cx - $R.Size) ($R.Cy - $R.Size) ($R.Size * 2) ($R.Size * 2)
     }
     'en_AU' = { param($G, $R)
-        $G.Clear([System.Drawing.ColorTranslator]::FromHtml('#012169'))
+        $G.Clear((Get-Color '#012169'))
         $cantonW = $R.Width * 0.55; $cantonH = $R.Height * 0.4
         Draw-UnionJack $G 0 0 ($R.Left + $cantonW) ($R.Top + $cantonH)
         $star = $R.Width * 0.09
@@ -153,11 +182,7 @@ $FlagDrawings = @{
     'en_PH' = { param($G, $R)
         Draw-HorizontalStripes $G $R @('#0038A8', '#CE1126')
         $apex = $R.Left + $R.Width * 0.55
-        $triangle = [System.Drawing.PointF[]]@(
-            (New-Object System.Drawing.PointF(0, 0)),
-            (New-Object System.Drawing.PointF([float]$apex, [float]$R.Cy)),
-            (New-Object System.Drawing.PointF(0, [float]$R.Size)))
-        $G.FillPolygon([System.Drawing.Brushes]::White, $triangle)
+        $G.FillPolygon([System.Drawing.Brushes]::White, (New-PointArray @(@(0, 0), @($apex, $R.Cy), @(0, $R.Size))))
         $sunCx = $R.Left + $R.Width * 0.18; $sunD = $R.Width * 0.24
         for ($i = 0; $i -lt 8; $i++) {
             $a = $i * [Math]::PI / 4
@@ -193,26 +218,22 @@ $FlagDrawings = @{
     'it_IT' = { param($G, $R) Draw-VerticalStripes $G $R @('#009246', '#FFFFFF', '#CE2B37') }
     'pl_PL' = { param($G, $R) Draw-HorizontalStripes $G $R @('#FFFFFF', '#DC143C') }
     'pt_BR' = { param($G, $R)
-        $G.Clear([System.Drawing.ColorTranslator]::FromHtml('#009C3B'))
+        $G.Clear((Get-Color '#009C3B'))
         $rw = $R.Width * 0.85; $rh = $R.Height * 0.55
-        $rhombus = [System.Drawing.PointF[]]@(
-            (New-Object System.Drawing.PointF([float]$R.Cx, [float]($R.Cy - $rh / 2))),
-            (New-Object System.Drawing.PointF([float]($R.Cx + $rw / 2), [float]$R.Cy)),
-            (New-Object System.Drawing.PointF([float]$R.Cx, [float]($R.Cy + $rh / 2))),
-            (New-Object System.Drawing.PointF([float]($R.Cx - $rw / 2), [float]$R.Cy)))
+        $rhombus = New-PointArray @(@($R.Cx, ($R.Cy - $rh / 2)), @(($R.Cx + $rw / 2), $R.Cy), @($R.Cx, ($R.Cy + $rh / 2)), @(($R.Cx - $rw / 2), $R.Cy))
         $G.FillPolygon((Get-Brush '#FFDF00'), $rhombus)
         Draw-Disc $G '#002776' $R.Cx $R.Cy ($rh * 0.62)
     }
     'ru_RU' = { param($G, $R) Draw-HorizontalStripes $G $R @('#FFFFFF', '#0039A6', '#D52B1E') }
     'tr_TR' = { param($G, $R)
-        $G.Clear([System.Drawing.ColorTranslator]::FromHtml('#E30A17'))
+        $G.Clear((Get-Color '#E30A17'))
         $d = $R.Width * 0.6; $cx = $R.Cx - $R.Width * 0.12
         Draw-Disc $G '#FFFFFF' $cx $R.Cy $d
         Draw-Disc $G '#E30A17' ($cx + $d * 0.2) $R.Cy ($d * 0.8)
         Draw-Star $G '#FFFFFF' ($cx + $d * 0.62) $R.Cy ($d * 0.22)
     }
     'zh_TW' = { param($G, $R)
-        $G.Clear([System.Drawing.ColorTranslator]::FromHtml('#FE0000'))
+        $G.Clear((Get-Color '#FE0000'))
         $cantonRight = $R.Left + $R.Width * 0.6; $cantonBottom = $R.Top + $R.Height * 0.5
         $G.FillRectangle((Get-Brush '#000095'), 0, 0, [float]$cantonRight, [float]$cantonBottom)
         $sunCx = ($R.Left + $cantonRight) / 2; $sunCy = ($R.Top + $cantonBottom) / 2; $sunD = $R.Width * 0.3
@@ -224,11 +245,7 @@ $FlagDrawings = @{
     }
     'cs_CZ' = { param($G, $R)
         Draw-HorizontalStripes $G $R @('#FFFFFF', '#D7141A')
-        $triangle = [System.Drawing.PointF[]]@(
-            (New-Object System.Drawing.PointF(0, 0)),
-            (New-Object System.Drawing.PointF([float]($R.Left + $R.Width * 0.5), [float]$R.Cy)),
-            (New-Object System.Drawing.PointF(0, [float]$R.Size)))
-        $G.FillPolygon((Get-Brush '#11457E'), $triangle)
+        $G.FillPolygon((Get-Brush '#11457E'), (New-PointArray @(@(0, 0), @(($R.Left + $R.Width * 0.5), $R.Cy), @(0, $R.Size))))
     }
     'el_GR' = { param($G, $R)
         $stripes = @(); for ($i = 0; $i -lt 9; $i++) { $stripes += if ($i % 2 -eq 0) { '#0D5EAF' } else { '#FFFFFF' } }
@@ -243,7 +260,7 @@ $FlagDrawings = @{
     'ro_RO' = { param($G, $R) Draw-VerticalStripes $G $R @('#002B7F', '#FCD116', '#CE1126') }
     'th_TH' = { param($G, $R) Draw-HorizontalStripes $G $R @('#A51931', '#FFFFFF', '#2D2A4A', '#FFFFFF', '#A51931') @(1, 1, 2, 1, 1) }
     'vi_VN' = { param($G, $R)
-        $G.Clear([System.Drawing.ColorTranslator]::FromHtml('#DA251D'))
+        $G.Clear((Get-Color '#DA251D'))
         Draw-Star $G '#FFFF00' $R.Cx $R.Cy ($R.Width * 0.38)
     }
     'ar_AE' = { param($G, $R)
@@ -252,112 +269,174 @@ $FlagDrawings = @{
     }
 }
 
-# ---------------------------------------------------------------- Composition
+# ---------------------------------------------------------------- Base : géométrie
 
-# Lecture de l'entrée 256px du .ico (DIB 32bpp, lignes du bas vers le haut) — GDI+ plafonne à 128px sinon
-function Read-IcoEntry256([string]$Path) {
-    $bytes = [IO.File]::ReadAllBytes($Path)
-    $count = [BitConverter]::ToUInt16($bytes, 4)
-    for ($i = 0; $i -lt $count; $i++) {
-        $entry = 6 + $i * 16
-        if ($bytes[$entry] -ne 0) { continue }   # 0 = 256px
-        $offset = [BitConverter]::ToUInt32($bytes, $entry + 12)
-        $width  = [BitConverter]::ToInt32($bytes, $offset + 4)
-        $height = [BitConverter]::ToInt32($bytes, $offset + 8) / 2
-        $bmp    = New-Object System.Drawing.Bitmap($width, $height, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
-        $rect   = New-Object System.Drawing.Rectangle(0, 0, $width, $height)
-        $data   = $bmp.LockBits($rect, [System.Drawing.Imaging.ImageLockMode]::WriteOnly, $bmp.PixelFormat)
-        $stride = $width * 4
-        for ($y = 0; $y -lt $height; $y++) {
-            $srcRow = $offset + 40 + ($height - 1 - $y) * $stride
-            [System.Runtime.InteropServices.Marshal]::Copy($bytes, $srcRow, [IntPtr]::Add($data.Scan0, $y * $data.Stride), $stride)
-        }
-        $bmp.UnlockBits($data)
-        return $bmp
+# Traits du H épaissis aux petites tailles, sinon ils disparaissent dans l'anticrénelage
+function Get-StrokeFactor([int]$Size) {
+    switch ($Size) {
+        16      { return 1.4 }
+        32      { return 1.15 }
+        default { return 1.0 }
     }
-    throw "Pas d'entrée 256px dans $Path"
 }
 
-function New-VisibleRegion([int]$Size) {
-    $left = $Size * $Visible.Left; $right = $Size * $Visible.Right
-    $top  = $Size * $Visible.Top;  $bottom = $Size * $Visible.Bottom
+# Épaisseurs en pixels entiers (bords nets) ; les liserés gardent au moins 1 px
+function Get-BaseMetrics([int]$Size) {
+    $border      = [Math]::Max(1, [Math]::Round($Size * $Shape.Border))
+    $innerBorder = [Math]::Max(1, [Math]::Round($Size * $Shape.InnerBorder))
     return @{
-        Left = $left; Right = $right; Top = $top; Bottom = $bottom
-        Width = $right - $left; Height = $bottom - $top
-        Cx = ($left + $right) / 2; Cy = ($top + $bottom) / 2
+        Bevel       = [Math]::Round($Size * $Shape.Bevel)
+        Border      = $border
+        InnerBorder = $innerBorder
+        Inset       = $border + $innerBorder
+        Shadow      = [Math]::Max(1, [Math]::Round($Size / 128))
+    }
+}
+
+# Carré aux coins coupés, rétréci de $Inset par rapport au bord de l'icône (les diagonales reculent de Inset·√2)
+function New-OctagonPath([int]$Size, [double]$Inset, [double]$Bevel) {
+    $cut = $Bevel + $Inset * ([Math]::Sqrt(2) - 1)
+    $a = $Inset; $b = $Size - $Inset
+    $path = New-Object System.Drawing.Drawing2D.GraphicsPath
+    $path.AddPolygon((New-PointArray @(
+        @(($a + $cut), $a), @(($b - $cut), $a), @($b, ($a + $cut)), @($b, ($b - $cut)),
+        @(($b - $cut), $b), @(($a + $cut), $b), @($a, ($b - $cut)), @($a, ($a + $cut)))))
+    return $path
+}
+
+# Zone intérieure (entre les liserés) transmise aux dessins de drapeaux
+function New-InnerRegion([int]$Size, [int]$Inset) {
+    return @{
+        Left = $Inset; Right = $Size - $Inset; Top = $Inset; Bottom = $Size - $Inset
+        Width = $Size - 2 * $Inset; Height = $Size - 2 * $Inset
+        Cx = $Size / 2; Cy = $Size / 2
         Size = $Size
     }
 }
 
-function New-FlagBitmap([scriptblock]$Drawing, [int]$Size) {
+# Dimensions du H, centrées sur l'icône et arrondies au pixel pour rester symétriques et nettes
+function Get-MonogramMetrics([int]$Size) {
+    $factor = Get-StrokeFactor $Size
+    $center = $Size / 2
+    $halfHeight = [Math]::Round($Size * $Shape.HHeight / 2)
+    $halfWidth  = [Math]::Round($Size * $Shape.HWidth / 2)
+    $stem  = [Math]::Max(1, [Math]::Round($Size * $Shape.Stem * $factor))
+    $bar   = [Math]::Max(1, [Math]::Round($Size * $Shape.Bar * $factor))
+    $flare = [Math]::Round($Size * $Shape.Flare)
+    return @{
+        Top         = $center - $halfHeight
+        Height      = 2 * $halfHeight
+        LeftStem    = $center - $halfWidth + $flare
+        RightStem   = $center + $halfWidth - $flare - $stem
+        Stem        = $stem
+        BarTop      = $center - [Math]::Round($bar / 2)
+        Bar         = $bar
+        Flare       = $flare
+        FlareHeight = [Math]::Round($Size * $Shape.FlareHeight)
+    }
+}
+
+# Montant vertical évasé en biseaux droits en haut et en bas
+function Get-StemPoints([double]$Left, [double]$Top, [double]$Width, [double]$Height, [double]$Flare, [double]$FlareHeight) {
+    $right = $Left + $Width; $bottom = $Top + $Height
+    return New-PointArray @(
+        @(($Left - $Flare), $Top), @(($right + $Flare), $Top), @($right, ($Top + $FlareHeight)),
+        @($right, ($bottom - $FlareHeight)), @(($right + $Flare), $bottom), @(($Left - $Flare), $bottom),
+        @($Left, ($bottom - $FlareHeight)), @($Left, ($Top + $FlareHeight)))
+}
+
+# ---------------------------------------------------------------- Base : dessin
+
+function New-BackgroundBrush([int]$Size) {
+    $brush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
+        (New-Object System.Drawing.Point(0, 0)), (New-Object System.Drawing.Point(0, $Size)),
+        (Get-Color $Palette.NightTop), (Get-Color $Palette.Night))
+    $brush.WrapMode = 'TileFlipXY'   # évite la ligne parasite de la dernière rangée
+    return $brush
+}
+
+# Liseré or sombre, fin liseré or, puis fond nuit dégradé
+function Draw-BaseFrame($G, [int]$Size, $M) {
+    $G.FillPath((Get-Brush $Palette.GoldDark), (New-OctagonPath $Size 0 $M.Bevel))
+    $G.FillPath((Get-Brush $Palette.Gold), (New-OctagonPath $Size $M.Border $M.Bevel))
+    $G.FillPath((New-BackgroundBrush $Size), (New-OctagonPath $Size $M.Inset $M.Bevel))
+}
+
+function New-FlagBitmap([scriptblock]$Drawing, [int]$Size, $Region) {
     $bmp = New-Object System.Drawing.Bitmap($Size, $Size, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
     $g = [System.Drawing.Graphics]::FromImage($bmp)
     $g.SmoothingMode = 'AntiAlias'
-    & $Drawing $g (New-VisibleRegion $Size)
+    & $Drawing $g $Region
     $g.Dispose()
     return $bmp
 }
 
-function Get-Pixels([System.Drawing.Bitmap]$Bmp) {
-    $rect = New-Object System.Drawing.Rectangle(0, 0, $Bmp.Width, $Bmp.Height)
-    $data = $Bmp.LockBits($rect, [System.Drawing.Imaging.ImageLockMode]::ReadOnly, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
-    $buffer = New-Object byte[] ($data.Stride * $Bmp.Height)
-    [System.Runtime.InteropServices.Marshal]::Copy($data.Scan0, $buffer, 0, $buffer.Length)
-    $Bmp.UnlockBits($data)
-    return $buffer
+# Drapeau découpé à l'octogone intérieur (remplissage par texture : bords anticrénelés), puis voilé de bleu nuit
+function Draw-FlagLayer($G, [int]$Size, $M, [scriptblock]$Drawing) {
+    $flag    = New-FlagBitmap $Drawing $Size (New-InnerRegion $Size $M.Inset)
+    $texture = New-Object System.Drawing.TextureBrush($flag)
+    $texture.WrapMode = 'Clamp'
+    $inner = New-OctagonPath $Size $M.Inset $M.Bevel
+    $G.FillPath($texture, $inner)
+    $veil = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb($Shape.VeilAlpha, (Get-Color $Palette.Night)))
+    $G.FillPath($veil, $inner)
+    $texture.Dispose(); $flag.Dispose(); $veil.Dispose()
 }
 
-function Set-Pixels([System.Drawing.Bitmap]$Bmp, [byte[]]$Buffer) {
-    $rect = New-Object System.Drawing.Rectangle(0, 0, $Bmp.Width, $Bmp.Height)
-    $data = $Bmp.LockBits($rect, [System.Drawing.Imaging.ImageLockMode]::WriteOnly, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
-    [System.Runtime.InteropServices.Marshal]::Copy($Buffer, 0, $data.Scan0, $Buffer.Length)
-    $Bmp.UnlockBits($data)
+# Deux montants évasés + barre centrale (la barre chevauche les montants : aucune couture d'anticrénelage)
+function New-MonogramPath($H, [int]$Offset) {
+    $path = New-Object System.Drawing.Drawing2D.GraphicsPath
+    $path.FillMode = 'Winding'   # sinon le chevauchement barre/montants devient un trou
+    $path.AddPolygon((Get-StemPoints ($H.LeftStem + $Offset)  ($H.Top + $Offset) $H.Stem $H.Height $H.Flare $H.FlareHeight))
+    $path.AddPolygon((Get-StemPoints ($H.RightStem + $Offset) ($H.Top + $Offset) $H.Stem $H.Height $H.Flare $H.FlareHeight))
+    $path.AddRectangle((New-Object System.Drawing.RectangleF([float]($H.LeftStem + $Offset), [float]($H.BarTop + $Offset), [float]($H.RightStem + $H.Stem - $H.LeftStem), [float]$H.Bar)))
+    return $path
 }
 
-# Le fond LoL est bleu-turquoise (B > R), le L et l'anneau sont dorés (R > B).
-# On remplace les pixels à dominante bleue par le drapeau, avec un fondu sur la frontière
-# et un peu du relief d'origine pour ne pas avoir un aplat mort.
-function Merge-FlagIntoBackground([System.Drawing.Bitmap]$Base, [System.Drawing.Bitmap]$FlagBmp) {
-    $src  = Get-Pixels $Base
-    $flag = Get-Pixels $FlagBmp
-    $out  = New-Object byte[] $src.Length
-    for ($i = 0; $i -lt $src.Length; $i += 4) {
-        $b = $src[$i]; $gr = $src[$i + 1]; $r = $src[$i + 2]; $a = $src[$i + 3]
-        if ($a -eq 0) { continue }
-        $t = ($b - $r - 5) / 30.0
-        if ($t -lt 0) { $t = 0 } elseif ($t -gt 1) { $t = 1 }
-        $lum   = (0.299 * $r + 0.587 * $gr + 0.114 * $b) / 255.0
-        $shade = [Math]::Min(1.05, 0.8 + 0.35 * $lum)
-        $out[$i]     = [byte][Math]::Min(255, $b  * (1 - $t) + $flag[$i]     * $shade * $t)
-        $out[$i + 1] = [byte][Math]::Min(255, $gr * (1 - $t) + $flag[$i + 1] * $shade * $t)
-        $out[$i + 2] = [byte][Math]::Min(255, $r  * (1 - $t) + $flag[$i + 2] * $shade * $t)
-        $out[$i + 3] = $a
-    }
-    $result = New-Object System.Drawing.Bitmap($Base.Width, $Base.Height, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
-    Set-Pixels $result $out
-    return $result
+# H or, ombre portée bleu nuit décalée d'un pixel (deux à 256 px) et fin liseré bleu nuit : relief sur le fond,
+# contraste sur les drapeaux clairs. Le remplissage or final recouvre la moitié intérieure du liseré.
+function Draw-MonogramWithShadow($G, [int]$Size, $M) {
+    $h = Get-MonogramMetrics $Size
+    $G.FillPath((Get-Brush $Palette.Night), (New-MonogramPath $h $M.Shadow))
+    $path = New-MonogramPath $h 0
+    $pen  = New-Object System.Drawing.Pen((Get-Color $Palette.Night), [float](2 * $M.Shadow))
+    $G.DrawPath($pen, $path)
+    $G.FillPath((Get-Brush $Palette.Gold), $path)
+    $pen.Dispose()
 }
 
-function Resize-Bitmap([System.Drawing.Bitmap]$Bmp, [int]$Size) {
-    $r = New-Object System.Drawing.Bitmap($Size, $Size, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
-    $g = [System.Drawing.Graphics]::FromImage($r)
+# Icône complète à la taille demandée ; $FlagDrawing $null = base seule
+function New-BaseIconBitmap([int]$Size, $FlagDrawing) {
+    $metrics = Get-BaseMetrics $Size
+    $bmp = New-Object System.Drawing.Bitmap($Size, $Size, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+    $g = [System.Drawing.Graphics]::FromImage($bmp)
+    $g.SmoothingMode     = 'AntiAlias'
     $g.InterpolationMode = 'HighQualityBicubic'
-    $g.SmoothingMode     = 'HighQuality'
-    $g.PixelOffsetMode   = 'HighQuality'
-    $g.DrawImage($Bmp, 0, 0, $Size, $Size)
+    Draw-BaseFrame $g $Size $metrics
+    if ($FlagDrawing) { Draw-FlagLayer $g $Size $metrics $FlagDrawing }
+    Draw-MonogramWithShadow $g $Size $metrics
     $g.Dispose()
-    return $r
+    return $bmp
+}
+
+# ---------------------------------------------------------------- Fichier .ico
+
+function ConvertTo-PngBytes([System.Drawing.Bitmap]$Bmp) {
+    $ms = New-Object IO.MemoryStream
+    $Bmp.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png)
+    return , $ms.ToArray()   # la virgule évite que le pipeline déroule le byte[]
+}
+
+# Une entrée par taille, chacune dessinée nativement
+function New-IconEntries($FlagDrawing) {
+    return @(foreach ($size in $IconSizes) {
+        [PSCustomObject]@{ Size = $size; Bitmap = (New-BaseIconBitmap $size $FlagDrawing) }
+    })
 }
 
 # .ico à entrées PNG (supporté depuis Vista) : en-tête 6 o + 16 o par entrée, puis les données
-function Write-Ico([System.Drawing.Bitmap]$Master, [int[]]$Sizes, [string]$Path) {
-    $pngs = foreach ($s in $Sizes) {
-        $ms = New-Object IO.MemoryStream
-        $resized = Resize-Bitmap $Master $s
-        $resized.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png)
-        $resized.Dispose()
-        [PSCustomObject]@{ Size = $s; Bytes = $ms.ToArray() }
-    }
+function Write-Ico([object[]]$Entries, [string]$Path) {
+    $pngs = @($Entries | ForEach-Object { [PSCustomObject]@{ Size = $_.Size; Bytes = (ConvertTo-PngBytes $_.Bitmap) } })
     $stream = [IO.File]::Create($Path)
     $w = New-Object IO.BinaryWriter($stream)
     $w.Write([uint16]0); $w.Write([uint16]1); $w.Write([uint16]$pngs.Count)
@@ -373,33 +452,45 @@ function Write-Ico([System.Drawing.Bitmap]$Master, [int[]]$Sizes, [string]$Path)
     $w.Dispose(); $stream.Dispose()
 }
 
-# ja_JP → league-of-legends-jp.ico (même convention que create-shortcuts.ps1)
+# ja_JP → hex-launcher-jp.ico (même convention que create-shortcuts.ps1)
 function Get-IconFileName([string]$Code) {
-    return "league-of-legends-$($Code.Split('_')[1].ToLower()).ico"
+    return "$BaseIconName-$($Code.Split('_')[1].ToLower()).ico"
+}
+
+function Export-Preview([object[]]$Entries, [string]$IconFileName) {
+    $largest = $Entries | Sort-Object Size -Descending | Select-Object -First 1
+    $largest.Bitmap.Save((Join-Path $PreviewDir ([IO.Path]::ChangeExtension($IconFileName, 'png'))), [System.Drawing.Imaging.ImageFormat]::Png)
+}
+
+function Export-Icon($FlagDrawing, [string]$IconFileName) {
+    $entries = New-IconEntries $FlagDrawing
+    $target  = Join-Path $icoFolder $IconFileName
+    Write-Ico $entries $target
+    if ($PreviewDir) { Export-Preview $entries $IconFileName }
+    $entries | ForEach-Object { $_.Bitmap.Dispose() }
+    return $target
 }
 
 # ---------------------------------------------------------------- Main
 
-if (-not $Locales) {
+function Read-LocaleCodes {
     # ForEach-Object déplie le tableau que ConvertFrom-Json (PS 5.1) renvoie comme un seul objet
-    $Locales = @(Get-Content (Join-Path $folder 'locales.json') -Raw -Encoding UTF8 | ConvertFrom-Json | ForEach-Object { $_ } | ForEach-Object { $_.code })
+    return @(Get-Content (Join-Path $folder 'locales.json') -Raw -Encoding UTF8 | ConvertFrom-Json | ForEach-Object { $_ } | ForEach-Object { $_.code })
 }
-$Locales = @($Locales | ForEach-Object { $_ -split '[,;\s]+' } | Where-Object { $_ })
 
-$missing = @($Locales | Where-Object { -not $FlagDrawings.ContainsKey($_) })
+$codes = if ($Locales) { @($Locales | ForEach-Object { $_ -split '[,;\s]+' } | Where-Object { $_ }) }
+         elseif ($Base) { @() }
+         else { Read-LocaleCodes }
+
+$missing = @($codes | Where-Object { -not $FlagDrawings.ContainsKey($_) })
 if ($missing.Count -gt 0) { throw "Pas de dessin de drapeau pour : $($missing -join ', ') — ajouter une entrée dans `$FlagDrawings" }
 
 New-Item -ItemType Directory -Force $icoFolder | Out-Null
 if ($PreviewDir) { New-Item -ItemType Directory -Force $PreviewDir | Out-Null }
 
-$base = Read-IcoEntry256 $SourceIco
-foreach ($code in $Locales) {
-    $flagBmp = New-FlagBitmap $FlagDrawings[$code] $base.Width
-    $merged  = Merge-FlagIntoBackground $base $flagBmp
-    $target  = Join-Path $icoFolder (Get-IconFileName $code)
-    Write-Ico $merged $IconSizes $target
-    if ($PreviewDir) { $merged.Save((Join-Path $PreviewDir "$code.png"), [System.Drawing.Imaging.ImageFormat]::Png) }
-    $flagBmp.Dispose(); $merged.Dispose()
-    "OK : $code → $target"
+if ($Base -or -not $Locales) {
+    "OK : base → $(Export-Icon $null "$BaseIconName.ico")"
 }
-$base.Dispose()
+foreach ($code in $codes) {
+    "OK : $code → $(Export-Icon $FlagDrawings[$code] (Get-IconFileName $code))"
+}

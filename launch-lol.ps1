@@ -5,8 +5,10 @@
 .DESCRIPTION
     1. Ferme le Riot Client / client LoL s'ils tournent (sinon ils réécrivent le yaml à leur fermeture)
     2. Réécrit settings.locale dans league_of_legends.live.product_settings.yaml
-    3. Lance le Riot Client, puis l'application compagnon demandée par -Companion (Porofessor, Blitz…)
-       si elle figure dans la liste companionApps de config.json
+    3. Lance le Riot Client
+    4. Ferme les autres applications compagnon de config.json (une seule active pendant la partie, sinon les
+       overlays entrent en conflit), puis lance celle demandée par -Companion (Porofessor, Blitz…) si elle
+       figure dans la liste companionApps
 
     Les chemins machine (Riot, yaml, applications compagnon) sont lus dans config.json, à côté de ce script.
     Voir README.md pour l'adapter à un autre poste.
@@ -69,6 +71,13 @@ function Start-LeagueClient([string]$Path, [string]$Value) {
     Start-Process -FilePath $Path -ArgumentList "--launch-product=league_of_legends --launch-patchline=live --locale=$Value"
 }
 
+# Une seule appli compagnon active : celle du raccourci (laissée en place si elle tourne déjà), les autres sont fermées
+function Stop-OtherCompanionApps($Config, [string]$KeepId) {
+    $names = @(Get-OtherCompanionProcessNames $Config $KeepId)
+    if ($names.Count -eq 0) { return }
+    Get-Process -Name $names -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+}
+
 function Start-CompanionApp($App) {
     if (-not (Test-Path $App.path)) { return $false }
     if ([string]::IsNullOrWhiteSpace($App.arguments)) {
@@ -100,6 +109,10 @@ try {
     Wait-WithAnimation 0.5
 
     $companionApp = Find-LaunchCompanion $config $Companion
+    Update-SplashStatus $splash 'Fermeture des autres applis compagnon…'
+    if (-not $DryRun) { Stop-OtherCompanionApps $config $Companion }
+    Wait-WithAnimation 0.5
+
     if ($companionApp) {
         Update-SplashStatus $splash "Lancement de $($companionApp.name)…"
         $started = if ($DryRun) { Test-Path $companionApp.path } else { Start-CompanionApp $companionApp }

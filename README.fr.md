@@ -1,6 +1,10 @@
-# Hextech Launcher
+# hex-launcher
 
 [English](README.md) · **Français** · [日本語](README.ja.md)
+
+> **Projet non affilié à Riot Games.** hex-launcher a été créé dans le cadre de la politique [« Legal Jibber Jabber »](https://www.riotgames.com/en/legal) de Riot Games. Riot Games ne soutient ni ne sponsorise ce projet. League of Legends et Riot Games sont des marques ou marques déposées de Riot Games, Inc. Ce projet n'embarque aucun visuel Riot : ses icônes sont originales.
+
+**Windows uniquement, pour l'instant** (Windows 10/11, PowerShell 5.1 inclus — macOS non pris en charge).
 
 Assistant de lancement League of Legends pour Windows : démarre le jeu dans la langue de son choix
 (japonais, français…) depuis un raccourci, avec un petit splash animé et sans console noire, et gère les
@@ -24,12 +28,12 @@ installe, et on obtient un raccourci par langue × appli compagnon
 | `lib/launch-config.lib.ps1` | Fonctions partagées : lecture/écriture de `config.json`, migration de l'ancien format à une seule appli |
 | `lib/splash.lib.ps1` | Splash animé partagé (lancement du jeu, installation des applis compagnon) |
 | `tests/` | Tests Pester (`Invoke-Pester -Path tests`) |
-| `make-flag-icons.ps1` | Outil : régénère les icônes drapeau de `ico/` à partir de l'icône Riot (pas nécessaire à l'usage) |
-| `ico/` | Icônes : originale Riot + une variante drapeau par langue (`league-of-legends-xx.ico`) |
+| `make-flag-icons.ps1` | Outil : régénère les icônes drapeau de `ico/` à partir de l'icône de base originale (pas nécessaire à l'usage) |
+| `ico/` | Icônes : base originale (monogramme H) + une variante drapeau par langue (`hex-launcher-xx.ico`) |
 
 ## Installation sur une nouvelle machine
 
-1. Copier ce dossier où on veut (ex. `Documents\hextech-launcher`) — **sans** `config.json` s'il vient
+1. Copier ce dossier où on veut (ex. `Documents\hex-launcher`) — **sans** `config.json` s'il vient
    d'une autre machine, pour que la détection se fasse.
 2. Double-cliquer sur **`install.bat`** (jamais « Exécuter en tant qu'administrateur » : l'outil refuse, volontairement). Trois étapes :
    - **[1/3] Détection** — trouve le Riot Client (via `RiotClientInstalls.json`, le fichier officiel de Riot) et toutes
@@ -56,7 +60,9 @@ Au premier lancement dans une nouvelle langue, le Riot Client télécharge le pa
 
 ## Applications compagnon
 
-Plusieurs applis compagnon peuvent cohabiter ; chaque raccourci en lance exactement une après le jeu.
+Plusieurs applis compagnon peuvent cohabiter ; chaque raccourci en lance exactement une après le jeu, et
+**ferme d'abord les autres** (deux overlays en même temps entrent en conflit) — un raccourci sans compagnon les ferme toutes.
+Pour Porofessor, cela revient à fermer le client Overwolf.
 Rien n'est jamais désinstallé sans avoir coché la case « désinstaller » (ou passé `-UninstallOthers`).
 
 | Appli | Installation | Désinstallation |
@@ -163,8 +169,8 @@ Toutes les langues que Riot propose sont dans `locales.json` et cochables à l'i
 s'appelle `League of Legends XX` (XX = partie pays du code : `ja_JP` → JP, `ko_KR` → KR), suivi de
 ` - <appli compagnon>` quand une appli lui est attachée.
 
-Icône : `ico/league-of-legends-xx.ico` (xx en minuscules) — toutes les langues du catalogue ont leur
-drapeau. Si l'icône manque, l'icône Riot d'origine est utilisée.
+Icône : `ico/hex-launcher-xx.ico` (xx en minuscules) — toutes les langues du catalogue ont leur
+drapeau. Si l'icône manque, l'icône de base est utilisée.
 
 Pour une langue absente du catalogue (nouvelle locale Riot) :
 1. ajouter une ligne dans `locales.json` avec le code exact tel qu'il apparaît dans `available_locales`
@@ -181,7 +187,7 @@ Le lanceur fait donc, dans l'ordre :
 1. Fermer le Riot Client et le client LoL s'ils tournent (sinon la modification serait écrasée).
 2. Réécrire `settings.locale` avec la langue demandée (`default_locale`, géré par Riot, n'est pas touché).
 3. Lancer le Riot Client avec `--locale=xx_XX` en plus, par sécurité.
-4. Lancer l'appli compagnon nommée par `-Companion`, s'il y en a une.
+4. Fermer les autres applis compagnon de `config.json`, puis lancer celle nommée par `-Companion`, s'il y en a une.
 
 ## Tests
 

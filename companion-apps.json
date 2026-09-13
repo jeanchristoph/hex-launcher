@@ -3,7 +3,7 @@
     "id": "porofessor",
     "name": "Porofessor",
     "signer": { "organization": "Overwolf Ltd", "country": "IL" },
-    "processNames": [],
+    "processNames": ["Overwolf"],
     "launch": {
       "path": "%ProgramFiles(x86)%\\Overwolf\\OverwolfLauncher.exe",
       "arguments": "-launchapp pibhbkkgefgheeglaeemkkfjlhidhcedalapdggh -from-startmenu"

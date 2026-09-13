@@ -39,7 +39,7 @@ $launcher    = Join-Path $folder 'launch-lol.ps1'
 $configPath  = Join-Path $folder 'config.json'
 $localesPath = Join-Path $folder 'locales.json'
 $powershell  = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-$defaultIcon = Join-Path $folder 'ico\league-of-legends.ico'
+$defaultIcon = Join-Path $folder 'ico\hex-launcher.ico'
 $shell       = New-Object -ComObject WScript.Shell
 
 # ---------------------------------------------------------------- Catalogue
@@ -56,9 +56,9 @@ function Get-ShortcutName([string]$Code, $Companion) {
     return $name
 }
 
-# ja_JP → ico\league-of-legends-jp.ico si présent, sinon l'icône Riot
+# ja_JP → ico\hex-launcher-jp.ico si présent, sinon l'icône de base
 function Resolve-IconPath([string]$Code) {
-    $candidate = Join-Path $folder "ico\league-of-legends-$($Code.Split('_')[1].ToLower()).ico"
+    $candidate = Join-Path $folder "ico\hex-launcher-$($Code.Split('_')[1].ToLower()).ico"
     if (Test-Path $candidate) { return $candidate }
     return $defaultIcon
 }
@@ -101,7 +101,7 @@ function Get-PreselectedCodes([object[]]$Catalog, [object[]]$Existing) {
 }
 
 # Pré-coche les compagnons déjà présents dans des raccourcis ; sinon toutes les applis de config.json
-function Get-PreselectedCompanionIds([object[]]$CompanionApps, [object[]]$Existing) {
+function Get-PreselectedShortcutCompanionIds([object[]]$CompanionApps, [object[]]$Existing) {
     $used = @($CompanionApps | Where-Object { $id = $_.id; $Existing | Where-Object { $_.CompanionId -eq $id } } | ForEach-Object { $_.id })
     if ($used.Count -gt 0 -or $Existing.Count -gt 0) { return $used }
     return @($CompanionApps | ForEach-Object { $_.id })
@@ -234,33 +234,35 @@ function Split-ListArgument([string[]]$Values) {
     return @($Values | ForEach-Object { $_ -split '[,;\s]+' } | Where-Object { $_ })
 }
 
-# ---------------------------------------------------------------- Main
+# ---------------------------------------------------------------- Main (ignoré quand le script est dot-sourcé par install.ps1 ou les tests)
 
-$catalog = Read-LocaleCatalog $localesPath
-$config  = Read-LaunchConfig $configPath
-Test-LaunchConfig $config
-$companionApps = @($config.companionApps)
-$existing      = Get-ExistingLaunchShortcuts $Destination
+if ($MyInvocation.InvocationName -ne '.') {
+    $catalog = Read-LocaleCatalog $localesPath
+    $config  = Read-LaunchConfig $configPath
+    Test-LaunchConfig $config
+    $companionApps = @($config.companionApps)
+    $existing      = Get-ExistingLaunchShortcuts $Destination
 
-if (-not $Locales) {
-    $choice = Show-ShortcutPicker $catalog (Get-PreselectedCodes $catalog $existing) $companionApps (Get-PreselectedCompanionIds $companionApps $existing)
-    if ($null -eq $choice) { "Annulé : aucun raccourci créé."; exit 2 }
-    $Locales    = $choice.Codes
-    $Companions = $choice.CompanionIds
+    if (-not $Locales) {
+        $choice = Show-ShortcutPicker $catalog (Get-PreselectedCodes $catalog $existing) $companionApps (Get-PreselectedShortcutCompanionIds $companionApps $existing)
+        if ($null -eq $choice) { "Annulé : aucun raccourci créé."; exit 2 }
+        $Locales    = $choice.Codes
+        $Companions = $choice.CompanionIds
+    }
+
+    $Locales    = Split-ListArgument $Locales
+    $Companions = Split-ListArgument $Companions
+
+    $unknown = @($Locales | Where-Object { $_ -notin $catalog.code })
+    if ($unknown.Count -gt 0) { throw "Langue(s) inconnue(s) dans locales.json : $($unknown -join ', ')" }
+    $unknownCompanions = @($Companions | Where-Object { -not (Find-LaunchCompanion $config $_) })
+    if ($unknownCompanions.Count -gt 0) { throw "Appli(s) compagnon absente(s) de config.json : $($unknownCompanions -join ', ') — relancer install.bat" }
+    if ($Locales.Count -eq 0) { "Aucune langue cochée : aucun raccourci créé."; exit 0 }
+
+    $selectedCompanions = @($Companions | ForEach-Object { Find-LaunchCompanion $config $_ })
+    $combinations = Get-ShortcutCombinations $Locales $selectedCompanions
+    foreach ($combination in $combinations) {
+        "Créé : $(New-LaunchShortcutWithFallback $combination)"
+    }
+    Remove-ObsoleteShortcuts $existing $combinations
 }
-
-$Locales    = Split-ListArgument $Locales
-$Companions = Split-ListArgument $Companions
-
-$unknown = @($Locales | Where-Object { $_ -notin $catalog.code })
-if ($unknown.Count -gt 0) { throw "Langue(s) inconnue(s) dans locales.json : $($unknown -join ', ')" }
-$unknownCompanions = @($Companions | Where-Object { -not (Find-LaunchCompanion $config $_) })
-if ($unknownCompanions.Count -gt 0) { throw "Appli(s) compagnon absente(s) de config.json : $($unknownCompanions -join ', ') — relancer install.bat" }
-if ($Locales.Count -eq 0) { "Aucune langue cochée : aucun raccourci créé."; exit 0 }
-
-$selectedCompanions = @($Companions | ForEach-Object { Find-LaunchCompanion $config $_ })
-$combinations = Get-ShortcutCombinations $Locales $selectedCompanions
-foreach ($combination in $combinations) {
-    "Créé : $(New-LaunchShortcutWithFallback $combination)"
-}
-Remove-ObsoleteShortcuts $existing $combinations
