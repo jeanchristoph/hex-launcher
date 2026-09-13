@@ -16,26 +16,30 @@ installe, et on obtient un raccourci par langue × appli compagnon
 
 | Fichier | Rôle |
 |---|---|
-| `install.bat` | **À double-cliquer** : détecte les emplacements, fait choisir les applis compagnon, puis les langues et les raccourcis |
-| `config.json` | Chemins Riot + liste des applis compagnon. Généré par `install.bat`, éditable à la main si la détection ne suffit pas |
-| `locales.json` | Catalogue des langues proposées à l'install (code Riot + libellé affiché) |
-| `companion-apps.json` | Catalogue des applis compagnon : comment détecter, installer, désinstaller et lancer chacune, et qui signe ses binaires |
-| `launch-lol.ps1` | Le lanceur : ferme le client Riot, force la langue, relance le jeu (+ l'appli compagnon donnée par `-Companion`) |
-| `detect-config.ps1` | Appelé par `install.bat` : détecte Riot et les applis compagnon déjà installées |
-| `manage-companion-app.ps1` | Appelé par `install.bat` : choix des applis compagnon, installation des manquantes, désinstallation sur demande |
-| `create-shortcuts.ps1` | Appelé par `install.bat` : choix des langues et des compagnons, puis un `.lnk` par combinaison sur le Bureau (repli dans ce dossier si le Bureau est inaccessible) |
-| `lib/companion-app.lib.ps1` | Fonctions partagées : catalogue, détection via le registre (lecture seule), commande de désinstallation, vérification de signature Authenticode |
-| `lib/launch-config.lib.ps1` | Fonctions partagées : lecture/écriture de `config.json`, migration de l'ancien format à une seule appli |
-| `lib/splash.lib.ps1` | Splash animé partagé (lancement du jeu, installation des applis compagnon) |
+| `install.bat` | **À double-cliquer** : ouvre l'assistant d'installation (une fenêtre : détection, applis compagnon, raccourcis) |
+| `LISEZMOI.txt` | Démarrage rapide en trois lignes (FR/EN) |
+| `app/` | Le moteur — rien à y modifier |
+| `app/install.ps1` | L'assistant d'installation (fenêtre unique au thème LoL) |
+| `app/config.json` | Chemins Riot + liste des applis compagnon. Généré par `install.bat`, éditable à la main si la détection ne suffit pas |
+| `app/locales.json` | Catalogue des langues proposées à l'install (code Riot + libellé affiché) |
+| `app/companion-apps.json` | Catalogue des applis compagnon : comment détecter, installer, désinstaller et lancer chacune, et qui signe ses binaires |
+| `app/launch-lol.ps1` | Le lanceur : ferme le client Riot, force la langue, relance le jeu (+ l'appli compagnon donnée par `-Companion`) |
+| `app/detect-config.ps1` | Appelé par `install.bat` : détecte Riot et les applis compagnon déjà installées |
+| `app/manage-companion-app.ps1` | Appelé par `install.bat` : choix des applis compagnon, installation des manquantes, désinstallation sur demande |
+| `app/create-shortcuts.ps1` | Appelé par `install.bat` : choix des langues et des compagnons, puis un `.lnk` par combinaison sur le Bureau (repli dans ce dossier si le Bureau est inaccessible) |
+| `app/lib/companion-app.lib.ps1` | Fonctions partagées : catalogue, détection via le registre (lecture seule), commande de désinstallation, vérification de signature Authenticode |
+| `app/lib/launch-config.lib.ps1` | Fonctions partagées : lecture/écriture de `config.json`, migration de l'ancien format à une seule appli |
+| `app/lib/splash.lib.ps1` | Splash animé partagé (lancement du jeu, installation des applis compagnon) |
 | `tests/` | Tests Pester (`Invoke-Pester -Path tests`) |
-| `make-flag-icons.ps1` | Outil : régénère les icônes drapeau de `ico/` à partir de l'icône de base originale (pas nécessaire à l'usage) |
-| `ico/` | Icônes : base originale (monogramme H) + une variante drapeau par langue (`hex-launcher-xx.ico`) |
+| `app/make-flag-icons.ps1` | Outil : régénère les icônes drapeau de `ico/` à partir de l'icône de base originale (pas nécessaire à l'usage) |
+| `app/ico/` | Icônes : base originale (monogramme H) + une variante drapeau par langue (`hex-launcher-xx.ico`) |
 
 ## Installation sur une nouvelle machine
 
+0. **[Télécharger la dernière version](https://github.com/jeanchristoph/hex-launcher/releases/latest)** (`hex-launcher-x.y.z.zip`) et la décompresser — ou cloner le dépôt.
 1. Copier ce dossier où on veut (ex. `Documents\hex-launcher`) — **sans** `config.json` s'il vient
    d'une autre machine, pour que la détection se fasse.
-2. Double-cliquer sur **`install.bat`** (jamais « Exécuter en tant qu'administrateur » : l'outil refuse, volontairement). Trois étapes :
+2. Double-cliquer sur **`install.bat`** (jamais « Exécuter en tant qu'administrateur » : l'outil refuse, volontairement). Une fenêtre, trois étapes :
    - **[1/3] Détection** — trouve le Riot Client (via `RiotClientInstalls.json`, le fichier officiel de Riot) et toutes
      les applis compagnon du catalogue déjà installées, puis écrit `config.json` (jamais écrasé s'il existe déjà :
      les réglages manuels sont conservés) ;
@@ -52,8 +56,8 @@ installe, et on obtient un raccourci par langue × appli compagnon
 
 Pour ajouter ou retirer des langues ou des applis compagnon plus tard : relancer `install.bat`.
 
-Si la détection s'est trompée : éditer `config.json` (voir ci-dessous) puis relancer `install.bat`.
-Pour forcer une nouvelle détection : supprimer `config.json` puis relancer.
+Si la détection s'est trompée : éditer `app\config.json` (voir ci-dessous) puis relancer `install.bat`.
+Pour forcer une nouvelle détection : supprimer `app\config.json` puis relancer.
 
 Au premier lancement dans une nouvelle langue, le Riot Client télécharge le pack de textes + voix
 (quelques centaines de Mo). C'est normal.
@@ -89,10 +93,10 @@ Après la désinstallation d'une appli Overwolf, Overwolf ouvre une page de feed
 
 Usage scripté (déploiement) :
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File manage-companion-app.ps1 -Apps blitz,opgg                   # dialogue de confirmation
-powershell -NoProfile -ExecutionPolicy Bypass -File manage-companion-app.ps1 -Apps blitz -UninstallOthers -Force # aucun dialogue
-powershell -NoProfile -ExecutionPolicy Bypass -File manage-companion-app.ps1 -Apps none -DryRun                 # montre ce qui serait fait
-powershell -NoProfile -ExecutionPolicy Bypass -File create-shortcuts.ps1 -Locales ja_JP,ko_KR -Companions blitz,opgg
+powershell -NoProfile -ExecutionPolicy Bypass -File app\manage-companion-app.ps1 -Apps blitz,opgg                   # dialogue de confirmation
+powershell -NoProfile -ExecutionPolicy Bypass -File app\manage-companion-app.ps1 -Apps blitz -UninstallOthers -Force # aucun dialogue
+powershell -NoProfile -ExecutionPolicy Bypass -File app\manage-companion-app.ps1 -Apps none -DryRun                 # montre ce qui serait fait
+powershell -NoProfile -ExecutionPolicy Bypass -File app\create-shortcuts.ps1 -Locales ja_JP,ko_KR -Companions blitz,opgg
 ```
 Identifiants : `porofessor`, `blitz`, `opgg`, `mobalytics`, `none`. Codes de sortie : 0 ok · 1 erreur · 2 annulé ou refusé.
 
@@ -129,7 +133,7 @@ Une entrée dans `companion-apps.json` ; l'ordre de la liste est la priorité de
 | `uninstall.dialogProcessNames` | Mode interactif : process du dialogue de l'éditeur à attendre (Overwolf : `OWUninstallMenu`) |
 | `uninstall.notice` | Texte affiché dans la confirmation avant désinstallation (ex. l'avertissement Overwolf) |
 
-## `config.json`
+## `app\config.json`
 
 ```json
 {
@@ -169,14 +173,14 @@ Toutes les langues que Riot propose sont dans `locales.json` et cochables à l'i
 s'appelle `League of Legends XX` (XX = partie pays du code : `ja_JP` → JP, `ko_KR` → KR), suivi de
 ` - <appli compagnon>` quand une appli lui est attachée.
 
-Icône : `ico/hex-launcher-xx.ico` (xx en minuscules) — toutes les langues du catalogue ont leur
-drapeau. Si l'icône manque, l'icône de base est utilisée.
+Icône : chaque raccourci reçoit la variante drapeau de sa langue (`app/ico/hex-launcher-xx.ico`, par exemple
+`hex-launcher-jp.ico` pour `ja_JP`). Sans drapeau pour une langue, l'icône de base `app/ico/hex-launcher.ico` est utilisée.
 
 Pour une langue absente du catalogue (nouvelle locale Riot) :
 1. ajouter une ligne dans `locales.json` avec le code exact tel qu'il apparaît dans `available_locales`
    du fichier yaml ;
 2. (optionnel) ajouter le dessin du drapeau dans `$FlagDrawings` de `make-flag-icons.ps1` et lancer
-   `powershell -NoProfile -ExecutionPolicy Bypass -File make-flag-icons.ps1 -Locales xx_XX`.
+   `powershell -NoProfile -ExecutionPolicy Bypass -File app\make-flag-icons.ps1 -Locales xx_XX`.
 
 ## Comment ça marche
 
@@ -203,7 +207,7 @@ Installeurs, désinstalleurs, réseau et registre sont mockés : les tests ne to
   Le lanceur le ferme lui-même, mais si un processus est bloqué, le fermer à la main (zone de
   notification → Quitter) et relancer.
 - **Rien ne se passe au double-clic** : ouvrir un terminal PowerShell dans le dossier et lancer
-  `.\launch-lol.ps1 -Locale ja_JP` pour voir l'erreur (fichier de config introuvable, chemin faux…).
+  `.\app\launch-lol.ps1 -Locale ja_JP` pour voir l'erreur (fichier de config introuvable, chemin faux…).
 - **Caractères bizarres dans le splash ou les dialogues** (`Ã©`, `â€¦`) : un `.ps1` a été réenregistré sans BOM.
   Tous les scripts (`launch-lol.ps1`, `manage-companion-app.ps1`, `create-shortcuts.ps1`, `lib\*.ps1`) doivent
   être en **UTF-8 avec BOM** (VS Code : barre d'état → encodage → « Enregistrer avec l'encodage »).
@@ -217,6 +221,6 @@ Installeurs, désinstalleurs, réseau et registre sont mockés : les tests ne to
 - **L'appli compagnon est toujours là après « Désinstaller »** : le dialogue de l'éditeur a été fermé sans
   confirmer (Overwolf), ou la désinstallation a pris plus de temps que prévu. Rien d'autre n'a été installé ;
   relancer `install.bat`.
-- **Tester sans lancer le jeu** : `.\launch-lol.ps1 -Locale ja_JP -DryRun -YamlPath copie.yaml`
+- **Tester sans lancer le jeu** : `.\app\launch-lol.ps1 -Locale ja_JP -DryRun -YamlPath copie.yaml`
   affiche le splash et réécrit la copie, sans fermer ni lancer quoi que ce soit.
-  `manage-companion-app.ps1 -DryRun` affiche les actions appli compagnon sans les exécuter.
+  `app\manage-companion-app.ps1 -DryRun` affiche les actions appli compagnon sans les exécuter.

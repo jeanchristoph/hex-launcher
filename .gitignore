@@ -9,3 +9,9 @@ Thumbs.db
 desktop.ini
 .vscode/
 .idea/
+
+# Archives de release (tools/make-release.ps1)
+dist/
+
+# Propositions et essais visuels (jamais versionnes)
+tmp/

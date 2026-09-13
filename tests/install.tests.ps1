@@ -6,7 +6,7 @@
     Rappel Pester 3 : un Mock déclaré dans un It survit jusqu'à la fin du Describe → re-déclarer quand l'ordre compte.
 #>
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
-. (Join-Path $here '..\install.ps1')
+. (Join-Path $here '..\app\install.ps1')
 . (Join-Path $here 'companion-test-helpers.ps1')
 
 function New-TestLaunchConfig([object[]]$CompanionApps = @(), [string]$RiotPath = 'C:\Riot\RiotClientServices.exe', [string]$YamlPath = 'C:\ProgramData\lol.yaml') {

@@ -3,7 +3,7 @@
     Tests Pester 3.4 de lib\splash.lib.ps1 — sans afficher de fenêtre.
 #>
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
-. (Join-Path $here '..\lib\splash.lib.ps1')
+. (Join-Path $here '..\app\lib\splash.lib.ps1')
 
 function New-FakeSplash { return [pscustomobject]@{ Tag = [pscustomobject]@{ Text = '' }; Visible = $true } }
 

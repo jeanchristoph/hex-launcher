@@ -119,13 +119,13 @@
 **Effort:** M
 **Files:** `install.bat` → `Installer.bat`, `LISEZMOI.txt`, `app/` (tous les `.ps1`, `lib/`, `ico/`, `locales.json`, `companion-apps.json`, `config.json`), `tests/`, `.gitignore`, `README.md`, `README.fr.md`, `README.ja.md`, `.forge/project.md`
 **Description:** À la racine : `Installer.bat`, `LISEZMOI.txt` (3 lignes : double-cliquer Installer.bat, jamais en administrateur, README pour le reste), `LICENSE`, README ×3. Tout le technique dans `app/` ; `Installer.bat` lance `app\install.ps1` ; les scripts restent relatifs à `$PSScriptRoot` ; raccourcis → `app\launch-lol.ps1` ; `config.json` généré dans `app/` (gitignore ajusté) ; tests adaptés (`..pp\…`). Vérifier `install.bat`/`create-shortcuts`/`launch-lol` de bout en bout après déplacement.
-[ ]
+[x] git mv vers app/, LISEZMOI.txt, tests et README adaptés, scripts vérifiés depuis app/
 
 ### T19 — Release GitHub en ZIP
 **Effort:** S
 **Files:** `tools/make-release.ps1`, `.forge/project.md`, `README.md`, `README.fr.md`, `README.ja.md`
 **Description:** Script de packaging : `hextech-launcher-<version>.zip` contenant la racine épurée + `app/` sans `tests/`, `.forge/`, `.gitattributes`, `config.json` ; version lue d'un fichier `app/version.txt` ; `gh release create v<version>` avec le zip et des notes ; README : lien « Télécharger la dernière version » vers les releases. Première release v1.0.0 après validation de T16.
-[ ]
+[x] tools/make-release.ps1 + tests, app/version.txt = 1.0.0, dist/ gitignoré, liens releases dans les README — publication v1.0.0 sur feu vert
 
 ### T20 — Identité : `hex-launcher` + mention légale Riot
 **Effort:** S
@@ -138,6 +138,24 @@
 **Files:** `make-flag-icons.ps1`, `ico/*.ico`, `create-shortcuts.ps1`, `lib/theme.lib.ps1`, `README.md`, `README.fr.md`, `README.ja.md`
 **Description:** L'icône Riot (et ses 27 dérivées drapeau) ne peut pas être réutilisée dans une app. Nouvelle base originale générée en GDI+ : carré aux coins biseautés, fond bleu nuit `#0A0E14`, liseré or `#785A28`, H géométrique or `#C8AA6E` (typographie neutre, pas Beaufort/Friz Quadrata). `ico/hex-launcher.ico` (multi-tailles) ; `make-flag-icons.ps1` compose les drapeaux dans le fond de cette base → `ico/hex-launcher-xx.ico` pour les 27 locales ; anciens `league-of-legends*.ico` supprimés ; `Resolve-IconPath`, `Get-ThemeIconPath`, README mis à jour. Délégué à un sous-agent avec previews PNG.
 [x] octogone or/bleu nuit + H géométrique, 28 .ico dessinés nativement par taille, drapeaux sous voile alpha, anciennes icônes Riot supprimées
+
+### T22 — Monogramme H plus proche de l'esprit du L de LoL, sans plagiat
+**Effort:** S
+**Files:** `app/make-flag-icons.ps1`, `app/ico/*.ico`
+**Description:** Rapprocher le H du rendu du L officiel par le *traitement* (empattements marqués et évasés, or métallique en dégradé vertical crème → or → or sombre avec arête claire, ombre plus profonde) sans reprendre l'anneau circulaire ni la police Riot : l'octogone et le tracé géométrique restent. Régénérer les 28 icônes, previews et contrôle à 16/32 px. Délégué à un sous-agent.
+[x] obsolète — icônes finales fournies par l'utilisateur (modèle HL), 28 .ico régénérés le 2026-09-13
+
+### T23 — Icône des raccourcis : icône LoL installée sur le PC (intérim)
+**Effort:** XS
+**Files:** `app/create-shortcuts.ps1`, `app/install.ps1`, `tests/create-shortcuts.tests.ps1`, `README.md`, `README.fr.md`, `README.ja.md`
+**Description:** En attendant un logo définitif, tous les raccourcis référencent `league_of_legends.live.ico` installé par Riot à côté du fichier de langue (jamais copié dans le projet) ; repli sur `app/ico/hex-launcher.ico`. Pas de drapeau ; seul le libellé change par langue. Les variantes drapeau restent dans `app/ico/` pour plus tard.
+[x] Resolve-IconPath($Config), tests, README ×3 — 250 tests
+
+### T24 — Rebranchement des icônes drapeau sur les raccourcis
+**Effort:** XS
+**Files:** `app/create-shortcuts.ps1`, `app/install.ps1`, `tests/create-shortcuts.tests.ps1`, `README.md`, `README.fr.md`, `README.ja.md`
+**Description:** Clôt l'intérim T23 : `Resolve-IconPath($Code)` → `ico\hex-launcher-<xx>.ico` si présent, sinon `ico\hex-launcher.ico` ; `Get-InstalledLeagueIconPath` et toute référence à `league_of_legends.live.ico` supprimées ; `install.ps1` résout l'icône par combinaison ; tests (par langue, repli, langue sans drapeau) et paragraphe « Icône » des README ×3 mis à jour.
+[x] Resolve-IconPath($Code) + Get-FlagIconPath, install.ps1 allégé, test « un drapeau par langue du catalogue », README ×3 — 250 tests
 
 ## Risks
 - Porofessor : `/S` silencieux testé seulement avec Overwolf déjà présent ; Overwolf absent → comportement inconnu (timeout de sonde plus long, message explicite)
@@ -166,8 +184,11 @@
 | T15 — Le lanceur ferme les autres applis compagnon | S | [x] |
 | T16 — Assistant d'installation unique au thème LoL | L | [x] |
 | T17 — Drapeaux à bandes verticales unifiés | XS | [x] |
-| T18 — Dossier livré épuré (app/) | M | [ ] |
-| T19 — Release GitHub en ZIP | S | [ ] |
+| T18 — Dossier livré épuré (app/) | M | [x] |
+| T19 — Release GitHub en ZIP | S | [x] |
 | T20 — Identité hex-launcher + mention légale | S | [x] |
 | T21 — Jeu d'icônes original | M | [x] |
+| T22 — Monogramme H esprit LoL sans plagiat | S | [x] obsolète |
+| T23 — Icône des raccourcis : icône LoL installée (intérim) | XS | [x] |
+| T24 — Rebranchement des icônes drapeau sur les raccourcis | XS | [x] |
 | **Total** | **~5 j** | |

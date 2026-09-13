@@ -6,9 +6,9 @@
     powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-Pester -Path tests"
 #>
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
-. (Join-Path $here '..\lib\companion-app.lib.ps1')
+. (Join-Path $here '..\app\lib\companion-app.lib.ps1')
 . (Join-Path $here 'companion-test-helpers.ps1')
-$ProjectCatalogPath = Join-Path $here '..\companion-apps.json'
+$ProjectCatalogPath = Join-Path $here '..\app\companion-apps.json'
 
 # ---------------------------------------------------------------- Catalogue
 
