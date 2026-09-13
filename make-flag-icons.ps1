@@ -79,14 +79,32 @@ function Get-StarPoints([double]$Cx, [double]$Cy, [double]$Outer, [int]$Branches
     return [System.Drawing.PointF[]]$points
 }
 
-function Draw-Star($G, [string]$Color, [double]$Cx, [double]$Cy, [double]$Outer) {
-    $G.FillPolygon((Get-Brush $Color), (Get-StarPoints $Cx $Cy $Outer))
+function Draw-Star($G, [string]$Color, [double]$Cx, [double]$Cy, [double]$Outer, [int]$Branches = 5) {
+    $G.FillPolygon((Get-Brush $Color), (Get-StarPoints $Cx $Cy $Outer $Branches))
 }
 
 function Draw-Line($G, [string]$Color, [double]$Width, [double]$X1, [double]$Y1, [double]$X2, [double]$Y2) {
     $pen = New-Object System.Drawing.Pen([System.Drawing.ColorTranslator]::FromHtml($Color), [float]$Width)
     $G.DrawLine($pen, [float]$X1, [float]$Y1, [float]$X2, [float]$Y2)
     $pen.Dispose()
+}
+
+# Union Jack simplifié (sans liseré) dans le rectangle donné ; le tracé est clippé au rectangle
+function Draw-UnionJack($G, [double]$X, [double]$Y, [double]$W, [double]$H) {
+    $G.SetClip((New-Object System.Drawing.RectangleF([float]$X, [float]$Y, [float]$W, [float]$H)))
+    $G.FillRectangle((Get-Brush '#012169'), [float]$X, [float]$Y, [float]$W, [float]$H)
+    $cx = $X + $W / 2; $cy = $Y + $H / 2; $t = [Math]::Min($W, $H) * 0.075
+    Draw-Line $G '#FFFFFF' ($t * 1.4) $X $Y ($X + $W) ($Y + $H);  Draw-Line $G '#FFFFFF' ($t * 1.4) ($X + $W) $Y $X ($Y + $H)
+    Draw-Line $G '#C8102E' ($t * 0.5) $X $Y ($X + $W) ($Y + $H);  Draw-Line $G '#C8102E' ($t * 0.5) ($X + $W) $Y $X ($Y + $H)
+    Draw-Line $G '#FFFFFF' ($t * 2.2) $cx $Y $cx ($Y + $H);        Draw-Line $G '#FFFFFF' ($t * 2.2) $X $cy ($X + $W) $cy
+    Draw-Line $G '#C8102E' ($t * 1.2) $cx $Y $cx ($Y + $H);        Draw-Line $G '#C8102E' ($t * 1.2) $X $cy ($X + $W) $cy
+    $G.ResetClip()
+}
+
+# Croissant : disque plein + disque de la couleur du fond décalé
+function Draw-Crescent($G, [string]$Color, [string]$Background, [double]$Cx, [double]$Cy, [double]$Diameter, [double]$Offset) {
+    Draw-Disc $G $Color $Cx $Cy $Diameter
+    Draw-Disc $G $Background ($Cx + $Offset) $Cy ($Diameter * 0.8)
 }
 
 # ---------------------------------------------------------------- Drapeaux (simplifiés)
@@ -111,12 +129,55 @@ $FlagDrawings = @{
         } }
     }
     'en_GB' = { param($G, $R)
+        # Centré sur la zone visible, tracé sur toute l'image
+        Draw-UnionJack $G ($R.Cx - $R.Size) ($R.Cy - $R.Size) ($R.Size * 2) ($R.Size * 2)
+    }
+    'en_AU' = { param($G, $R)
         $G.Clear([System.Drawing.ColorTranslator]::FromHtml('#012169'))
-        $s = $R.Size; $t = $R.Size * 0.075
-        Draw-Line $G '#FFFFFF' ($t * 1.4) 0 0 $s $s;  Draw-Line $G '#FFFFFF' ($t * 1.4) $s 0 0 $s
-        Draw-Line $G '#C8102E' ($t * 0.5) 0 0 $s $s;  Draw-Line $G '#C8102E' ($t * 0.5) $s 0 0 $s
-        Draw-Line $G '#FFFFFF' ($t * 2.2) $R.Cx 0 $R.Cx $s;  Draw-Line $G '#FFFFFF' ($t * 2.2) 0 $R.Cy $s $R.Cy
-        Draw-Line $G '#C8102E' ($t * 1.2) $R.Cx 0 $R.Cx $s;  Draw-Line $G '#C8102E' ($t * 1.2) 0 $R.Cy $s $R.Cy
+        $cantonW = $R.Width * 0.55; $cantonH = $R.Height * 0.4
+        Draw-UnionJack $G 0 0 ($R.Left + $cantonW) ($R.Top + $cantonH)
+        $star = $R.Width * 0.09
+        Draw-Star $G '#FFFFFF' ($R.Left + $cantonW / 2) ($R.Top + $cantonH * 1.7) ($star * 1.3) 7   # étoile du Commonwealth
+        foreach ($p in @(@(0.80, 0.22), @(0.95, 0.45), @(0.72, 0.62), @(0.86, 0.88))) {              # Croix du Sud
+            Draw-Star $G '#FFFFFF' ($R.Left + $R.Width * $p[0]) ($R.Top + $R.Height * $p[1]) $star 7
+        }
+    }
+    'en_SG' = { param($G, $R)
+        Draw-HorizontalStripes $G $R @('#EF3340', '#FFFFFF')
+        $cy = $R.Top + $R.Height * 0.25; $d = $R.Height * 0.32
+        Draw-Crescent $G '#FFFFFF' '#EF3340' ($R.Left + $R.Width * 0.3) $cy $d ($d * 0.28)
+        foreach ($p in @(@(0.62, -0.42), @(0.52, -0.12), @(0.72, -0.12), @(0.56, 0.22), @(0.68, 0.22))) {
+            Draw-Star $G '#FFFFFF' ($R.Left + $R.Width * $p[0]) ($cy + $d * $p[1]) ($d * 0.11)
+        }
+    }
+    'en_PH' = { param($G, $R)
+        Draw-HorizontalStripes $G $R @('#0038A8', '#CE1126')
+        $apex = $R.Left + $R.Width * 0.55
+        $triangle = [System.Drawing.PointF[]]@(
+            (New-Object System.Drawing.PointF(0, 0)),
+            (New-Object System.Drawing.PointF([float]$apex, [float]$R.Cy)),
+            (New-Object System.Drawing.PointF(0, [float]$R.Size)))
+        $G.FillPolygon([System.Drawing.Brushes]::White, $triangle)
+        $sunCx = $R.Left + $R.Width * 0.18; $sunD = $R.Width * 0.24
+        for ($i = 0; $i -lt 8; $i++) {
+            $a = $i * [Math]::PI / 4
+            Draw-Line $G '#FCD116' ($sunD * 0.15) $sunCx $R.Cy ($sunCx + $sunD * 0.85 * [Math]::Cos($a)) ($R.Cy + $sunD * 0.85 * [Math]::Sin($a))
+        }
+        Draw-Disc $G '#FCD116' $sunCx $R.Cy $sunD
+    }
+    'es_AR' = { param($G, $R)
+        Draw-HorizontalStripes $G $R @('#74ACDF', '#FFFFFF', '#74ACDF')
+        Draw-Disc $G '#F6B40E' $R.Cx $R.Cy ($R.Height * 0.22)
+    }
+    'id_ID' = { param($G, $R) Draw-HorizontalStripes $G $R @('#FF0000', '#FFFFFF') }
+    'zh_MY' = { param($G, $R)
+        $stripes = @(); for ($i = 0; $i -lt 7; $i++) { $stripes += if ($i % 2 -eq 0) { '#CC0001' } else { '#FFFFFF' } }
+        Draw-HorizontalStripes $G $R $stripes
+        $cantonRight = $R.Left + $R.Width * 0.55; $cantonBottom = $R.Top + $R.Height * 4 / 7
+        $G.FillRectangle((Get-Brush '#010066'), 0, 0, [float]$cantonRight, [float]$cantonBottom)
+        $cx = ($R.Left + $cantonRight) / 2; $cy = ($R.Top + $cantonBottom) / 2; $d = $R.Width * 0.3
+        Draw-Crescent $G '#FFCC00' '#010066' ($cx - $d * 0.15) $cy $d ($d * 0.25)
+        Draw-Star $G '#FFCC00' ($cx + $d * 0.42) $cy ($d * 0.3) 14
     }
     'ko_KR' = { param($G, $R)
         $G.Clear([System.Drawing.Color]::White)
