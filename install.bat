@@ -1,48 +1,9 @@
 @echo off
-rem Installation du lanceur League of Legends multi-langue :
-rem   1. detecte les emplacements (Riot, appli compagnon) et genere config.json s'il n'existe pas
-rem   2. propose l'application compagnon (Porofessor, Blitz, OP.GG...) : installation / desinstallation
-rem   3. cree les raccourcis sur le Bureau
+rem Installation du lanceur League of Legends : ouvre l'assistant install.ps1 (fenetre unique, sans console).
+rem   1. detecte les emplacements (Riot, applis compagnon) et genere config.json s'il n'existe pas
+rem   2. propose les applications compagnon (Porofessor, Blitz, OP.GG, Mobalytics) : installation / desinstallation
+rem   3. cree les raccourcis langue x appli compagnon sur le Bureau
 rem A relancer apres toute modification de config.json ou deplacement du dossier.
+rem Ne pas lancer en tant qu'administrateur : l'assistant refuse (installeurs per-user).
 
-echo ====================================================
-echo   Lanceur League of Legends - installation
-echo ====================================================
-echo.
-echo [1/3] Detection de la configuration
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0detect-config.ps1"
-if errorlevel 1 goto :error
-
-echo.
-echo [2/3] Choix des applications compagnon
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0manage-companion-app.ps1"
-if %errorlevel% equ 2 (echo Etape ignoree : applications compagnon inchangees.) else if not %errorlevel% equ 0 goto :error
-
-echo.
-echo [3/3] Choix des langues et des compagnons, creation des raccourcis sur le Bureau
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0create-shortcuts.ps1"
-if %errorlevel% equ 2 goto :cancelled
-if not %errorlevel% equ 0 goto :error
-
-echo.
-echo Termine. Un raccourci "League of Legends XX" par langue et par appli compagnon choisies est sur le Bureau.
-echo Relancer install.bat pour ajouter ou retirer des langues ou des applis compagnon.
-echo.
-echo Pour installer ou retirer une appli compagnon : relancer install.bat (etape 2/3).
-echo Pour corriger un chemin : editer config.json puis relancer install.bat.
-echo Pour tout re-detecter : supprimer config.json d'abord.
-echo.
-pause
-exit /b 0
-
-:cancelled
-echo.
-echo Installation annulee : aucun raccourci modifie.
-pause
-exit /b 0
-
-:error
-echo.
-echo [ERREUR] L'installation a echoue. Voir les messages ci-dessus.
-pause
-exit /b 1
+start "" /min powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%~dp0install.ps1"

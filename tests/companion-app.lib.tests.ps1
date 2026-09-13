@@ -294,7 +294,11 @@ Describe 'ConvertTo-LaunchCompanionEntry' {
         $entry.arguments | Should Be '--flag'
     }
 
-    It 'conserve les quatre clés attendues par launch-lol.ps1, dans l''ordre' {
-        ((ConvertTo-LaunchCompanionEntry (New-TestCompanionApp)).Keys -join ',') | Should Be 'id,name,path,arguments'
+    It 'conserve les cinq clés attendues par launch-lol.ps1, dans l''ordre' {
+        ((ConvertTo-LaunchCompanionEntry (New-TestCompanionApp)).Keys -join ',') | Should Be 'id,name,path,arguments,processNames'
+    }
+
+    It 'recopie les process à fermer depuis le catalogue' {
+        (ConvertTo-LaunchCompanionEntry (New-TestCompanionApp -ProcessNames @('Overwolf'))).processNames -join ',' | Should Be 'Overwolf'
     }
 }

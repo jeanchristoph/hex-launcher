@@ -9,7 +9,7 @@ function New-FakeSplash { return [pscustomobject]@{ Tag = [pscustomobject]@{ Tex
 
 Describe 'New-SplashLabel' {
     It 'centre le texte et applique couleur, police et hauteur' {
-        $label = New-SplashLabel 'Titre' (New-Object System.Drawing.Font('Segoe UI', 12)) '#C8AA6E' 'Top' 40
+        $label = New-SplashLabel 'Titre' (New-Object System.Drawing.Font('Segoe UI', 12)) 'Gold' 'Top' 40
         $label.Text | Should Be 'Titre'
         $label.TextAlign | Should Be 'MiddleCenter'
         $label.Height | Should Be 40
@@ -17,7 +17,7 @@ Describe 'New-SplashLabel' {
     }
 
     It 'laisse la hauteur par défaut quand elle vaut 0 (Dock Fill)' {
-        $label = New-SplashLabel '' (New-Object System.Drawing.Font('Segoe UI', 9)) '#A09B8C' 'Fill' 0
+        $label = New-SplashLabel '' (New-Object System.Drawing.Font('Segoe UI', 9)) 'Muted' 'Fill' 0
         $label.Dock | Should Be 'Fill'
     }
 }

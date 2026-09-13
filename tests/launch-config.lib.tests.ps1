@@ -17,6 +17,7 @@ Describe 'Read-LaunchConfig' {
         $config = Read-LaunchConfig (New-TempLegacyConfig)
         @($config.companionApps).Count | Should Be 1
         $config.companionApps[0].id | Should Be 'opgg'
+        $config.companionApps[0].processNames -join ',' | Should Be 'OP.GG'
         $config.companionApps[0].name | Should Be 'OP.GG'
         $config.companionApps[0].path | Should Be 'C:\old\OP.GG.exe'
         $config.PSObject.Properties['companionApp'] | Should BeNullOrEmpty
@@ -76,6 +77,30 @@ Describe 'Find-LaunchCompanion' {
     It 'rend null pour un identifiant absent ou vide' {
         Find-LaunchCompanion $config 'opgg' | Should BeNullOrEmpty
         Find-LaunchCompanion $config '' | Should BeNullOrEmpty
+    }
+}
+
+Describe 'Get-OtherCompanionProcessNames' {
+    $config = [pscustomobject]@{ companionApps = @(
+        [pscustomobject]@{ id = 'porofessor'; name = 'Porofessor'; path = 'C:\Overwolf\OverwolfLauncher.exe'; arguments = ''; processNames = @('Overwolf') },
+        [pscustomobject]@{ id = 'blitz'; name = 'Blitz'; path = 'C:\Programs\Blitz\Blitz.exe'; arguments = ''; processNames = @() },
+        [pscustomobject]@{ id = 'opgg'; name = 'OP.GG'; path = 'C:\Programs\OP.GG\OP.GG.exe'; arguments = '' }
+    ) }
+
+    It 'liste les process de toutes les applis sauf celle du raccourci' {
+        (Get-OtherCompanionProcessNames $config 'blitz') -join ',' | Should Be 'Overwolf,OP.GG'
+    }
+
+    It 'liste toutes les applis quand le raccourci n''en demande aucune' {
+        (Get-OtherCompanionProcessNames $config '') -join ',' | Should Be 'Overwolf,Blitz,OP.GG'
+    }
+
+    It 'déduit le nom de process de l''exécutable quand l''entrée ne le déclare pas' {
+        (Get-OtherCompanionProcessNames $config 'porofessor') -join ',' | Should Be 'Blitz,OP.GG'
+    }
+
+    It 'rend une liste vide sans aucune appli compagnon' {
+        @(Get-OtherCompanionProcessNames ([pscustomobject]@{ companionApps = @() }) 'blitz').Count | Should Be 0
     }
 }
 

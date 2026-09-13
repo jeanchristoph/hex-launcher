@@ -1,6 +1,10 @@
-# Hextech Launcher
+# hex-launcher
 
 **English** · [Français](README.fr.md) · [日本語](README.ja.md)
+
+> **Not affiliated with Riot Games.** hex-launcher was created under Riot Games' ["Legal Jibber Jabber"](https://www.riotgames.com/en/legal) policy. Riot Games does not endorse or sponsor this project. League of Legends and Riot Games are trademarks or registered trademarks of Riot Games, Inc. This project ships no Riot artwork: its icons are original.
+
+**Windows only, for now** (Windows 10/11, PowerShell 5.1 included — macOS is not supported).
 
 League of Legends launcher helper for Windows: start the game in the language of your choice
 (Japanese, French…) from a desktop shortcut with a small animated splash and no black console window,
@@ -24,12 +28,12 @@ they get installed for you, and you get one shortcut per language × companion a
 | `lib/launch-config.lib.ps1` | Shared functions: reading/writing `config.json`, migration of the old single-app format |
 | `lib/splash.lib.ps1` | Shared animated splash (game launch, companion app install) |
 | `tests/` | Pester tests (`Invoke-Pester -Path tests`) |
-| `make-flag-icons.ps1` | Tool: regenerates the flag icons in `ico/` from the Riot icon (not needed for normal use) |
-| `ico/` | Icons: original Riot icon + one flag variant per language (`league-of-legends-xx.ico`) |
+| `make-flag-icons.ps1` | Tool: regenerates the flag icons in `ico/` from the original base icon (not needed for normal use) |
+| `ico/` | Icons: original base icon (H monogram) + one flag variant per language (`hex-launcher-xx.ico`) |
 
 ## Installing on a new machine
 
-1. Copy this folder anywhere (e.g. `Documents\hextech-launcher`) — **without** `config.json` if it comes
+1. Copy this folder anywhere (e.g. `Documents\hex-launcher`) — **without** `config.json` if it comes
    from another machine, so detection can run.
 2. Double-click **`install.bat`** (never "Run as administrator": the tool refuses, on purpose). Three steps:
    - **[1/3] Detection** — finds the Riot Client (via `RiotClientInstalls.json`, Riot's official file) and every
@@ -56,7 +60,9 @@ The first time you launch in a new language, the Riot Client downloads the text 
 
 ## Companion apps
 
-Several companion apps can live side by side; each shortcut starts exactly one of them after the game.
+Several companion apps can live side by side; each shortcut starts exactly one of them after the game, and
+**closes the others first** (two overlays at once conflict) — a shortcut without companion closes them all.
+For Porofessor this means closing the Overwolf client.
 Nothing is ever uninstalled unless you tick the "uninstall" box (or pass `-UninstallOthers`).
 
 | App | Install | Uninstall |
@@ -163,8 +169,8 @@ Every language Riot offers is in `locales.json` and can be ticked at install tim
 named `League of Legends XX` (XX = country part of the code: `ja_JP` → JP, `ko_KR` → KR), followed by
 ` - <companion app>` when one is attached.
 
-Icon: `ico/league-of-legends-xx.ico` (lowercase xx) — every language in the catalogue has its flag.
-If the icon is missing, the original Riot icon is used.
+Icon: `ico/hex-launcher-xx.ico` (lowercase xx) — every language in the catalogue has its flag.
+If the icon is missing, the base icon is used.
 
 For a language missing from the catalogue (new Riot locale):
 1. add a line to `locales.json` with the exact code as it appears in `available_locales` of the yaml file;
@@ -180,7 +186,7 @@ So the launcher does, in order:
 1. Close the Riot Client and the LoL client if they are running (otherwise the change would be overwritten).
 2. Rewrite `settings.locale` with the requested language (`default_locale`, managed by Riot, is left alone).
 3. Start the Riot Client with `--locale=xx_XX` as well, for good measure.
-4. Start the companion app named by `-Companion`, if any.
+4. Close the other companion apps of `config.json`, then start the one named by `-Companion`, if any.
 
 ## Tests
 

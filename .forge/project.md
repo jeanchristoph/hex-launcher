@@ -1,4 +1,4 @@
-# Project — Hextech Launcher (ex LoL Lang Switcher)
+# Project — hex-launcher (ex LoL Lang Switcher, ex Hextech Launcher)
 **Generated:** 2026-09-13
 
 ## Stack
@@ -54,5 +54,6 @@ lol/
 
 ## Tools & access
 - Available MCPs: ClickUp, claude-in-chrome, phpstorm (non pertinent ici)
+- Identité visuelle : nom `hex-launcher`, mention de non-affiliation Riot en tête des README ; icônes originales générées par make-flag-icons.ps1
 - Registre et configuration Windows : lecture seule, interdiction d'écrire (règle utilisateur, CLAUDE.md global)
 - External documentation: `RiotClientInstalls.json` (`%ProgramData%\Riot Games\`) et `league_of_legends.live.product_settings.yaml` — fichiers officiels Riot lus/écrits par le lanceur ; README.md du projet (référence fonctionnelle complète)

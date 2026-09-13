@@ -92,6 +92,53 @@
 **Description:** Nouveau flux (plusieurs applis, un raccourci par combinaison, désinstallation sur demande), schéma `companionApps`, tableau des raccourcis, précisions de la revue (`-Force` = zéro dialogue, Porofessor validé avec Overwolf présent, BOM sur tous les .ps1). `.gitattributes` : `*.ps1`/`*.bat`/`*.json` en CRLF.
 [x]
 
+### T15 — Le lanceur ferme les autres applis compagnon
+**Effort:** S
+**Files:** `lib/launch-config.lib.ps1`, `lib/companion-app.lib.ps1`, `companion-apps.json`, `launch-lol.ps1`, `tests/launch-config.lib.tests.ps1`, `README.md`, `README.fr.md`, `README.ja.md`
+**Description:** BUSINESS_RULE : une seule appli compagnon active pendant la partie. Chaque entrée `companionApps` de `config.json` porte ses `processNames` (copiés du catalogue ; ancien format migré → nom de l'exécutable). `launch-lol.ps1` ferme, avant de lancer l'appli demandée par `-Companion`, les process de toutes les autres applis de la liste ; sans `-Companion`, ferme toutes les applis compagnon. L'appli choisie déjà lancée est laissée en place. Porofessor : `processNames: ["Overwolf"]` (l'app vit dans le client Overwolf). Logique pure testée dans la lib, statut « Fermeture de X… » dans le splash, README ×3.
+[x] Get-OtherCompanionProcessNames (lib, testée), Stop-OtherCompanionApps dans le lanceur, Porofessor → Overwolf — 146 tests
+
+### T16 — Assistant d'installation unique au thème LoL
+**Effort:** L
+**Files:** `install.ps1`, `install.bat`, `lib/theme.lib.ps1`, `lib/splash.lib.ps1`, `detect-config.ps1`, `manage-companion-app.ps1`, `create-shortcuts.ps1`, `tests/theme.lib.tests.ps1`, `tests/install.tests.ps1`, `README.md`, `README.fr.md`, `README.ja.md`
+**Description:** Remplacer la console + trois dialogues gris par une seule fenêtre WinForms au thème LoL (palette du splash), avec étapes à gauche, panneau central, boutons Retour / Suivant / Annuler. Les scripts actuels restent le moteur.
+[x] T16.1 — `lib/theme.lib.ps1` : palette LoL et fabriques de contrôles thématisés ; `splash.lib.ps1` s'appuie dessus
+[x] T16.2 — Moteur réutilisable : garde Main sur `create-shortcuts.ps1` et `detect-config.ps1` ; hooks de progression (étape, splash) dans `manage-companion-app.ps1`
+[x] T16.3 — `install.ps1` : fenêtre unique, colonne des étapes, navigation (machine à états pure, testée)
+[x] T16.4 — Pages : détection, applis compagnon (liste + désinstaller + récapitulatif + journal), raccourcis (langues × compagnons), terminé
+[x] T16.5 — `install.bat` lance `install.ps1` sans console ; README ×3
+[x] T16.6 — Tests Pester (machine à états, thème, hooks) + validation visuelle
+
+### T17 — Drapeaux à bandes verticales unifiés
+**Effort:** XS
+**Files:** `make-flag-icons.ps1`, `ico/league-of-legends-{fr,it,mx,ro}.ico`
+**Description:** FR, IT, MX, RO n'ont pas des largeurs de bande verticale identiques ; aligner sur FR (trois tiers égaux), corriger la géométrie partagée plutôt que chaque entrée, régénérer les icônes concernées, mesurer avant/après. Délégué à un sous-agent.
+[x] FR était l'intrus (bleu réduit volontairement) → tiers égaux sur les 4 (33/33/33 px), seule fr.ico change
+
+### T18 — Dossier livré épuré (`app/`)
+**Effort:** M
+**Files:** `install.bat` → `Installer.bat`, `LISEZMOI.txt`, `app/` (tous les `.ps1`, `lib/`, `ico/`, `locales.json`, `companion-apps.json`, `config.json`), `tests/`, `.gitignore`, `README.md`, `README.fr.md`, `README.ja.md`, `.forge/project.md`
+**Description:** À la racine : `Installer.bat`, `LISEZMOI.txt` (3 lignes : double-cliquer Installer.bat, jamais en administrateur, README pour le reste), `LICENSE`, README ×3. Tout le technique dans `app/` ; `Installer.bat` lance `app\install.ps1` ; les scripts restent relatifs à `$PSScriptRoot` ; raccourcis → `app\launch-lol.ps1` ; `config.json` généré dans `app/` (gitignore ajusté) ; tests adaptés (`..pp\…`). Vérifier `install.bat`/`create-shortcuts`/`launch-lol` de bout en bout après déplacement.
+[ ]
+
+### T19 — Release GitHub en ZIP
+**Effort:** S
+**Files:** `tools/make-release.ps1`, `.forge/project.md`, `README.md`, `README.fr.md`, `README.ja.md`
+**Description:** Script de packaging : `hextech-launcher-<version>.zip` contenant la racine épurée + `app/` sans `tests/`, `.forge/`, `.gitattributes`, `config.json` ; version lue d'un fichier `app/version.txt` ; `gh release create v<version>` avec le zip et des notes ; README : lien « Télécharger la dernière version » vers les releases. Première release v1.0.0 après validation de T16.
+[ ]
+
+### T20 — Identité : `hex-launcher` + mention de non-affiliation
+**Effort:** S
+**Files:** `README.md`, `README.fr.md`, `README.ja.md`, `.forge/project.md`, `install.ps1` (titres), `lib/splash.lib.ps1` (titre du splash), dépôt GitHub
+**Description:** Renommage en `hex-launcher` (GitHub `gh repo rename`, remote, README, titres d'interface). Mention de non-affiliation en évidence dans les 3 README (politique « Legal Jibber Jabber » de Riot Games, non-affiliation, marques).
+[x] gh repo rename (redirection conservée), remote, README ×3, install.ps1/bat, project.md
+
+### T21 — Jeu d'icônes original (H monogramme)
+**Effort:** M
+**Files:** `make-flag-icons.ps1`, `ico/*.ico`, `create-shortcuts.ps1`, `lib/theme.lib.ps1`, `README.md`, `README.fr.md`, `README.ja.md`
+**Description:** Nouvelle base originale générée en GDI+ : carré aux coins biseautés, fond bleu nuit `#0A0E14`, liseré or `#785A28`, H géométrique or `#C8AA6E` (typographie neutre). `ico/hex-launcher.ico` (multi-tailles) ; `make-flag-icons.ps1` compose les drapeaux dans le fond de cette base → `ico/hex-launcher-xx.ico` pour les 27 locales ; anciens `league-of-legends*.ico` supprimés ; `Resolve-IconPath`, `Get-ThemeIconPath`, README mis à jour. Délégué à un sous-agent avec previews PNG.
+[x] octogone or/bleu nuit + H géométrique, 28 .ico dessinés nativement par taille, drapeaux sous voile alpha, anciennes icônes Riot supprimées
+
 ## Risks
 - Porofessor : `/S` silencieux testé seulement avec Overwolf déjà présent ; Overwolf absent → comportement inconnu (timeout de sonde plus long, message explicite)
 - winget absent (App Installer non installé, comptes restreints) → repli `download`/`browser`
@@ -116,4 +163,11 @@
 | T12 — Étape 2/3 multi-sélection + correctifs de revue | M | [x] |
 | T13 — Raccourcis langue × compagnon | S | [x] |
 | T14 — README ×3 + project.md multi-compagnon | S | [x] |
-| **Total** | **~3,5 j** | |
+| T15 — Le lanceur ferme les autres applis compagnon | S | [x] |
+| T16 — Assistant d'installation unique au thème LoL | L | [x] |
+| T17 — Drapeaux à bandes verticales unifiés | XS | [x] |
+| T18 — Dossier livré épuré (app/) | M | [ ] |
+| T19 — Release GitHub en ZIP | S | [ ] |
+| T20 — Identité hex-launcher + mention de non-affiliation | S | [x] |
+| T21 — Jeu d'icônes original | M | [x] |
+| **Total** | **~5 j** | |

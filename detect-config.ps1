@@ -55,24 +55,27 @@ function New-LaunchConfig {
     }
 }
 
-# ---------------------------------------------------------------- Main
+# ---------------------------------------------------------------- Main (ignoré quand le script est dot-sourcé par install.ps1 ou les tests)
 
-if (-not $OutputPath) { $OutputPath = Join-Path $PSScriptRoot 'config.json' }
-
-if ((Test-Path $OutputPath) -and -not $Force) {
-    "config.json existant conservé : $OutputPath"
-    "  (supprimer le fichier ou relancer avec -Force pour re-détecter)"
-    exit 0
+function Invoke-ConfigDetection([string]$OutputPath, [bool]$Force) {
+    if ((Test-Path $OutputPath) -and -not $Force) {
+        "config.json existant conservé : $OutputPath"
+        "  (supprimer le fichier ou relancer avec -Force pour re-détecter)"
+        return
+    }
+    $config = New-LaunchConfig
+    Write-LaunchConfig $config $OutputPath
+    "config.json généré : $OutputPath"
+    "  Riot Client        : $($config.riotClientPath)" + $(if (Test-Path $config.riotClientPath) { '' } else { '  [INTROUVABLE]' })
+    "  Fichier de langue  : $($config.productSettingsPath)" + $(if (Test-Path $config.productSettingsPath) { '' } else { '  [INTROUVABLE — LoL est-il installé ?]' })
+    if ($config.companionApps.Count -gt 0) {
+        "  Applis compagnon   : $(($config.companionApps | ForEach-Object { $_.name }) -join ', ')"
+    } else {
+        "  Applis compagnon   : aucune détectée — choix possible à l'étape suivante"
+    }
 }
 
-$config = New-LaunchConfig
-Write-LaunchConfig $config $OutputPath
-
-"config.json généré : $OutputPath"
-"  Riot Client        : $($config.riotClientPath)" + $(if (Test-Path $config.riotClientPath) { '' } else { '  [INTROUVABLE]' })
-"  Fichier de langue  : $($config.productSettingsPath)" + $(if (Test-Path $config.productSettingsPath) { '' } else { '  [INTROUVABLE — LoL est-il installé ?]' })
-if ($config.companionApps.Count -gt 0) {
-    "  Applis compagnon   : $(($config.companionApps | ForEach-Object { $_.name }) -join ', ')"
-} else {
-    "  Applis compagnon   : aucune détectée — choix possible à l'étape suivante"
+if ($MyInvocation.InvocationName -ne '.') {
+    if (-not $OutputPath) { $OutputPath = Join-Path $PSScriptRoot 'config.json' }
+    Invoke-ConfigDetection $OutputPath ([bool]$Force)
 }

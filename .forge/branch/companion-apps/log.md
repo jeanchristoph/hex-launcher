@@ -1,3 +1,13 @@
+- [2026-09-13] T16 validée visuellement (assistant unique thème LoL, OP.GG installé via l'assistant). T20 faite (hex-launcher, mention légale). T21 icônes en cours (agent).
+- [2026-09-13] T20 (nom hex-launcher + mention de non-affiliation) et T21 (icônes originales, H monogramme, typographie neutre) ajoutées.
+- [2026-09-13] Retours visuels sur l'assistant corrigés : case à cocher or, page Bienvenue, encadrés pour les chemins (235 tests).
+- [2026-09-13] Confort utilisateur : T18 (racine épurée, technique dans app/) et T19 (release ZIP GitHub) ajoutées ; raccourci « réglages » écarté pour l'instant ; .exe signé noté comme piste future (SmartScreen sans signature).
+- [2026-09-13] T16 en cours : thème lib écrit, splash rebasé sur le thème, gardes Main + hooks UI en place (153 tests), install.ps1 délégué à un sous-agent. T17 (drapeaux verticaux FR/IT/MX/RO) ajoutée et déléguée.
+- [2026-09-13] Test réel utilisateur d'install.bat : config.json = Blitz + Mobalytics (choix utilisateur) ; retour = conflit d'overlays → T15.
+- [2026-09-13] Utilisateur : une seule fenêtre au thème LoL pour l'installateur (options A+B) → T16 (L) ajoutée, décomposée en 6 micro-étapes.
+- [2026-09-13] T15 faite (146 tests). Nouvelle demande : visuel de l'installateur (fenêtre cmd) à rapprocher de l'univers LoL.
+- [2026-09-13] Retour du test réel : conflit entre overlays → T15 (le lanceur ferme les autres applis compagnon, y compris sans -Companion). Ajoutée au plan, brief complété.
+- [2026-09-13] Plan T1-T14 terminé, master = 6eabf35 sur GitHub (branche par défaut master, main supprimée). Clôture en attente : test réel install.bat + raccourcis par l'utilisateur.
 - [2026-09-13] T11-T14 faits (modèle multi-compagnon + correctifs de revue), flux réel validé sur la machine (install/uninstall des 3 stratégies, splash fluide), T4.1 validé, T10 fait : Porofessor sans Overwolf = setup Overwolf interactif (73 s), pas d'UAC observable (désactivé chez l'utilisateur). 141 tests verts.
 - [2026-09-13] Dépôt GitHub hextech-launcher créé par l'utilisateur ; remote rebranché, main poussé en force (6 commits, commit auto GitHub remplacé), description + topics posés ; lol-lang-switcher supprimé par l'utilisateur. Branche companion-apps à commiter (grave).
 - [2026-09-13] Revue adversariale (3 relecteurs : bas niveau PS 5.1, sécurité, architecture/régression) : ~40 constats, majeurs retenus — Start-Process -Wait arborescent, $null fantôme sur machine vierge, échec de désinstallation ignoré, attente Overwolf morte/courte, regex O= contournable, exécution élevée non refusée, config.json réécrit silencieusement. Corrections planifiées en T12.
