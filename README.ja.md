@@ -16,23 +16,27 @@ Windows 向け League of Legends 起動アシスタント：デスクトップ�
 
 | ファイル | 役割 |
 |---|---|
-| `install.bat` | **これをダブルクリック**：インストール場所を検出し、補助アプリ、次に言語とショートカットを選択させます |
-| `config.json` | Riot のパスと補助アプリの一覧。`install.bat` が生成。検出がうまくいかない場合は手動編集可 |
-| `locales.json` | インストール時に選べる言語のカタログ（Riot のコード＋表示名） |
-| `companion-apps.json` | 補助アプリのカタログ：各アプリの検出・インストール・アンインストール・起動方法と、バイナリの署名者 |
-| `launch-lol.ps1` | ランチャー本体：Riot Client を終了し、言語を強制設定し、ゲームを再起動（＋ `-Companion` で指定した補助アプリ） |
-| `detect-config.ps1` | `install.bat` から呼ばれる：Riot と既にインストール済みの補助アプリを検出 |
-| `manage-companion-app.ps1` | `install.bat` から呼ばれる：補助アプリの選択、不足分のインストール、要求時のアンインストール |
-| `create-shortcuts.ps1` | `install.bat` から呼ばれる：言語と補助アプリの選択ダイアログを表示し、組み合わせごとに `.lnk` をデスクトップに作成（デスクトップに書き込めない場合はこのフォルダーに作成） |
-| `lib/companion-app.lib.ps1` | 共通関数：カタログ、レジストリによる検出（読み取り専用）、アンインストールコマンド、Authenticode 署名検証 |
-| `lib/launch-config.lib.ps1` | 共通関数：`config.json` の読み書き、旧形式（単一アプリ）からの移行 |
-| `lib/splash.lib.ps1` | 共通のアニメーション付きスプラッシュ（ゲーム起動、補助アプリのインストール） |
+| `install.bat` | **これをダブルクリック**：インストールアシスタントを開きます（1 つのウィンドウ：検出、補助アプリ、ショートカット） |
+| `LISEZMOI.txt` | 3 行のクイックスタート（仏／英） |
+| `app/` | エンジン — 編集不要 |
+| `app/install.ps1` | インストールアシスタント（LoL テーマの単一ウィンドウ） |
+| `app/config.json` | Riot のパスと補助アプリの一覧。`install.bat` が生成。検出がうまくいかない場合は手動編集可 |
+| `app/locales.json` | インストール時に選べる言語のカタログ（Riot のコード＋表示名） |
+| `app/companion-apps.json` | 補助アプリのカタログ：各アプリの検出・インストール・アンインストール・起動方法と、バイナリの署名者 |
+| `app/launch-lol.ps1` | ランチャー本体：Riot Client を終了し、言語を強制設定し、ゲームを再起動（＋ `-Companion` で指定した補助アプリ） |
+| `app/detect-config.ps1` | `install.bat` から呼ばれる：Riot と既にインストール済みの補助アプリを検出 |
+| `app/manage-companion-app.ps1` | `install.bat` から呼ばれる：補助アプリの選択、不足分のインストール、要求時のアンインストール |
+| `app/create-shortcuts.ps1` | `install.bat` から呼ばれる：言語と補助アプリの選択ダイアログを表示し、組み合わせごとに `.lnk` をデスクトップに作成（デスクトップに書き込めない場合はこのフォルダーに作成） |
+| `app/lib/companion-app.lib.ps1` | 共通関数：カタログ、レジストリによる検出（読み取り専用）、アンインストールコマンド、Authenticode 署名検証 |
+| `app/lib/launch-config.lib.ps1` | 共通関数：`config.json` の読み書き、旧形式（単一アプリ）からの移行 |
+| `app/lib/splash.lib.ps1` | 共通のアニメーション付きスプラッシュ（ゲーム起動、補助アプリのインストール） |
 | `tests/` | Pester テスト（`Invoke-Pester -Path tests`） |
-| `make-flag-icons.ps1` | ツール：オリジナルの基本アイコンから `ico/` の国旗アイコンを再生成（通常の使用には不要） |
-| `ico/` | アイコン：オリジナルの基本アイコン（H モノグラム）＋言語ごとの国旗バージョン（`hex-launcher-xx.ico`） |
+| `app/make-flag-icons.ps1` | ツール：オリジナルの基本アイコンから `ico/` の国旗アイコンを再生成（通常の使用には不要） |
+| `app/ico/` | アイコン：オリジナルの基本アイコン（H モノグラム）＋言語ごとの国旗バージョン（`hex-launcher-xx.ico`） |
 
 ## 新しい PC へのインストール
 
+0. **[最新版をダウンロード](https://github.com/jeanchristoph/hex-launcher/releases/latest)**（`hex-launcher-x.y.z.zip`）して展開するか、リポジトリをクローンします。
 1. このフォルダーを好きな場所にコピーします（例：`Documents\hex-launcher`）。別の PC から持ってきた場合は、
    検出が正しく動くように **`config.json` を含めない**でください。
 2. **`install.bat`** をダブルクリックします（「管理者として実行」は不可：ツールは意図的に拒否します）。3 つのステップ：
@@ -49,8 +53,8 @@ Windows 向け League of Legends 起動アシスタント：デスクトップ�
 
 後から言語や補助アプリを追加・削除するには：`install.bat` を再実行してください。
 
-検出が間違っていた場合は：`config.json` を編集（下記参照）して `install.bat` を再実行。
-検出をやり直すには：`config.json` を削除して再実行してください。
+検出が間違っていた場合は：`app\config.json` を編集（下記参照）して `install.bat` を再実行。
+検出をやり直すには：`app\config.json` を削除して再実行してください。
 
 新しい言語で初めて起動するとき、Riot Client がテキスト＋ボイスパック（数百 MB）をダウンロードします。正常な動作です。
 
@@ -84,10 +88,10 @@ Overwolf アプリのアンインストール後、Overwolf はブラウザー�
 
 スクリプトでの使用（配布）：
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File manage-companion-app.ps1 -Apps blitz,opgg                   # 確認ダイアログあり
-powershell -NoProfile -ExecutionPolicy Bypass -File manage-companion-app.ps1 -Apps blitz -UninstallOthers -Force # ダイアログなし
-powershell -NoProfile -ExecutionPolicy Bypass -File manage-companion-app.ps1 -Apps none -DryRun                 # 実行内容の表示のみ
-powershell -NoProfile -ExecutionPolicy Bypass -File create-shortcuts.ps1 -Locales ja_JP,ko_KR -Companions blitz,opgg
+powershell -NoProfile -ExecutionPolicy Bypass -File app\manage-companion-app.ps1 -Apps blitz,opgg                   # 確認ダイアログあり
+powershell -NoProfile -ExecutionPolicy Bypass -File app\manage-companion-app.ps1 -Apps blitz -UninstallOthers -Force # ダイアログなし
+powershell -NoProfile -ExecutionPolicy Bypass -File app\manage-companion-app.ps1 -Apps none -DryRun                 # 実行内容の表示のみ
+powershell -NoProfile -ExecutionPolicy Bypass -File app\create-shortcuts.ps1 -Locales ja_JP,ko_KR -Companions blitz,opgg
 ```
 ID：`porofessor`、`blitz`、`opgg`、`mobalytics`、`none`。終了コード：0 成功 · 1 エラー · 2 キャンセルまたは拒否。
 
@@ -124,7 +128,7 @@ ID：`porofessor`、`blitz`、`opgg`、`mobalytics`、`none`。終了コード�
 | `uninstall.dialogProcessNames` | 対話式：待機する発行者ダイアログのプロセス（Overwolf：`OWUninstallMenu`） |
 | `uninstall.notice` | アンインストール前の確認に表示する文（例：Overwolf の注意） |
 
-## `config.json`
+## `app\config.json`
 
 ```json
 {
@@ -162,13 +166,13 @@ ID：`porofessor`、`blitz`、`opgg`、`mobalytics`、`none`。終了コード�
 Riot が提供するすべての言語が `locales.json` にあり、インストール時に選択できます。ショートカット名は
 `League of Legends XX`（XX = コードの国部分：`ja_JP` → JP、`ko_KR` → KR）で、補助アプリが付く場合は ` - <補助アプリ>` が続きます。
 
-アイコン：`ico/hex-launcher-xx.ico`（xx は小文字）— カタログ内のすべての言語に国旗があります。
-アイコンがない場合は基本アイコンが使われます。
+アイコン：各ショートカットにはその言語の国旗バリエーション（`app/ico/hex-launcher-xx.ico`、例：`ja_JP` は `hex-launcher-jp.ico`）が
+設定されます。国旗がない言語には基本アイコン `app/ico/hex-launcher.ico` が使われます。
 
 カタログにない言語（Riot の新しいロケール）を追加するには：
 1. yaml ファイルの `available_locales` にある正確なコードで `locales.json` に 1 行追加；
 2. （任意）`make-flag-icons.ps1` の `$FlagDrawings` に国旗の描画を追加し、
-   `powershell -NoProfile -ExecutionPolicy Bypass -File make-flag-icons.ps1 -Locales xx_XX` を実行。
+   `powershell -NoProfile -ExecutionPolicy Bypass -File app\make-flag-icons.ps1 -Locales xx_XX` を実行。
 
 ## 仕組み
 
@@ -193,7 +197,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-Pester -Path test
 
 - **ゲームが前の言語のまま**：書き換え中に Riot Client がまだ動いていました。ランチャーは自動で終了させますが、
   プロセスが固まっている場合は手動で終了（通知領域のアイコン → 終了）して再試行してください。
-- **ダブルクリックしても何も起きない**：フォルダーで PowerShell を開き、`.\launch-lol.ps1 -Locale ja_JP` を実行して
+- **ダブルクリックしても何も起きない**：フォルダーで PowerShell を開き、`.\app\launch-lol.ps1 -Locale ja_JP` を実行して
   エラーを確認してください（設定ファイルが見つからない、パスが間違っているなど）。
 - **スプラッシュやダイアログの文字化け**（`Ã©`、`â€¦`）：`.ps1` が BOM なしで保存し直されています。
   すべてのスクリプト（`launch-lol.ps1`、`manage-companion-app.ps1`、`create-shortcuts.ps1`、`lib\*.ps1`）は
@@ -207,5 +211,5 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-Pester -Path test
   ツールはそれを実行しません。Windows の「インストールされているアプリ」からアンインストールしてください。
 - **「Désinstaller」の後も補助アプリが残っている**：発行者のダイアログを確認せずに閉じた（Overwolf）か、
   アンインストールに予想以上の時間がかかりました。他には何もインストールされていません。`install.bat` を再実行してください。
-- **ゲームを起動せずにテストする**：`.\launch-lol.ps1 -Locale ja_JP -DryRun -YamlPath copy.yaml` で、何も終了・起動せずに
-  スプラッシュを表示してコピーを書き換えます。`manage-companion-app.ps1 -DryRun` は補助アプリの操作を実行せずに表示します。
+- **ゲームを起動せずにテストする**：`.\app\launch-lol.ps1 -Locale ja_JP -DryRun -YamlPath copy.yaml` で、何も終了・起動せずに
+  スプラッシュを表示してコピーを書き換えます。`app\manage-companion-app.ps1 -DryRun` は補助アプリの操作を実行せずに表示します。

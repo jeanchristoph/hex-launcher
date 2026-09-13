@@ -3,7 +3,7 @@
     Tests Pester 3.4 de lib\launch-config.lib.ps1 : lecture/écriture de config.json et migration du format.
 #>
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
-. (Join-Path $here '..\lib\launch-config.lib.ps1')
+. (Join-Path $here '..\app\lib\launch-config.lib.ps1')
 . (Join-Path $here 'companion-test-helpers.ps1')
 
 Describe 'Read-LaunchConfig' {

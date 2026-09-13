@@ -5,13 +5,13 @@
     Rappel Pester 3 : un Mock déclaré dans un It survit jusqu'à la fin du Describe → re-déclarer quand l'ordre compte.
 #>
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
-. (Join-Path $here '..\manage-companion-app.ps1')
+. (Join-Path $here '..\app\manage-companion-app.ps1')
 . (Join-Path $here 'companion-test-helpers.ps1')
 
 function New-TestOptions([hashtable]$Overrides = @{}) {
     $options = @{
         RequestedIds = @(); HasRequest = $false; UninstallOthers = $false; Force = $false; DryRun = $false
-        ConfigPath = ''; CatalogPath = (Join-Path $here '..\companion-apps.json')
+        ConfigPath = ''; CatalogPath = (Join-Path $here '..\app\companion-apps.json')
     }
     foreach ($key in $Overrides.Keys) { $options[$key] = $Overrides[$key] }
     return $options

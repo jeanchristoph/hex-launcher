@@ -1,3 +1,9 @@
+- [2026-09-14] T24 faite : raccourcis sur ico\hex-launcher-xx.ico (repli base), plus aucune référence à league_of_legends.live.ico — 250 tests. Plan entièrement coché ; reste grave master + release v1.0.0.
+- [2026-09-14] Icônes finales HL déposées dans app/ico (28 .ico) → T24 ajoutée (raccourcis par drapeau, fin de l'intérim T23), T22 close comme obsolète.
+- [2026-09-14] Icône : 15 propositions livrées (5 presets, P1-P5, S01-S10), l'utilisateur retient S08/S10 puis fournit un modèle HL généré (anneau or, HL facetté, gemme cyan) → reproduction programmatique en cours (modele-v1, FR seul). Versionnage : jamais écraser une vN (s08-v2/v3, s10-v2/v3).
+- [2026-09-14] Intérim T23 : raccourcis avec l'icône LoL installée sur le PC (référencée, pas copiée), sans drapeau. — décision utilisateur.
+- [2026-09-13] Utilisateur : plutôt que référencer l'icône LoL locale dans les raccourcis, rapprocher le H de l'esprit du L (empattements, or métallique) sans plagiat → T22 déléguée.
+- [2026-09-13] T18 (app/), T19 (make-release.ps1, zip 1.0.0), T21 (28 icônes originales) faits — 240 tests. Reste : grave master + publication de la release v1.0.0.
 - [2026-09-13] T16 validée visuellement (assistant unique thème LoL, OP.GG installé via l'assistant). T20 faite (hex-launcher, mention légale). T21 icônes en cours (agent).
 - [2026-09-13] T20 (nom hex-launcher + mention de non-affiliation) et T21 (icônes originales, H monogramme, typographie neutre) ajoutées.
 - [2026-09-13] Retours visuels sur l'assistant corrigés : case à cocher or, page Bienvenue, encadrés pour les chemins (235 tests).

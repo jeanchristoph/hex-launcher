@@ -3,7 +3,7 @@
     Tests Pester 3.4 de lib\theme.lib.ps1 — fabriques de contrôles thématisés, sans afficher de fenêtre.
 #>
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
-. (Join-Path $here '..\lib\theme.lib.ps1')
+. (Join-Path $here '..\app\lib\theme.lib.ps1')
 
 Describe 'Get-ThemeColor' {
     It 'rend la couleur or du thème' {
