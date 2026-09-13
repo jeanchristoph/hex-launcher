@@ -1,9 +1,9 @@
 [
-  { "code": "ja_JP", "label": "日本語 (Japon)",            "default": true },
+  { "code": "ja_JP", "label": "日本語",                    "default": true },
   { "code": "fr_FR", "label": "Français",                 "default": true },
   { "code": "en_US", "label": "English (US)" },
   { "code": "en_GB", "label": "English (UK)" },
-  { "code": "ko_KR", "label": "한국어 (Corée)" },
+  { "code": "ko_KR", "label": "한국어" },
   { "code": "de_DE", "label": "Deutsch" },
   { "code": "es_ES", "label": "Español (España)" },
   { "code": "es_MX", "label": "Español (México)" },
