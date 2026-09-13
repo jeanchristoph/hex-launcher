@@ -1,0 +1,11 @@
+# Configuration propre à chaque machine (générée par install.bat / detect-config.ps1)
+config.json
+
+# Raccourcis générés (chemins absolus, propres à la machine)
+*.lnk
+
+# Windows / éditeurs
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
