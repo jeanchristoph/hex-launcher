@@ -320,7 +320,8 @@ function Get-IconFileName([string]$Code) {
 # ---------------------------------------------------------------- Main
 
 if (-not $Locales) {
-    $Locales = @(Get-Content (Join-Path $folder 'locales.json') -Raw -Encoding UTF8 | ConvertFrom-Json | ForEach-Object { $_.code })
+    # ForEach-Object déplie le tableau que ConvertFrom-Json (PS 5.1) renvoie comme un seul objet
+    $Locales = @(Get-Content (Join-Path $folder 'locales.json') -Raw -Encoding UTF8 | ConvertFrom-Json | ForEach-Object { $_ } | ForEach-Object { $_.code })
 }
 $Locales = @($Locales | ForEach-Object { $_ -split '[,;\s]+' } | Where-Object { $_ })
 
