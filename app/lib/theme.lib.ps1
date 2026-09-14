@@ -3,7 +3,7 @@
     Thème visuel League of Legends partagé : palette et fabriques de contrôles WinForms.
 
 .DESCRIPTION
-    Chargé par dot-sourcing depuis splash.lib.ps1 et install.ps1 :
+    Chargé par dot-sourcing depuis splash.lib.ps1 et setup.ps1 :
         . (Join-Path $PSScriptRoot 'lib\theme.lib.ps1')
 
     Palette inspirée du client LoL : fond nuit, or pour les titres et liserés, crème pour le texte,

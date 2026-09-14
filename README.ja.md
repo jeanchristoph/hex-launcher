@@ -16,17 +16,17 @@ Windows 向け League of Legends 起動アシスタント：デスクトップ�
 
 | ファイル | 役割 |
 |---|---|
-| `install.bat` | **これをダブルクリック**：インストールアシスタントを開きます（1 つのウィンドウ：検出、補助アプリ、ショートカット） |
+| `setup.bat` | **これをダブルクリック**（旧 `install.bat`）：セットアップアシスタントを開きます（1 つのウィンドウ：検出、補助アプリ、ショートカット） |
 | `LISEZMOI.txt` | 3 行のクイックスタート（仏／英） |
 | `app/` | エンジン — 編集不要 |
-| `app/install.ps1` | インストールアシスタント（LoL テーマの単一ウィンドウ） |
-| `app/config.json` | Riot のパスと補助アプリの一覧。`install.bat` が生成。検出がうまくいかない場合は手動編集可 |
+| `app/setup.ps1` | セットアップアシスタント（LoL テーマの単一ウィンドウ） |
+| `app/config.json` | Riot のパスと補助アプリの一覧。`setup.bat` が生成。検出がうまくいかない場合は手動編集可 |
 | `app/locales.json` | インストール時に選べる言語のカタログ（Riot のコード＋表示名） |
 | `app/companion-apps.json` | 補助アプリのカタログ：各アプリの検出・インストール・アンインストール・起動方法と、バイナリの署名者 |
 | `app/launch-lol.ps1` | ランチャー本体：Riot Client を終了し、言語を強制設定し、ゲームを再起動（＋ `-Companion` で指定した補助アプリ） |
-| `app/detect-config.ps1` | `install.bat` から呼ばれる：Riot と既にインストール済みの補助アプリを検出 |
-| `app/manage-companion-app.ps1` | `install.bat` から呼ばれる：補助アプリの選択、不足分のインストール、要求時のアンインストール |
-| `app/create-shortcuts.ps1` | `install.bat` から呼ばれる：言語と補助アプリの選択ダイアログを表示し、組み合わせごとに `.lnk` をデスクトップに作成（デスクトップに書き込めない場合はこのフォルダーに作成） |
+| `app/detect-config.ps1` | `setup.bat` から呼ばれる：Riot と既にインストール済みの補助アプリを検出 |
+| `app/manage-companion-app.ps1` | `setup.bat` から呼ばれる：補助アプリの選択、不足分のインストール、要求時のアンインストール |
+| `app/create-shortcuts.ps1` | `setup.bat` から呼ばれる：言語と補助アプリの選択ダイアログを表示し、組み合わせごとに `.lnk` をデスクトップに作成（デスクトップに書き込めない場合はこのフォルダーに作成） |
 | `app/lib/companion-app.lib.ps1` | 共通関数：カタログ、レジストリによる検出（読み取り専用）、アンインストールコマンド、Authenticode 署名検証 |
 | `app/lib/launch-config.lib.ps1` | 共通関数：`config.json` の読み書き、旧形式（単一アプリ）からの移行 |
 | `app/lib/splash.lib.ps1` | 共通のアニメーション付きスプラッシュ（ゲーム起動、補助アプリのインストール） |
@@ -35,12 +35,12 @@ Windows 向け League of Legends 起動アシスタント：デスクトップ�
 | `app/lib/icon.lib.ps1` / `icon-badge.lib.ps1` | `.ico` の読み書きと、国旗アイコンへの補助アプリバッジの合成 |
 | `app/ico/` | アイコン：オリジナルの基本アイコン（H モノグラム）＋言語ごとの国旗バージョン（`hex-launcher-xx.ico`）。`ico/companion/` にはこの PC で合成された国旗＋バッジのアイコンが入ります |
 
-## 新しい PC へのインストール
+## 新しい PC でのセットアップ
 
 0. **[最新版をダウンロード](https://github.com/jeanchristoph/hex-launcher/releases/latest)**（`hex-launcher-x.y.z.zip`）して展開するか、リポジトリをクローンします。
 1. このフォルダーを好きな場所にコピーします（例：`Documents\hex-launcher`）。別の PC から持ってきた場合は、
    検出が正しく動くように **`config.json` を含めない**でください。
-2. **`install.bat`** をダブルクリックします（「管理者として実行」は不可：ツールは意図的に拒否します）。3 つのステップ：
+2. **`setup.bat`** をダブルクリックします（「管理者として実行」は不可：ツールは意図的に拒否します）。3 つのステップ：
    - **[1/3] 検出** — Riot Client を検出（Riot 公式のファイル `RiotClientInstalls.json` を使用）し、カタログの補助アプリのうち
      既にインストール済みのものをすべて検出し、`config.json` を書き出します（既に存在する場合は上書きしません：手動設定は保持されます）；
    - **[2/3] 補助アプリ** — カタログの各アプリがチェックボックス付きで表示され、前回の選択（なければインストール済みのもの）が
@@ -52,9 +52,9 @@ Windows 向け League of Legends 起動アシスタント：デスクトップ�
      デスクトップに書き込めない場合（保護されたフォルダー、OneDrive など）は、代わりにこのフォルダーに作成します。
 3. 使いたい言語と補助アプリのショートカットをダブルクリックします。
 
-後から言語や補助アプリを追加・削除するには：`install.bat` を再実行してください。
+後から言語や補助アプリを追加・削除するには：`setup.bat` を再実行してください。
 
-検出が間違っていた場合は：`app\config.json` を編集（下記参照）して `install.bat` を再実行。
+検出が間違っていた場合は：`app\config.json` を編集（下記参照）して `setup.bat` を再実行。
 検出をやり直すには：`app\config.json` を削除して再実行してください。
 
 新しい言語で初めて起動するとき、Riot Client がテキスト＋ボイスパック（数百 MB）をダウンロードします。正常な動作です。
@@ -209,12 +209,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-Pester -Path test
   **BOM 付き UTF-8** である必要があります（VS Code：ステータスバー → エンコード → 「エンコード付きで保存」）。
 - **ショートカットのアイコンが更新されない**：Windows のアイコンキャッシュです。フォルダーで右クリック → 最新の情報に更新、
   それでもだめならサインアウト／サインインしてください。
-- **「Ne pas exécuter en tant qu'administrateur」**：`install.bat` を昇格して起動しました。通常起動してください。
+- **「Ne pas exécuter en tant qu'administrateur」**：`setup.bat` を昇格して起動しました。通常起動してください。
 - **「winget indisponible」**：この Windows に App Installer がありません。Microsoft Store からインストールするか、
   ツールがブラウザーで開く Blitz のダウンロードページを使ってください。
 - **「désinstalleur … non signé」**：レジストリで見つかったアンインストーラーが想定した発行者の署名ではありません。
   ツールはそれを実行しません。Windows の「インストールされているアプリ」からアンインストールしてください。
 - **「Désinstaller」の後も補助アプリが残っている**：発行者のダイアログを確認せずに閉じた（Overwolf）か、
-  アンインストールに予想以上の時間がかかりました。他には何もインストールされていません。`install.bat` を再実行してください。
+  アンインストールに予想以上の時間がかかりました。他には何もインストールされていません。`setup.bat` を再実行してください。
 - **ゲームを起動せずにテストする**：`.\app\launch-lol.ps1 -Locale ja_JP -DryRun -YamlPath copy.yaml` で、何も終了・起動せずに
   スプラッシュを表示してコピーを書き換えます。`app\manage-companion-app.ps1 -DryRun` は補助アプリの操作を実行せずに表示します。

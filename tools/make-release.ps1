@@ -3,7 +3,7 @@
     Construit l'archive de distribution hex-launcher-<version>.zip et, sur demande, publie la release GitHub.
 
 .DESCRIPTION
-    L'archive contient exactement ce qu'un joueur doit télécharger : install.bat, LISEZMOI.txt, LICENSE,
+    L'archive contient exactement ce qu'un joueur doit télécharger : setup.bat, LISEZMOI.txt, LICENSE,
     les README et le dossier app\ — sans config.json (propre à chaque machine), sans tests\, .forge\,
     .git*, tools\ ni dist\. La version est lue dans app\version.txt.
 
@@ -19,7 +19,7 @@ param(
     [string]$Notes = ''
 )
 
-$ReleaseRootFiles = @('install.bat', 'LISEZMOI.txt', 'LICENSE', 'README.md', 'README.fr.md', 'README.ja.md')
+$ReleaseRootFiles = @('setup.bat', 'LISEZMOI.txt', 'LICENSE', 'README.md', 'README.fr.md', 'README.ja.md')
 $ReleaseExcluded     = @('config.json')
 $ReleaseExcludedDirs = @('ico\companion')   # icônes drapeau + pastille composées sur chaque poste par create-shortcuts.ps1
 

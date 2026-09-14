@@ -119,7 +119,7 @@ try {
         if (-not $started) { Update-SplashStatus $splash "$($companionApp.name) introuvable — ignoré (vérifier config.json)" }
         Wait-WithAnimation 1.5
     } elseif ($Companion) {
-        Update-SplashStatus $splash "Appli compagnon « $Companion » absente de config.json — ignorée (relancer install.bat)"
+        Update-SplashStatus $splash "Appli compagnon « $Companion » absente de config.json — ignorée (relancer setup.bat)"
         Wait-WithAnimation 1.5
     } else {
         Wait-WithAnimation 1

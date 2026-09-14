@@ -1,12 +1,12 @@
 ﻿<#
 .SYNOPSIS
-    Tests Pester 3.4 de install.ps1 — le script est dot-sourcé, son bloc Main est ignoré : aucune fenêtre n'est affichée.
+    Tests Pester 3.4 de setup.ps1 — le script est dot-sourcé, son bloc Main est ignoré : aucune fenêtre n'est affichée.
     Machine à états, résumés et orchestration des pages sont testés sans WinForms ; le moteur (installeurs,
     raccourcis, config.json) est mocké.
     Rappel Pester 3 : un Mock déclaré dans un It survit jusqu'à la fin du Describe → re-déclarer quand l'ordre compte.
 #>
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
-. (Join-Path $here '..\app\install.ps1')
+. (Join-Path $here '..\app\setup.ps1')
 . (Join-Path $here 'companion-test-helpers.ps1')
 
 function New-TestLaunchConfig([object[]]$CompanionApps = @(), [string]$RiotPath = 'C:\Riot\RiotClientServices.exe', [string]$YamlPath = 'C:\ProgramData\lol.yaml') {
@@ -24,7 +24,7 @@ function New-FakeForm {
     return $form
 }
 
-function Reset-InstallTestState([hashtable]$Overrides = @{}) {
+function Reset-SetupTestState([hashtable]$Overrides = @{}) {
     $script:InstallState.StepId            = 'detect'
     $script:InstallState.ExitCode          = 2
     $script:InstallState.IsBusy            = $false
@@ -42,13 +42,13 @@ function Reset-InstallTestState([hashtable]$Overrides = @{}) {
 
 Describe 'Machine à états de l''assistant' {
     It 'enchaîne détection, applis compagnon, raccourcis puis terminé' {
-        $InstallSteps -join ',' | Should Be 'detect,apps,shortcuts,done'
+        $SetupSteps -join ',' | Should Be 'detect,apps,shortcuts,done'
     }
 
     It 'numérote les étapes dans l''ordre et rend -1 pour une étape inconnue' {
-        Get-InstallStepIndex 'detect' | Should Be 0
-        Get-InstallStepIndex 'done' | Should Be 3
-        Get-InstallStepIndex 'inconnue' | Should Be -1
+        Get-SetupStepIndex 'detect' | Should Be 0
+        Get-SetupStepIndex 'done' | Should Be 3
+        Get-SetupStepIndex 'inconnue' | Should Be -1
     }
 
     It 'donne l''étape suivante et aucune après la dernière' {
@@ -75,22 +75,22 @@ Describe 'Machine à états de l''assistant' {
     }
 
     It 'qualifie chaque étape par rapport à l''étape courante' {
-        Get-InstallStepStatus 'detect' 'apps' | Should Be 'Done'
-        Get-InstallStepStatus 'apps' 'apps' | Should Be 'Current'
-        Get-InstallStepStatus 'shortcuts' 'apps' | Should Be 'Upcoming'
+        Get-SetupStepStatus 'detect' 'apps' | Should Be 'Done'
+        Get-SetupStepStatus 'apps' 'apps' | Should Be 'Current'
+        Get-SetupStepStatus 'shortcuts' 'apps' | Should Be 'Upcoming'
     }
 
     It 'coche les étapes passées et laisse les autres telles quelles' {
-        Get-InstallStepLabel 'detect' 'apps' | Should Be '✓ 1. Bienvenue'
-        Get-InstallStepLabel 'apps' 'apps' | Should Be '2. Applis compagnon'
-        Get-InstallStepLabel 'shortcuts' 'apps' | Should Be '3. Raccourcis'
-        Get-InstallStepLabel 'done' 'done' | Should Be '4. Terminé'
+        Get-SetupStepLabel 'detect' 'apps' | Should Be '✓ 1. Bienvenue'
+        Get-SetupStepLabel 'apps' 'apps' | Should Be '2. Applis compagnon'
+        Get-SetupStepLabel 'shortcuts' 'apps' | Should Be '3. Raccourcis'
+        Get-SetupStepLabel 'done' 'done' | Should Be '4. Terminé'
     }
 
     It 'colore l''étape courante en or, les faites en cyan, les autres en gris' {
-        Get-InstallStepColor 'Current' | Should Be 'Gold'
-        Get-InstallStepColor 'Done' | Should Be 'Accent'
-        Get-InstallStepColor 'Upcoming' | Should Be 'Muted'
+        Get-SetupStepColor 'Current' | Should Be 'Gold'
+        Get-SetupStepColor 'Done' | Should Be 'Accent'
+        Get-SetupStepColor 'Upcoming' | Should Be 'Muted'
     }
 
     It 'nomme le bouton principal selon ce que la page exécute' {
@@ -101,8 +101,8 @@ Describe 'Machine à états de l''assistant' {
     }
 }
 
-Describe 'Get-InstallLayout' {
-    $layout = Get-InstallLayout 784 521
+Describe 'Get-SetupLayout' {
+    $layout = Get-SetupLayout 784 521
 
     It 'place les boutons en bas de la zone cliente' {
         $layout.ButtonsTop + 34 | Should BeLessThan 522
@@ -141,23 +141,23 @@ Describe 'Get-CheckedItemIds' {
     }
 }
 
-Describe 'New-InstallCheckedList' {
+Describe 'New-SetupCheckedList' {
     $items = @(@{ Key = 'ja_JP'; Label = 'ja_JP   日本語' }, @{ Key = 'fr_FR'; Label = 'fr_FR   Français' })
 
     It 'pré-coche les clés demandées et les retrouve sans fenêtre' {
-        $list = New-InstallCheckedList $items @('fr_FR') 0 0 200 100
+        $list = New-SetupCheckedList $items @('fr_FR') 0 0 200 100
         $list.Items.Count | Should Be 2
-        (Get-InstallCheckedKeys $list) -join ',' | Should Be 'fr_FR'
+        (Get-SetupCheckedKeys $list) -join ',' | Should Be 'fr_FR'
     }
 
     It 'anticipe un cochage en attente' {
-        $list = New-InstallCheckedList $items @('fr_FR') 0 0 200 100
-        (Get-InstallCheckedKeys $list 0 $true) -join ',' | Should Be 'ja_JP,fr_FR'
+        $list = New-SetupCheckedList $items @('fr_FR') 0 0 200 100
+        (Get-SetupCheckedKeys $list 0 $true) -join ',' | Should Be 'ja_JP,fr_FR'
     }
 
     It 'accepte une liste vide' {
-        $list = New-InstallCheckedList @() @() 0 0 200 100
-        (Get-InstallCheckedKeys $list).Count | Should Be 0
+        $list = New-SetupCheckedList @() @() 0 0 200 100
+        (Get-SetupCheckedKeys $list).Count | Should Be 0
     }
 }
 
@@ -266,7 +266,7 @@ Describe 'Get-ConfigStatusText' {
 }
 
 
-Describe 'Initialize-InstallConfig' {
+Describe 'Initialize-SetupConfig' {
     AfterEach { Remove-TestTempFiles }
     Mock Write-LaunchConfig {}
     Mock New-LaunchConfig { [ordered]@{ riotClientPath = 'C:\r.exe'; productSettingsPath = 'C:\y'; companionApps = @() } }
@@ -274,7 +274,7 @@ Describe 'Initialize-InstallConfig' {
     It 'génère config.json quand il manque, puis le relit' {
         Mock Read-LaunchConfig { New-TestLaunchConfig }
         $absent = Join-Path $env:TEMP ("config-absent-{0}.json" -f [guid]::NewGuid())
-        $result = Initialize-InstallConfig $absent
+        $result = Initialize-SetupConfig $absent
         $result.Created | Should Be $true
         $result.Config.riotClientPath | Should Be 'C:\Riot\RiotClientServices.exe'
         Assert-MockCalled -Scope It New-LaunchConfig -Exactly -Times 1
@@ -283,7 +283,7 @@ Describe 'Initialize-InstallConfig' {
 
     It 'conserve un config.json existant sans le réécrire' {
         Mock Read-LaunchConfig { New-TestLaunchConfig }
-        $result = Initialize-InstallConfig (New-TempConfig)
+        $result = Initialize-SetupConfig (New-TempConfig)
         $result.Created | Should Be $false
         Assert-MockCalled -Scope It Write-LaunchConfig -Exactly -Times 0
     }
@@ -360,295 +360,295 @@ Describe 'Get-CompletionSummaryLines' {
 
 # ---------------------------------------------------------------- Journal et sûreté
 
-Describe 'Write-InstallLog' {
+Describe 'Write-SetupLog' {
     Mock Invoke-SplashTick {}
 
     It 'n''échoue pas quand la page n''a pas de journal' {
-        Reset-InstallTestState
-        { Write-InstallLog 'x' } | Should Not Throw
+        Reset-SetupTestState
+        { Write-SetupLog 'x' } | Should Not Throw
     }
 
     It 'ajoute les lignes à la suite, séparées par un retour à la ligne' {
-        Reset-InstallTestState @{ Controls = @{ Log = (New-ThemedLog 0 0 100 100) } }
-        Write-InstallLog 'Téléchargement de Blitz…'
-        Write-InstallLog 'Créé : x.lnk'
+        Reset-SetupTestState @{ Controls = @{ Log = (New-ThemedLog 0 0 100 100) } }
+        Write-SetupLog 'Téléchargement de Blitz…'
+        Write-SetupLog 'Créé : x.lnk'
         $script:InstallState.Controls.Log.Text | Should Be "Téléchargement de Blitz…`r`nCréé : x.lnk"
     }
 }
 
-Describe 'Invoke-InstallLogged' {
-    Mock Write-InstallLog {}
+Describe 'Invoke-SetupLogged' {
+    Mock Write-SetupLog {}
 
     It 'rend la valeur produite par l''action' {
-        Invoke-InstallLogged { 'valeur' } | Should Be 'valeur'
+        Invoke-SetupLogged { 'valeur' } | Should Be 'valeur'
     }
 
     It 'détourne les avertissements du moteur vers le journal sans les mêler au résultat' {
-        $result = Invoke-InstallLogged { Write-Warning 'winget indisponible'; @{ InstallFailed = @('Blitz') } }
+        $result = Invoke-SetupLogged { Write-Warning 'winget indisponible'; @{ InstallFailed = @('Blitz') } }
         $result.InstallFailed -join ',' | Should Be 'Blitz'
-        Assert-MockCalled -Scope It Write-InstallLog -Exactly -Times 1 -ParameterFilter { $Text -eq 'Avertissement : winget indisponible' }
+        Assert-MockCalled -Scope It Write-SetupLog -Exactly -Times 1 -ParameterFilter { $Text -eq 'Avertissement : winget indisponible' }
     }
 
     It 'rend null quand l''action ne produit rien' {
-        Invoke-InstallLogged { Write-Warning 'seul' } | Should BeNullOrEmpty
+        Invoke-SetupLogged { Write-Warning 'seul' } | Should BeNullOrEmpty
     }
 
     It 'laisse remonter une exception de l''action' {
-        { Invoke-InstallLogged { throw 'boom' } } | Should Throw
+        { Invoke-SetupLogged { throw 'boom' } } | Should Throw
     }
 }
 
-Describe 'Invoke-InstallSafely' {
-    Mock Stop-InstallOnError {}
+Describe 'Invoke-SetupSafely' {
+    Mock Stop-SetupOnError {}
 
     It 'exécute l''action' {
         $script:safelyProbe = 0
-        Invoke-InstallSafely { $script:safelyProbe = 1 }
+        Invoke-SetupSafely { $script:safelyProbe = 1 }
         $script:safelyProbe | Should Be 1
-        Assert-MockCalled -Scope It Stop-InstallOnError -Exactly -Times 0
+        Assert-MockCalled -Scope It Stop-SetupOnError -Exactly -Times 0
     }
 
     It 'transforme une exception en arrêt de l''installation au lieu de la laisser avaler' {
-        { Invoke-InstallSafely { throw 'boom' } } | Should Not Throw
-        Assert-MockCalled -Scope It Stop-InstallOnError -Exactly -Times 1 -ParameterFilter { $Message -eq 'boom' }
+        { Invoke-SetupSafely { throw 'boom' } } | Should Not Throw
+        Assert-MockCalled -Scope It Stop-SetupOnError -Exactly -Times 1 -ParameterFilter { $Message -eq 'boom' }
     }
 }
 
-Describe 'Stop-InstallOnError' {
-    Mock Show-InstallErrorBox {}
+Describe 'Stop-SetupOnError' {
+    Mock Show-SetupErrorBox {}
 
     It 'passe en code 1, lève le gel et ferme la fenêtre' {
         $form = New-FakeForm
-        Reset-InstallTestState @{ Form = $form; IsBusy = $true }
-        Stop-InstallOnError 'boom'
+        Reset-SetupTestState @{ Form = $form; IsBusy = $true }
+        Stop-SetupOnError 'boom'
         $script:InstallState.ExitCode | Should Be 1
         $script:InstallState.IsBusy | Should Be $false
         $form.IsClosed | Should Be $true
-        Assert-MockCalled -Scope It Show-InstallErrorBox -Exactly -Times 1 -ParameterFilter { $Text -match 'boom' }
+        Assert-MockCalled -Scope It Show-SetupErrorBox -Exactly -Times 1 -ParameterFilter { $Text -match 'boom' }
     }
 
     It 'affiche l''erreur même sans fenêtre ouverte' {
-        Reset-InstallTestState
-        { Stop-InstallOnError 'boom' } | Should Not Throw
+        Reset-SetupTestState
+        { Stop-SetupOnError 'boom' } | Should Not Throw
         $script:InstallState.ExitCode | Should Be 1
     }
 }
 
-Describe 'Register-InstallCompanionUi' {
-    Mock Write-InstallLog {}
+Describe 'Register-SetupCompanionUi' {
+    Mock Write-SetupLog {}
 
     It 'branche les étapes du moteur sur le journal et désactive le splash séparé' {
-        Register-InstallCompanionUi
+        Register-SetupCompanionUi
         $script:CompanionUi.UseSplash | Should Be $false
         & $script:CompanionUi.OnStep 'Téléchargement de Blitz…'
-        Assert-MockCalled -Scope It Write-InstallLog -Exactly -Times 1 -ParameterFilter { $Text -eq 'Téléchargement de Blitz…' }
+        Assert-MockCalled -Scope It Write-SetupLog -Exactly -Times 1 -ParameterFilter { $Text -eq 'Téléchargement de Blitz…' }
     }
 }
 
 # ---------------------------------------------------------------- Page applis compagnon
 
-Describe 'Invoke-InstallAppsStep' {
+Describe 'Invoke-SetupAppsStep' {
     $blitz = New-TestCompanionApp -Id 'blitz'
     $opgg  = New-TestCompanionApp -Id 'opgg'
     Mock Write-CompanionConfig { $true }
     Mock Get-InstalledCompanionApps { @() }
-    Mock Invoke-InstallCompanionActions { @{ UninstallFailed = @(); InstallFailed = @() } }
+    Mock Invoke-SetupCompanionActions { @{ UninstallFailed = @(); InstallFailed = @() } }
 
     It 'écrit config.json et avance sans rien exécuter quand rien n''est en attente' {
-        Reset-InstallTestState @{ Catalog = @($blitz, $opgg); Installed = @(New-TestInstalledApp $blitz); Config = (New-TestLaunchConfig) }
-        Mock Get-InstallCompanionChoice { @{ SelectedIds = @('blitz'); UninstallOthers = $false } }
-        Invoke-InstallAppsStep | Should Be $true
-        Assert-MockCalled -Scope It Invoke-InstallCompanionActions -Exactly -Times 0
+        Reset-SetupTestState @{ Catalog = @($blitz, $opgg); Installed = @(New-TestInstalledApp $blitz); Config = (New-TestLaunchConfig) }
+        Mock Get-SetupCompanionChoice { @{ SelectedIds = @('blitz'); UninstallOthers = $false } }
+        Invoke-SetupAppsStep | Should Be $true
+        Assert-MockCalled -Scope It Invoke-SetupCompanionActions -Exactly -Times 0
         Assert-MockCalled -Scope It Write-CompanionConfig -Exactly -Times 1 -ParameterFilter { ($SelectedApps | ForEach-Object { $_.id }) -join ',' -eq 'blitz' }
     }
 
     It 'exécute les actions en attente puis écrit config.json' {
-        Reset-InstallTestState @{ Catalog = @($blitz, $opgg); Installed = @(); Config = (New-TestLaunchConfig) }
-        Mock Get-InstallCompanionChoice { @{ SelectedIds = @('opgg'); UninstallOthers = $false } }
-        Invoke-InstallAppsStep | Should Be $true
-        Assert-MockCalled -Scope It Invoke-InstallCompanionActions -Exactly -Times 1 -ParameterFilter { ($Actions.Install | ForEach-Object { $_.id }) -join ',' -eq 'opgg' }
+        Reset-SetupTestState @{ Catalog = @($blitz, $opgg); Installed = @(); Config = (New-TestLaunchConfig) }
+        Mock Get-SetupCompanionChoice { @{ SelectedIds = @('opgg'); UninstallOthers = $false } }
+        Invoke-SetupAppsStep | Should Be $true
+        Assert-MockCalled -Scope It Invoke-SetupCompanionActions -Exactly -Times 1 -ParameterFilter { ($Actions.Install | ForEach-Object { $_.id }) -join ',' -eq 'opgg' }
         Assert-MockCalled -Scope It Write-CompanionConfig -Exactly -Times 1
         Assert-MockCalled -Scope It Get-InstalledCompanionApps -Exactly -Times 1
     }
 
     It 'reste sur la page et laisse config.json intact quand une désinstallation a échoué' {
-        Reset-InstallTestState @{ Catalog = @($blitz, $opgg); Installed = @(New-TestInstalledApp $opgg); Config = (New-TestLaunchConfig) }
-        Mock Get-InstallCompanionChoice { @{ SelectedIds = @('blitz'); UninstallOthers = $true } }
-        Mock Invoke-InstallCompanionActions { @{ UninstallFailed = @('opgg'); InstallFailed = @() } }
-        Invoke-InstallAppsStep | Should Be $false
+        Reset-SetupTestState @{ Catalog = @($blitz, $opgg); Installed = @(New-TestInstalledApp $opgg); Config = (New-TestLaunchConfig) }
+        Mock Get-SetupCompanionChoice { @{ SelectedIds = @('blitz'); UninstallOthers = $true } }
+        Mock Invoke-SetupCompanionActions { @{ UninstallFailed = @('opgg'); InstallFailed = @() } }
+        Invoke-SetupAppsStep | Should Be $false
         Assert-MockCalled -Scope It Write-CompanionConfig -Exactly -Times 0
     }
 
     It 'avance malgré une installation non aboutie (le lanceur ignorera l''appli absente)' {
-        Reset-InstallTestState @{ Catalog = @($blitz, $opgg); Installed = @(); Config = (New-TestLaunchConfig) }
-        Mock Get-InstallCompanionChoice { @{ SelectedIds = @('blitz'); UninstallOthers = $false } }
-        Mock Invoke-InstallCompanionActions { @{ UninstallFailed = @(); InstallFailed = @('blitz') } }
-        Invoke-InstallAppsStep | Should Be $true
+        Reset-SetupTestState @{ Catalog = @($blitz, $opgg); Installed = @(); Config = (New-TestLaunchConfig) }
+        Mock Get-SetupCompanionChoice { @{ SelectedIds = @('blitz'); UninstallOthers = $false } }
+        Mock Invoke-SetupCompanionActions { @{ UninstallFailed = @(); InstallFailed = @('blitz') } }
+        Invoke-SetupAppsStep | Should Be $true
         Assert-MockCalled -Scope It Write-CompanionConfig -Exactly -Times 1
     }
 }
 
-Describe 'Invoke-InstallCompanionActions' {
-    Mock Set-InstallBusy {}
-    Mock Write-InstallLog {}
+Describe 'Invoke-SetupCompanionActions' {
+    Mock Set-SetupBusy {}
+    Mock Write-SetupLog {}
 
     It 'gèle la fenêtre pendant les actions, la libère ensuite et journalise le bilan' {
         Mock Invoke-CompanionActions { @{ UninstallFailed = @(); InstallFailed = @('Blitz') } }
-        $result = Invoke-InstallCompanionActions ([pscustomobject]@{ Install = @(); Uninstall = @() })
+        $result = Invoke-SetupCompanionActions ([pscustomobject]@{ Install = @(); Uninstall = @() })
         $result.InstallFailed -join ',' | Should Be 'Blitz'
-        Assert-MockCalled -Scope It Set-InstallBusy -Exactly -Times 1 -ParameterFilter { $Busy -eq $true }
-        Assert-MockCalled -Scope It Set-InstallBusy -Exactly -Times 1 -ParameterFilter { $Busy -eq $false }
-        Assert-MockCalled -Scope It Write-InstallLog -Exactly -Times 1 -ParameterFilter { $Text -match '^Avertissement : Blitz' }
+        Assert-MockCalled -Scope It Set-SetupBusy -Exactly -Times 1 -ParameterFilter { $Busy -eq $true }
+        Assert-MockCalled -Scope It Set-SetupBusy -Exactly -Times 1 -ParameterFilter { $Busy -eq $false }
+        Assert-MockCalled -Scope It Write-SetupLog -Exactly -Times 1 -ParameterFilter { $Text -match '^Avertissement : Blitz' }
     }
 
     It 'libère la fenêtre même si le moteur lève une erreur' {
         Mock Invoke-CompanionActions { throw 'boom' }
-        { Invoke-InstallCompanionActions ([pscustomobject]@{ Install = @(); Uninstall = @() }) } | Should Throw
-        Assert-MockCalled -Scope It Set-InstallBusy -Exactly -Times 1 -ParameterFilter { $Busy -eq $false }
+        { Invoke-SetupCompanionActions ([pscustomobject]@{ Install = @(); Uninstall = @() }) } | Should Throw
+        Assert-MockCalled -Scope It Set-SetupBusy -Exactly -Times 1 -ParameterFilter { $Busy -eq $false }
     }
 }
 
 # ---------------------------------------------------------------- Page raccourcis
 
-Describe 'Invoke-InstallShortcutsStep' {
+Describe 'Invoke-SetupShortcutsStep' {
     $config = New-TestLaunchConfig @(New-TestCompanionEntry 'blitz' 'Blitz')
-    Mock Write-InstallLog {}
-    Mock New-InstallShortcuts { @('C:\Bureau\League of Legends JP - Blitz.lnk') }
+    Mock Write-SetupLog {}
+    Mock New-SetupShortcuts { @('C:\Bureau\League of Legends JP - Blitz.lnk') }
     Mock Remove-ObsoleteShortcuts { 'Retiré : C:\Bureau\League of Legends FR.lnk' }
 
     It 'reste sur la page sans rien créer quand aucune langue n''est cochée' {
-        Reset-InstallTestState @{ Config = $config }
-        Mock Get-InstallShortcutSelection { @{ Codes = @(); CompanionIds = @('blitz') } }
-        Invoke-InstallShortcutsStep | Should Be $false
-        Assert-MockCalled -Scope It New-InstallShortcuts -Exactly -Times 0
-        Assert-MockCalled -Scope It Write-InstallLog -Exactly -Times 1 -ParameterFilter { $Text -match 'Aucune langue cochée' }
+        Reset-SetupTestState @{ Config = $config }
+        Mock Get-SetupShortcutSelection { @{ Codes = @(); CompanionIds = @('blitz') } }
+        Invoke-SetupShortcutsStep | Should Be $false
+        Assert-MockCalled -Scope It New-SetupShortcuts -Exactly -Times 0
+        Assert-MockCalled -Scope It Write-SetupLog -Exactly -Times 1 -ParameterFilter { $Text -match 'Aucune langue cochée' }
     }
 
     It 'crée une combinaison par langue × compagnon puis retire les raccourcis obsolètes' {
-        Reset-InstallTestState @{ Config = $config }
-        Mock Get-InstallShortcutSelection { @{ Codes = @('ja_JP'); CompanionIds = @('blitz') } }
-        Invoke-InstallShortcutsStep | Should Be $true
+        Reset-SetupTestState @{ Config = $config }
+        Mock Get-SetupShortcutSelection { @{ Codes = @('ja_JP'); CompanionIds = @('blitz') } }
+        Invoke-SetupShortcutsStep | Should Be $true
         $script:InstallState.ShortcutPaths.Count | Should Be 1
-        Assert-MockCalled -Scope It New-InstallShortcuts -Exactly -Times 1 -ParameterFilter { $Combinations.Count -eq 1 -and $Combinations[0].Name -eq 'League of Legends JP - Blitz' }
+        Assert-MockCalled -Scope It New-SetupShortcuts -Exactly -Times 1 -ParameterFilter { $Combinations.Count -eq 1 -and $Combinations[0].Name -eq 'League of Legends JP - Blitz' }
         Assert-MockCalled -Scope It Remove-ObsoleteShortcuts -Exactly -Times 1
-        Assert-MockCalled -Scope It Write-InstallLog -Exactly -Times 1 -ParameterFilter { $Text -match '^Retiré' }
+        Assert-MockCalled -Scope It Write-SetupLog -Exactly -Times 1 -ParameterFilter { $Text -match '^Retiré' }
     }
 
     It 'crée un raccourci sans compagnon par langue quand aucune appli n''est cochée' {
-        Reset-InstallTestState @{ Config = $config }
-        Mock Get-InstallShortcutSelection { @{ Codes = @('ja_JP', 'fr_FR'); CompanionIds = @() } }
-        Invoke-InstallShortcutsStep | Should Be $true
-        Assert-MockCalled -Scope It New-InstallShortcuts -Exactly -Times 1 -ParameterFilter { $Combinations.Count -eq 2 -and $Combinations[1].Name -eq 'League of Legends FR' }
+        Reset-SetupTestState @{ Config = $config }
+        Mock Get-SetupShortcutSelection { @{ Codes = @('ja_JP', 'fr_FR'); CompanionIds = @() } }
+        Invoke-SetupShortcutsStep | Should Be $true
+        Assert-MockCalled -Scope It New-SetupShortcuts -Exactly -Times 1 -ParameterFilter { $Combinations.Count -eq 2 -and $Combinations[1].Name -eq 'League of Legends FR' }
     }
 }
 
-Describe 'New-InstallShortcuts' {
-    Mock Write-InstallLog {}
+Describe 'New-SetupShortcuts' {
+    Mock Write-SetupLog {}
 
     It 'journalise chaque raccourci créé et rend leurs chemins' {
         Mock New-LaunchShortcutWithFallback { param($Combination) "C:\Bureau\$($Combination.Name).lnk" }
         $combinations = Get-ShortcutCombinations @('ja_JP', 'fr_FR') @()
-        $paths = @(New-InstallShortcuts $combinations)
+        $paths = @(New-SetupShortcuts $combinations)
         $paths -join '|' | Should Be 'C:\Bureau\League of Legends JP.lnk|C:\Bureau\League of Legends FR.lnk'
-        Assert-MockCalled -Scope It Write-InstallLog -Exactly -Times 2 -ParameterFilter { $Text -match '^Créé : ' }
+        Assert-MockCalled -Scope It Write-SetupLog -Exactly -Times 2 -ParameterFilter { $Text -match '^Créé : ' }
     }
 
     It 'rend une liste vide sans combinaison' {
-        @(New-InstallShortcuts @()).Count | Should Be 0
+        @(New-SetupShortcuts @()).Count | Should Be 0
     }
 }
 
 # ---------------------------------------------------------------- Navigation
 
-Describe 'Invoke-InstallStepAction' {
-    Mock Invoke-InstallAppsStep { $false }
-    Mock Invoke-InstallShortcutsStep { $true }
+Describe 'Invoke-SetupStepAction' {
+    Mock Invoke-SetupAppsStep { $false }
+    Mock Invoke-SetupShortcutsStep { $true }
 
     It 'laisse passer la détection sans action' {
-        Invoke-InstallStepAction 'detect' | Should Be $true
-        Assert-MockCalled -Scope It Invoke-InstallAppsStep -Exactly -Times 0
-        Assert-MockCalled -Scope It Invoke-InstallShortcutsStep -Exactly -Times 0
+        Invoke-SetupStepAction 'detect' | Should Be $true
+        Assert-MockCalled -Scope It Invoke-SetupAppsStep -Exactly -Times 0
+        Assert-MockCalled -Scope It Invoke-SetupShortcutsStep -Exactly -Times 0
     }
 
     It 'délègue à la page des applis compagnon et respecte son verdict' {
-        Invoke-InstallStepAction 'apps' | Should Be $false
-        Assert-MockCalled -Scope It Invoke-InstallAppsStep -Exactly -Times 1
+        Invoke-SetupStepAction 'apps' | Should Be $false
+        Assert-MockCalled -Scope It Invoke-SetupAppsStep -Exactly -Times 1
     }
 
     It 'délègue à la page des raccourcis' {
-        Invoke-InstallStepAction 'shortcuts' | Should Be $true
-        Assert-MockCalled -Scope It Invoke-InstallShortcutsStep -Exactly -Times 1
+        Invoke-SetupStepAction 'shortcuts' | Should Be $true
+        Assert-MockCalled -Scope It Invoke-SetupShortcutsStep -Exactly -Times 1
     }
 }
 
-Describe 'Invoke-InstallNext' {
-    Mock Show-InstallPage {}
+Describe 'Invoke-SetupNext' {
+    Mock Show-SetupPage {}
 
     It 'avance à la page suivante quand l''action de la page réussit' {
-        Reset-InstallTestState @{ StepId = 'apps' }
-        Mock Invoke-InstallStepAction { $true }
-        Invoke-InstallNext
-        Assert-MockCalled -Scope It Show-InstallPage -Exactly -Times 1 -ParameterFilter { $StepId -eq 'shortcuts' }
+        Reset-SetupTestState @{ StepId = 'apps' }
+        Mock Invoke-SetupStepAction { $true }
+        Invoke-SetupNext
+        Assert-MockCalled -Scope It Show-SetupPage -Exactly -Times 1 -ParameterFilter { $StepId -eq 'shortcuts' }
     }
 
     It 'reste sur la page quand son action échoue' {
-        Reset-InstallTestState @{ StepId = 'apps' }
-        Mock Invoke-InstallStepAction { $false }
-        Invoke-InstallNext
-        Assert-MockCalled -Scope It Show-InstallPage -Exactly -Times 0
+        Reset-SetupTestState @{ StepId = 'apps' }
+        Mock Invoke-SetupStepAction { $false }
+        Invoke-SetupNext
+        Assert-MockCalled -Scope It Show-SetupPage -Exactly -Times 0
     }
 
     It 'ferme la fenêtre depuis la page terminé' {
         $form = New-FakeForm
-        Reset-InstallTestState @{ StepId = 'done'; Form = $form; ExitCode = 0 }
-        Mock Invoke-InstallStepAction { $true }
-        Invoke-InstallNext
+        Reset-SetupTestState @{ StepId = 'done'; Form = $form; ExitCode = 0 }
+        Mock Invoke-SetupStepAction { $true }
+        Invoke-SetupNext
         $form.IsClosed | Should Be $true
         $script:InstallState.ExitCode | Should Be 0
-        Assert-MockCalled -Scope It Show-InstallPage -Exactly -Times 0
+        Assert-MockCalled -Scope It Show-SetupPage -Exactly -Times 0
     }
 }
 
-Describe 'Invoke-InstallBack' {
-    Mock Show-InstallPage {}
+Describe 'Invoke-SetupBack' {
+    Mock Show-SetupPage {}
 
     It 'revient à la page précédente' {
-        Reset-InstallTestState @{ StepId = 'shortcuts' }
-        Invoke-InstallBack
-        Assert-MockCalled -Scope It Show-InstallPage -Exactly -Times 1 -ParameterFilter { $StepId -eq 'apps' }
+        Reset-SetupTestState @{ StepId = 'shortcuts' }
+        Invoke-SetupBack
+        Assert-MockCalled -Scope It Show-SetupPage -Exactly -Times 1 -ParameterFilter { $StepId -eq 'apps' }
     }
 
     It 'ne fait rien sur la première page' {
-        Reset-InstallTestState @{ StepId = 'detect' }
-        Invoke-InstallBack
-        Assert-MockCalled -Scope It Show-InstallPage -Exactly -Times 0
+        Reset-SetupTestState @{ StepId = 'detect' }
+        Invoke-SetupBack
+        Assert-MockCalled -Scope It Show-SetupPage -Exactly -Times 0
     }
 
     It 'ne fait rien une fois terminé' {
-        Reset-InstallTestState @{ StepId = 'done' }
-        Invoke-InstallBack
-        Assert-MockCalled -Scope It Show-InstallPage -Exactly -Times 0
+        Reset-SetupTestState @{ StepId = 'done' }
+        Invoke-SetupBack
+        Assert-MockCalled -Scope It Show-SetupPage -Exactly -Times 0
     }
 }
 
-Describe 'Invoke-InstallCancel' {
+Describe 'Invoke-SetupCancel' {
     It 'ferme la fenêtre avec le code 2' {
         $form = New-FakeForm
-        Reset-InstallTestState @{ Form = $form; ExitCode = 0 }
-        Invoke-InstallCancel
+        Reset-SetupTestState @{ Form = $form; ExitCode = 0 }
+        Invoke-SetupCancel
         $script:InstallState.ExitCode | Should Be 2
         $form.IsClosed | Should Be $true
     }
 }
 
-Describe 'Start-InstallWizard' {
-    Mock Show-InstallErrorBox {}
-    Mock New-InstallWindow { throw 'aucune fenêtre ne doit être créée' }
+Describe 'Start-SetupWizard' {
+    Mock Show-SetupErrorBox {}
+    Mock New-SetupWindow { throw 'aucune fenêtre ne doit être créée' }
 
     It 'refuse de tourner élevé sans ouvrir de fenêtre' {
         Mock Test-CompanionElevated { $true }
-        Start-InstallWizard | Should Be 1
-        Assert-MockCalled -Scope It Show-InstallErrorBox -Exactly -Times 1 -ParameterFilter { $Text -match 'administrateur' }
-        Assert-MockCalled -Scope It New-InstallWindow -Exactly -Times 0
+        Start-SetupWizard | Should Be 1
+        Assert-MockCalled -Scope It Show-SetupErrorBox -Exactly -Times 1 -ParameterFilter { $Text -match 'administrateur' }
+        Assert-MockCalled -Scope It New-SetupWindow -Exactly -Times 0
     }
 }

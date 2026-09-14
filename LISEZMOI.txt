@@ -1,16 +1,16 @@
 hex-launcher — lanceur League of Legends multi-langue + applis compagnon (Windows)
 =================================================================================
 
-  1. Double-cliquez sur  install.bat  (jamais « en tant qu'administrateur »).
+  1. Double-cliquez sur  setup.bat  (jamais « en tant qu'administrateur »).
   2. Suivez l'assistant : détection, applis compagnon, raccourcis.
   3. Lancez le jeu depuis les raccourcis « League of Legends XX » créés sur le Bureau.
 
 Le dossier  app\  contient le moteur (scripts, icônes, catalogues) : rien à y toucher.
-Pour changer de langue ou d'appli compagnon plus tard : relancez install.bat.
+Pour changer de langue ou d'appli compagnon plus tard : relancez setup.bat.
 Documentation complète : README.fr.md (français), README.md (English), README.ja.md (日本語).
 
 Projet non affilié à Riot Games — voir la mention légale dans les README.
 
 -----------------------------------------------------------------------------------
-EN — Double-click install.bat (never as administrator), follow the wizard, then use the
+EN — Double-click setup.bat (never as administrator), follow the wizard, then use the
 "League of Legends XX" desktop shortcuts. The app\ folder is the engine: nothing to edit there.
