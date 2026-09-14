@@ -62,6 +62,27 @@ function Test-CompanionCatalogEntry($Entry) {
     return $true
 }
 
+function Test-CompanionHexColor([string]$Value) {
+    return $Value -match '^#[0-9A-Fa-f]{6}$'
+}
+
+# Pastille des raccourcis compagnon : une lettre (ou deux) sur un disque de couleur, dessinée par nous — jamais un logo tiers.
+# glyphColor est optionnelle : sans elle, la lib choisit une lettre claire ou sombre selon la couleur du disque
+function Test-CompanionBadge($Badge) {
+    if ($null -eq $Badge) { return $false }
+    if ("$($Badge.glyph)" -notmatch '^\S{1,2}$') { return $false }
+    if (-not (Test-CompanionHexColor "$($Badge.color)")) { return $false }
+    if ([string]::IsNullOrWhiteSpace($Badge.glyphColor)) { return $true }
+    return Test-CompanionHexColor "$($Badge.glyphColor)"
+}
+
+# Pastille validée de l'appli, ou $null avec avertissement : une pastille absente ou invalide ne bloque jamais l'installation
+function Get-CompanionBadge($App) {
+    if (Test-CompanionBadge $App.badge) { return $App.badge }
+    Write-Warning "Appli compagnon '$($App.id)' : pastille absente ou invalide dans companion-apps.json (glyph 1-2 caractères, color et glyphColor #RRGGBB) — icône drapeau seule"
+    return $null
+}
+
 function Read-CompanionCatalog([string]$Path) {
     if (-not (Test-Path $Path)) { throw "companion-apps.json introuvable : $Path" }
     $entries = Read-JsonCatalog $Path

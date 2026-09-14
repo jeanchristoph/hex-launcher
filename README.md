@@ -27,12 +27,13 @@ they get installed for you, and you get one shortcut per language × companion a
 | `app/detect-config.ps1` | Called by `install.bat`: detects Riot and the companion apps already installed |
 | `app/manage-companion-app.ps1` | Called by `install.bat`: companion app picker, installs the missing ones, uninstalls on request |
 | `app/create-shortcuts.ps1` | Called by `install.bat`: language + companion picker, then one `.lnk` per combination on the desktop (falls back to this folder if the desktop is not writable) |
+| `app/lib/icon.lib.ps1` / `icon-badge.lib.ps1` | `.ico` read/write and composition of the companion badge over the flag icon |
 | `app/lib/companion-app.lib.ps1` | Shared functions: catalogue, detection through the registry (read-only), uninstall command, Authenticode signature check |
 | `app/lib/launch-config.lib.ps1` | Shared functions: reading/writing `config.json`, migration of the old single-app format |
 | `app/lib/splash.lib.ps1` | Shared animated splash (game launch, companion app install) |
 | `tests/` | Pester tests (`Invoke-Pester -Path tests`) |
 | `app/make-flag-icons.ps1` | Tool: regenerates the flag icons in `ico/` from the original base icon (not needed for normal use) |
-| `app/ico/` | Icons: original base icon (H monogram) + one flag variant per language (`hex-launcher-xx.ico`) |
+| `app/ico/` | Icons: original base icon (H monogram) + one flag variant per language (`hex-launcher-xx.ico`); `ico/companion/` holds the flag + badge icons composed on this machine |
 
 ## Installing on a new machine
 
@@ -109,6 +110,7 @@ One entry in `companion-apps.json`; list order is the detection priority.
   "id": "opgg",
   "name": "OP.GG",
   "signer":       { "organization": "OP.GG", "country": "KR" },
+  "badge":        { "glyph": "O", "color": "#1FA8D8" },
   "processNames": ["OP.GG"],
   "launch":    { "path": "%LOCALAPPDATA%\\Programs\\OP.GG\\OP.GG.exe", "arguments": "" },
   "detect":    { "registryDisplayNamePattern": "^OP\\.GG", "path": "%LOCALAPPDATA%\\Programs\\OP.GG\\OP.GG.exe" },
@@ -120,6 +122,7 @@ One entry in `companion-apps.json`; list order is the detection priority.
 
 | Key | Description |
 |---|---|
+| `badge.glyph` / `badge.color` / `badge.glyphColor` | Badge on this app's shortcuts: one letter (two at most) on a `#RRGGBB` coloured disc, drawn by the launcher — never a third-party logo. `glyphColor` (optional) sets the letter colour; otherwise it is dark on a light disc, white on a dark one. Missing or invalid badge: the shortcut keeps the plain flag icon |
 | `signer.organization` / `signer.country` | `O=` and `C=` of the publisher's code-signing certificate, exact and case-sensitive. Read them with `Get-AuthenticodeSignature <exe>` → `SignerCertificate.Subject`. Required for every app: installers and uninstallers are refused otherwise |
 | `processNames` | Processes closed before uninstalling, and after an install that started the app |
 | `launch.path` / `launch.arguments` | What the launcher starts after the game. `%VAR%` environment variables are expanded |
@@ -175,6 +178,8 @@ named `League of Legends XX` (XX = country part of the code: `ja_JP` → JP, `ko
 
 Icon: each shortcut gets the flag variant of its language (`app/ico/hex-launcher-xx.ico`, e.g. `hex-launcher-jp.ico`
 for `ja_JP`). If no flag exists for a language, the base icon `app/ico/hex-launcher.ico` is used.
+A shortcut with a companion app also carries a coloured badge in the top-right corner — P Porofessor, B Blitz,
+O OP.GG, M Mobalytics — composed at install time into `app/ico/companion/` (the letter is dropped below 32 px, the colour stays).
 
 For a language missing from the catalogue (new Riot locale):
 1. add a line to `locales.json` with the exact code as it appears in `available_locales` of the yaml file;

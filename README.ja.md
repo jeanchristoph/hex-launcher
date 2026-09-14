@@ -32,7 +32,8 @@ Windows 向け League of Legends 起動アシスタント：デスクトップ�
 | `app/lib/splash.lib.ps1` | 共通のアニメーション付きスプラッシュ（ゲーム起動、補助アプリのインストール） |
 | `tests/` | Pester テスト（`Invoke-Pester -Path tests`） |
 | `app/make-flag-icons.ps1` | ツール：オリジナルの基本アイコンから `ico/` の国旗アイコンを再生成（通常の使用には不要） |
-| `app/ico/` | アイコン：オリジナルの基本アイコン（H モノグラム）＋言語ごとの国旗バージョン（`hex-launcher-xx.ico`） |
+| `app/lib/icon.lib.ps1` / `icon-badge.lib.ps1` | `.ico` の読み書きと、国旗アイコンへの補助アプリバッジの合成 |
+| `app/ico/` | アイコン：オリジナルの基本アイコン（H モノグラム）＋言語ごとの国旗バージョン（`hex-launcher-xx.ico`）。`ico/companion/` にはこの PC で合成された国旗＋バッジのアイコンが入ります |
 
 ## 新しい PC へのインストール
 
@@ -104,6 +105,7 @@ ID：`porofessor`、`blitz`、`opgg`、`mobalytics`、`none`。終了コード�
   "id": "opgg",
   "name": "OP.GG",
   "signer":       { "organization": "OP.GG", "country": "KR" },
+  "badge":        { "glyph": "O", "color": "#1FA8D8" },
   "processNames": ["OP.GG"],
   "launch":    { "path": "%LOCALAPPDATA%\\Programs\\OP.GG\\OP.GG.exe", "arguments": "" },
   "detect":    { "registryDisplayNamePattern": "^OP\\.GG", "path": "%LOCALAPPDATA%\\Programs\\OP.GG\\OP.GG.exe" },
@@ -115,6 +117,7 @@ ID：`porofessor`、`blitz`、`opgg`、`mobalytics`、`none`。終了コード�
 
 | キー | 説明 |
 |---|---|
+| `badge.glyph` / `badge.color` / `badge.glyphColor` | このアプリのショートカットに付くバッジ：`#RRGGBB` 色の円に 1 文字（最大 2 文字）。ランチャーが描画し、第三者のロゴは使いません。`glyphColor`（任意）は文字色を指定します。省略時は明るい円に暗い文字、暗い円に白い文字になります。バッジが未設定または無効なら国旗アイコンのみになります |
 | `signer.organization` / `signer.country` | 発行者のコード署名証明書の `O=` と `C=`。完全一致、大文字小文字を区別。`Get-AuthenticodeSignature <exe>` → `SignerCertificate.Subject` で確認できます。すべてのアプリで必須：ないとインストーラーもアンインストーラーも拒否されます |
 | `processNames` | アンインストール前、およびアプリを起動してしまったインストール後に終了させるプロセス |
 | `launch.path` / `launch.arguments` | ゲームの後にランチャーが起動するもの。環境変数 `%VAR%` は展開されます |
@@ -168,6 +171,8 @@ Riot が提供するすべての言語が `locales.json` にあり、インス�
 
 アイコン：各ショートカットにはその言語の国旗バリエーション（`app/ico/hex-launcher-xx.ico`、例：`ja_JP` は `hex-launcher-jp.ico`）が
 設定されます。国旗がない言語には基本アイコン `app/ico/hex-launcher.ico` が使われます。
+補助アプリ付きのショートカットには右上に色付きバッジが加わります — P Porofessor、B Blitz、O OP.GG、M Mobalytics —
+インストール時に `app/ico/companion/` に合成されます（32 px 未満では文字が省かれ、色だけが残ります）。
 
 カタログにない言語（Riot の新しいロケール）を追加するには：
 1. yaml ファイルの `available_locales` にある正確なコードで `locales.json` に 1 行追加；

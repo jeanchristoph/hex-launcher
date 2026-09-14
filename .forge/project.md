@@ -27,10 +27,12 @@ lol/  (dépôt hex-launcher)
     ├── lib/splash.lib.ps1       # Splash animé partagé (sur le thème), TopMost/visibilité commutables
     ├── lib/companion-app.lib.ps1  # Catalogue, registre lecture seule, signature RDN, sonde d'état
     ├── lib/launch-config.lib.ps1  # config.json (companionApps, migration), catalogues JSON, process des autres compagnons
+    ├── lib/icon.lib.ps1         # Lecture/écriture .ico (entrées PNG ou DIB), chemins résolus à la PowerShell
+    ├── lib/icon-badge.lib.ps1   # Pastille compagnon (disque couleur + lettre, haut-droite) composée sur chaque taille
     ├── locales.json             # Catalogue des locales Riot (code, label natif, default)
     ├── companion-apps.json      # Catalogue des applis compagnon (signer, processNames, launch, detect, install, uninstall)
     ├── config.json              # Chemins machine (gitignoré, jamais écrasé sans -Force)
-    └── ico/                     # hex-launcher.ico + hex-launcher-xx.ico (originaux, aucun visuel Riot)
+    └── ico/                     # hex-launcher.ico + hex-launcher-xx.ico (originaux, aucun visuel Riot) ; ico/companion/ généré (gitignoré, hors release)
 ```
 
 ## Entry points
@@ -55,7 +57,8 @@ lol/  (dépôt hex-launcher)
 - `launch-lol.ps1` — `Set-LeagueLocale` ne réécrit que `settings.locale` du yaml Riot (jamais `default_locale`) ; `$RiotProcessNames` liste des process à tuer avant réécriture
 - `config.json` — schéma `companionApps: [ { id, name, path, arguments } ]` ; l'ancien bloc `companionApp` est migré à la lecture (`Read-LaunchConfig`). Un raccourci = une langue × un compagnon
 - Sécurité (revue 2026-09-13) : refus de tourner élevé ; tout binaire exécuté (installeur téléchargé, désinstalleur du registre) vérifié par `Test-CompanionBinaryTrusted` (chemin absolu, .exe, signature RDN organisation + pays) ; `Start-Process` jamais avec `-Wait` (arbre de process) → `Start-CompanionProcess` avec échéance
-- `create-shortcuts.ps1` — `Test-LaunchConfig` valide la config au moment de l'installation
+- `create-shortcuts.ps1` — `Test-LaunchConfig` valide la config au moment de l'installation ; `Resolve-ShortcutIconPath` compose drapeau + pastille (`badge` du catalogue) dans `ico\companion\` à chaque exécution, repli drapeau seul sur pastille absente ou échec
+- Pastilles compagnon : `badge { glyph, color }` dans `companion-apps.json` (P/B/O/M), dessinées par GDI+ — jamais un logo tiers (ToS Blitz/OP.GG/Overwolf : consentement écrit requis, analyse 2026-09-14)
 
 ## Tools & access
 - Available MCPs: ClickUp, claude-in-chrome, phpstorm (non pertinent ici)

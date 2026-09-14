@@ -3,6 +3,7 @@
     "id": "porofessor",
     "name": "Porofessor",
     "signer": { "organization": "Overwolf Ltd", "country": "IL" },
+    "badge": { "glyph": "P", "color": "#ECEAE4", "glyphColor": "#E36A62" },
     "processNames": ["Overwolf"],
     "launch": {
       "path": "%ProgramFiles(x86)%\\Overwolf\\OverwolfLauncher.exe",
@@ -17,20 +18,21 @@
       "url": "https://download.overwolf.com/install/Download?Name=Porofessor.gg&ExtensionId=pibhbkkgefgheeglaeemkkfjlhidhcedalapdggh&Channel=web_dl_btn",
       "arguments": "/S",
       "timeoutSeconds": 300,
-      "notice": "Si Overwolf n'est pas encore installé, son installeur affiche sa fenêtre : suivez ses étapes (environ 1 min).",
+      "notice": "Si Overwolf n'est pas encore installÃ©, son installeur affiche sa fenÃªtre : suivez ses Ã©tapes (environ 1 min).",
       "fallback": "browser",
       "browserUrl": "https://www.overwolf.com/app/trebonius-porofessor.gg"
     },
     "uninstall": {
       "mode": "interactive",
       "dialogProcessNames": ["OWUninstallMenu"],
-      "notice": "Overwolf va ouvrir son menu de désinstallation avec Overwolf ET Porofessor cochés. Décochez Overwolf si vous l'utilisez pour d'autres applications, puis cliquez sur Uninstall."
+      "notice": "Overwolf va ouvrir son menu de dÃ©sinstallation avec Overwolf ET Porofessor cochÃ©s. DÃ©cochez Overwolf si vous l'utilisez pour d'autres applications, puis cliquez sur Uninstall."
     }
   },
   {
     "id": "blitz",
     "name": "Blitz",
     "signer": { "organization": "Swift Media Entertainment, Inc.", "country": "US" },
+    "badge": { "glyph": "B", "color": "#E4103F" },
     "processNames": ["Blitz"],
     "launch": {
       "path": "%LOCALAPPDATA%\\Programs\\Blitz\\Blitz.exe",
@@ -55,6 +57,7 @@
     "id": "opgg",
     "name": "OP.GG",
     "signer": { "organization": "OP.GG", "country": "KR" },
+    "badge": { "glyph": "O", "color": "#645FED" },
     "processNames": ["OP.GG"],
     "launch": {
       "path": "%LOCALAPPDATA%\\Programs\\OP.GG\\OP.GG.exe",
@@ -80,6 +83,7 @@
     "id": "mobalytics",
     "name": "Mobalytics",
     "signer": { "organization": "GAMERS NET, INC.", "country": "US" },
+    "badge": { "glyph": "M", "color": "#3D3A69" },
     "processNames": ["Mobalytics"],
     "launch": {
       "path": "%LOCALAPPDATA%\\Programs\\mobalytics-desktop\\Mobalytics.exe",

@@ -27,6 +27,17 @@ Describe 'Get-ReleaseAppFiles' {
         $names -contains 'install.ps1' | Should Be $true
         $names -contains 'hex-launcher.ico' | Should Be $true
     }
+
+    It 'exclut les icônes compagnon composées sur la machine (app\ico\companion)' {
+        $root = Join-Path $env:TEMP ("release-files-{0}" -f [guid]::NewGuid())
+        New-Item -ItemType Directory -Path (Join-Path $root 'app\ico\companion') -Force | Out-Null
+        Set-Content (Join-Path $root 'app\ico\hex-launcher-fr.ico') 'flag'
+        Set-Content (Join-Path $root 'app\ico\companion\hex-launcher-fr-blitz.ico') 'composed'
+        $names = @(Get-ReleaseAppFiles $root | ForEach-Object { $_.Name })
+        $names -contains 'hex-launcher-fr.ico' | Should Be $true
+        $names -contains 'hex-launcher-fr-blitz.ico' | Should Be $false
+        Remove-Item $root -Recurse -Force
+    }
 }
 
 Describe 'New-ReleaseStaging et New-ReleaseArchive' {

@@ -13,6 +13,10 @@
     Les raccourcis obsolètes (combinaisons décochées) sont retirés de la destination, pour qu'elle
     reflète toujours le dernier choix.
 
+    Un raccourci avec compagnon reçoit l'icône drapeau surmontée de la pastille du compagnon (couleur + lettre
+    déclarées dans companion-apps.json), composée dans ico\companion\ à chaque exécution. Sans pastille ou en
+    cas d'échec de composition, le raccourci garde l'icône drapeau seule.
+
 .EXAMPLE
     powershell -NoProfile -ExecutionPolicy Bypass -File create-shortcuts.ps1
     powershell -NoProfile -ExecutionPolicy Bypass -File create-shortcuts.ps1 -Locales ja_JP,ko_KR
@@ -33,6 +37,8 @@ param(
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 . (Join-Path $PSScriptRoot 'lib\launch-config.lib.ps1')
+. (Join-Path $PSScriptRoot 'lib\companion-app.lib.ps1')
+. (Join-Path $PSScriptRoot 'lib\icon-badge.lib.ps1')
 
 $folder      = $PSScriptRoot
 $launcher    = Join-Path $folder 'launch-lol.ps1'
@@ -40,6 +46,9 @@ $configPath  = Join-Path $folder 'config.json'
 $localesPath = Join-Path $folder 'locales.json'
 $powershell  = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 $defaultIcon = Join-Path $folder 'ico\hex-launcher.ico'
+$catalogPath = Join-Path $folder 'companion-apps.json'
+$companionIconFolder = Join-Path $folder 'ico\companion'
+$CompanionBadges     = $null   # pastilles par identifiant, lues du catalogue à la première demande
 $shell       = New-Object -ComObject WScript.Shell
 
 # ---------------------------------------------------------------- Catalogue
@@ -66,6 +75,66 @@ function Resolve-IconPath([string]$Code) {
     $flagIcon = Get-FlagIconPath $Code
     if (Test-Path $flagIcon) { return $flagIcon }
     return $defaultIcon
+}
+
+# ---------------------------------------------------------------- Icône compagnon (drapeau + pastille)
+
+# Pastilles du catalogue indexées par identifiant ; catalogue illisible → aucune pastille, icônes drapeau seules
+function Read-CompanionBadges([string]$Path) {
+    $badges = @{}
+    try {
+        foreach ($app in Read-CompanionCatalog $Path) {
+            $badge = Get-CompanionBadge $app
+            if ($badge) { $badges[$app.id] = $badge }
+        }
+    } catch {
+        Write-Warning "Pastilles compagnon indisponibles ($($_.Exception.Message)) — icônes drapeau seules"
+    }
+    return $badges
+}
+
+function Get-CompanionBadges {
+    if ($null -eq $script:CompanionBadges) { $script:CompanionBadges = Read-CompanionBadges $catalogPath }
+    return $script:CompanionBadges
+}
+
+# ja_JP + blitz → hex-launcher-jp-blitz : préfixe commun à toutes les variantes de couleur de cette combinaison
+function Get-CompanionIconStem([string]$Code, $Companion) {
+    return "hex-launcher-$($Code.Split('_')[1].ToLower())-$($Companion.id)"
+}
+
+# ja_JP + blitz → ico\companion\hex-launcher-jp-blitz-3f9a12c4.ico : l'empreinte du rendu dans le nom change le chemin
+# dès que la pastille change, sinon Explorer garde l'ancienne image dans son cache d'icônes
+function Get-CompanionIconPath([string]$Code, $Companion, $Badge) {
+    return Join-Path $companionIconFolder "$(Get-CompanionIconStem $Code $Companion)-$(Get-BadgeSignature $Badge).ico"
+}
+
+# Retire les variantes d'une autre couleur de la même combinaison
+function Remove-StaleCompanionIcons([string]$Code, $Companion, [string]$Keep) {
+    $stale = Get-ChildItem -Path $companionIconFolder -Filter "$(Get-CompanionIconStem $Code $Companion)-*.ico" -File -ErrorAction SilentlyContinue |
+             Where-Object { $_.FullName -ne $Keep }
+    foreach ($file in $stale) { Remove-Item -Path $file.FullName -Force -ErrorAction SilentlyContinue }
+}
+
+# Drapeau + pastille, recomposée à chaque exécution pour suivre le catalogue ; sans pastille ou sur échec → drapeau seul
+function Resolve-CompanionIconPath([string]$Code, $Companion) {
+    $flagIcon = Resolve-IconPath $Code
+    $badge = (Get-CompanionBadges)[$Companion.id]
+    if (-not $badge) { return $flagIcon }
+    try {
+        New-Item -ItemType Directory -Path $companionIconFolder -Force | Out-Null
+        $target = Get-CompanionIconPath $Code $Companion $badge
+        Remove-StaleCompanionIcons $Code $Companion $target
+        return Add-CompanionBadge $flagIcon $badge $target
+    } catch {
+        Write-Warning "Icône compagnon '$($Companion.name)' non composée ($($_.Exception.Message)) — icône drapeau seule"
+        return $flagIcon
+    }
+}
+
+function Resolve-ShortcutIconPath($Combination) {
+    if ($Combination.Companion) { return Resolve-CompanionIconPath $Combination.Code $Combination.Companion }
+    return Resolve-IconPath $Combination.Code
 }
 
 # Une combinaison = une langue et, optionnellement, une appli compagnon
@@ -206,7 +275,7 @@ function New-LaunchShortcut($Combination, [string]$Directory) {
     $shortcut.TargetPath       = $powershell
     $shortcut.Arguments        = Get-LauncherArguments $Combination
     $shortcut.WorkingDirectory = $folder
-    $shortcut.IconLocation     = "$(Resolve-IconPath $Combination.Code),0"
+    $shortcut.IconLocation     = "$(Resolve-ShortcutIconPath $Combination),0"
     $shortcut.WindowStyle      = 7   # Réduite : aucune console visible
     $shortcut.Description      = "Lance League of Legends en $($Combination.Code)$(if ($Combination.Companion) { " avec $($Combination.Companion.name)" })"
     $shortcut.Save()
