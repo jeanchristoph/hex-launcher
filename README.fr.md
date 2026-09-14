@@ -16,17 +16,17 @@ installe, et on obtient un raccourci par langue × appli compagnon
 
 | Fichier | Rôle |
 |---|---|
-| `install.bat` | **À double-cliquer** : ouvre l'assistant d'installation (une fenêtre : détection, applis compagnon, raccourcis) |
+| `setup.bat` | **À double-cliquer** (ex-`install.bat`) : ouvre l'assistant de configuration (une fenêtre : détection, applis compagnon, raccourcis) |
 | `LISEZMOI.txt` | Démarrage rapide en trois lignes (FR/EN) |
 | `app/` | Le moteur — rien à y modifier |
-| `app/install.ps1` | L'assistant d'installation (fenêtre unique au thème LoL) |
-| `app/config.json` | Chemins Riot + liste des applis compagnon. Généré par `install.bat`, éditable à la main si la détection ne suffit pas |
+| `app/setup.ps1` | L'assistant de configuration (fenêtre unique au thème LoL) |
+| `app/config.json` | Chemins Riot + liste des applis compagnon. Généré par `setup.bat`, éditable à la main si la détection ne suffit pas |
 | `app/locales.json` | Catalogue des langues proposées à l'install (code Riot + libellé affiché) |
 | `app/companion-apps.json` | Catalogue des applis compagnon : comment détecter, installer, désinstaller et lancer chacune, et qui signe ses binaires |
 | `app/launch-lol.ps1` | Le lanceur : ferme le client Riot, force la langue, relance le jeu (+ l'appli compagnon donnée par `-Companion`) |
-| `app/detect-config.ps1` | Appelé par `install.bat` : détecte Riot et les applis compagnon déjà installées |
-| `app/manage-companion-app.ps1` | Appelé par `install.bat` : choix des applis compagnon, installation des manquantes, désinstallation sur demande |
-| `app/create-shortcuts.ps1` | Appelé par `install.bat` : choix des langues et des compagnons, puis un `.lnk` par combinaison sur le Bureau (repli dans ce dossier si le Bureau est inaccessible) |
+| `app/detect-config.ps1` | Appelé par `setup.bat` : détecte Riot et les applis compagnon déjà installées |
+| `app/manage-companion-app.ps1` | Appelé par `setup.bat` : choix des applis compagnon, installation des manquantes, désinstallation sur demande |
+| `app/create-shortcuts.ps1` | Appelé par `setup.bat` : choix des langues et des compagnons, puis un `.lnk` par combinaison sur le Bureau (repli dans ce dossier si le Bureau est inaccessible) |
 | `app/lib/companion-app.lib.ps1` | Fonctions partagées : catalogue, détection via le registre (lecture seule), commande de désinstallation, vérification de signature Authenticode |
 | `app/lib/icon.lib.ps1` / `icon-badge.lib.ps1` | Lecture/écriture des `.ico` et composition de la pastille compagnon sur l'icône drapeau |
 | `app/lib/launch-config.lib.ps1` | Fonctions partagées : lecture/écriture de `config.json`, migration de l'ancien format à une seule appli |
@@ -35,12 +35,12 @@ installe, et on obtient un raccourci par langue × appli compagnon
 | `app/make-flag-icons.ps1` | Outil : régénère les icônes drapeau de `ico/` à partir de l'icône de base originale (pas nécessaire à l'usage) |
 | `app/ico/` | Icônes : base originale (monogramme H) + une variante drapeau par langue (`hex-launcher-xx.ico`) ; `ico/companion/` reçoit les icônes drapeau + pastille composées sur ce poste |
 
-## Installation sur une nouvelle machine
+## Mise en route sur une nouvelle machine
 
 0. **[Télécharger la dernière version](https://github.com/jeanchristoph/hex-launcher/releases/latest)** (`hex-launcher-x.y.z.zip`) et la décompresser — ou cloner le dépôt.
 1. Copier ce dossier où on veut (ex. `Documents\hex-launcher`) — **sans** `config.json` s'il vient
    d'une autre machine, pour que la détection se fasse.
-2. Double-cliquer sur **`install.bat`** (jamais « Exécuter en tant qu'administrateur » : l'outil refuse, volontairement). Une fenêtre, trois étapes :
+2. Double-cliquer sur **`setup.bat`** (jamais « Exécuter en tant qu'administrateur » : l'outil refuse, volontairement). Une fenêtre, trois étapes :
    - **[1/3] Détection** — trouve le Riot Client (via `RiotClientInstalls.json`, le fichier officiel de Riot) et toutes
      les applis compagnon du catalogue déjà installées, puis écrit `config.json` (jamais écrasé s'il existe déjà :
      les réglages manuels sont conservés) ;
@@ -55,9 +55,9 @@ installe, et on obtient un raccourci par langue × appli compagnon
      créés dans ce dossier à la place.
 3. Double-cliquer sur le raccourci de la langue et du compagnon voulus.
 
-Pour ajouter ou retirer des langues ou des applis compagnon plus tard : relancer `install.bat`.
+Pour ajouter ou retirer des langues ou des applis compagnon plus tard : relancer `setup.bat`.
 
-Si la détection s'est trompée : éditer `app\config.json` (voir ci-dessous) puis relancer `install.bat`.
+Si la détection s'est trompée : éditer `app\config.json` (voir ci-dessous) puis relancer `setup.bat`.
 Pour forcer une nouvelle détection : supprimer `app\config.json` puis relancer.
 
 Au premier lancement dans une nouvelle langue, le Riot Client télécharge le pack de textes + voix
@@ -218,14 +218,14 @@ Installeurs, désinstalleurs, réseau et registre sont mockés : les tests ne to
   être en **UTF-8 avec BOM** (VS Code : barre d'état → encodage → « Enregistrer avec l'encodage »).
 - **L'icône du raccourci n'est pas à jour** : cache d'icônes Windows. Clic droit → Actualiser dans le
   dossier, sinon se déconnecter/reconnecter.
-- **« Ne pas exécuter en tant qu'administrateur »** : `install.bat` a été lancé élevé. Le lancer normalement.
+- **« Ne pas exécuter en tant qu'administrateur »** : `setup.bat` a été lancé élevé. Le lancer normalement.
 - **« winget indisponible »** : App Installer manque sur ce Windows. L'installer depuis le Microsoft Store,
   ou laisser l'outil ouvrir la page de téléchargement de Blitz dans le navigateur.
 - **« désinstalleur … non signé »** : le désinstalleur trouvé dans le registre n'est pas signé par l'éditeur attendu ;
   l'outil ne le lance pas. Désinstaller l'appli depuis « Applications installées » de Windows.
 - **L'appli compagnon est toujours là après « Désinstaller »** : le dialogue de l'éditeur a été fermé sans
   confirmer (Overwolf), ou la désinstallation a pris plus de temps que prévu. Rien d'autre n'a été installé ;
-  relancer `install.bat`.
+  relancer `setup.bat`.
 - **Tester sans lancer le jeu** : `.\app\launch-lol.ps1 -Locale ja_JP -DryRun -YamlPath copie.yaml`
   affiche le splash et réécrit la copie, sans fermer ni lancer quoi que ce soit.
   `app\manage-companion-app.ps1 -DryRun` affiche les actions appli compagnon sans les exécuter.

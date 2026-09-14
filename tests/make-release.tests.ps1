@@ -24,7 +24,7 @@ Describe 'Get-ReleaseAppFiles' {
     It 'exclut config.json, propre à chaque machine' {
         $names = @(Get-ReleaseAppFiles $ProjectRoot | ForEach-Object { $_.Name })
         $names -contains 'config.json' | Should Be $false
-        $names -contains 'install.ps1' | Should Be $true
+        $names -contains 'setup.ps1' | Should Be $true
         $names -contains 'hex-launcher.ico' | Should Be $true
     }
 
@@ -46,8 +46,8 @@ Describe 'New-ReleaseStaging et New-ReleaseArchive' {
     $staging = New-ReleaseStaging $ProjectRoot '0.0.1' $parent
 
     It 'livre la racine épurée et le moteur, sans fichiers de développement' {
-        (Get-ChildItem $staging -Name | Sort-Object { $_.ToLowerInvariant() }) -join ',' | Should Be 'app,install.bat,LICENSE,LISEZMOI.txt,README.fr.md,README.ja.md,README.md'
-        Test-Path (Join-Path $staging 'app\install.ps1') | Should Be $true
+        (Get-ChildItem $staging -Name | Sort-Object { $_.ToLowerInvariant() }) -join ',' | Should Be 'app,LICENSE,LISEZMOI.txt,README.fr.md,README.ja.md,README.md,setup.bat'
+        Test-Path (Join-Path $staging 'app\setup.ps1') | Should Be $true
         Test-Path (Join-Path $staging 'app\lib\theme.lib.ps1') | Should Be $true
         Test-Path (Join-Path $staging 'app\config.json') | Should Be $false
         Test-Path (Join-Path $staging 'tests') | Should Be $false

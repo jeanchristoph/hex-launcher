@@ -38,7 +38,7 @@
 **Effort:** S
 **Files:** `app/version.txt`, `README.md`, `README.fr.md`, `README.ja.md`, `LISEZMOI.txt`, `.forge/project.md`
 **Description:** `version.txt` → 0.1.2. README ×3 : une ligne « les raccourcis compagnon portent une pastille de couleur (P/B/O/M) » + note que le rafraîchissement du cache d'icônes Windows peut demander une déconnexion (documenté, jamais exécuté). `project.md` : nouvelles libs et dossier `ico\companion\`. Puis, sur feu vert : commit, merge `master`, `make-release.ps1 -Publish`.
-[ ] 2026-09-14 — version 0.1.2, README ×3, project.md faits (LISEZMOI.txt inchangé : rien à y dire) ; reste commit + merge + release sur feu vert
+[x] 2026-09-14 — version 0.1.2, README ×3, project.md ; commit c5bbf4e, master fast-forwardé, release v0.1.2 publiée (zip sans ico/companion)
 
 ## Risks
 - `.ico` à entrées DIB (non PNG) : le repli `System.Drawing.Icon` ne rend pas l'entrée 256 px → la lib lève un throw explicite plutôt qu'une icône incomplète ; nos `.ico` actuels sont tous PNG.
@@ -53,5 +53,5 @@
 | T3 — Composition de la pastille | M | [x] |
 | T4 — Raccourcis sur icône composée | S | [x] |
 | T5 — Release sans icônes générées | XS | [x] |
-| T6 — Version 0.1.2, doc, release | S | [ ] |
+| T6 — Version 0.1.2, doc, release | S | [x] |
 | **Total** | **~L (4-6 h)** | |

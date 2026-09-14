@@ -55,7 +55,7 @@ function New-LaunchConfig {
     }
 }
 
-# ---------------------------------------------------------------- Main (ignoré quand le script est dot-sourcé par install.ps1 ou les tests)
+# ---------------------------------------------------------------- Main (ignoré quand le script est dot-sourcé par setup.ps1 ou les tests)
 
 function Invoke-ConfigDetection([string]$OutputPath, [bool]$Force) {
     if ((Test-Path $OutputPath) -and -not $Force) {

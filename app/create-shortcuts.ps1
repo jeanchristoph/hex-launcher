@@ -308,7 +308,7 @@ function Split-ListArgument([string[]]$Values) {
     return @($Values | ForEach-Object { $_ -split '[,;\s]+' } | Where-Object { $_ })
 }
 
-# ---------------------------------------------------------------- Main (ignoré quand le script est dot-sourcé par install.ps1 ou les tests)
+# ---------------------------------------------------------------- Main (ignoré quand le script est dot-sourcé par setup.ps1 ou les tests)
 
 if ($MyInvocation.InvocationName -ne '.') {
     $catalog = Read-LocaleCatalog $localesPath
@@ -330,7 +330,7 @@ if ($MyInvocation.InvocationName -ne '.') {
     $unknown = @($Locales | Where-Object { $_ -notin $catalog.code })
     if ($unknown.Count -gt 0) { throw "Langue(s) inconnue(s) dans locales.json : $($unknown -join ', ')" }
     $unknownCompanions = @($Companions | Where-Object { -not (Find-LaunchCompanion $config $_) })
-    if ($unknownCompanions.Count -gt 0) { throw "Appli(s) compagnon absente(s) de config.json : $($unknownCompanions -join ', ') — relancer install.bat" }
+    if ($unknownCompanions.Count -gt 0) { throw "Appli(s) compagnon absente(s) de config.json : $($unknownCompanions -join ', ') — relancer setup.bat" }
     if ($Locales.Count -eq 0) { "Aucune langue cochée : aucun raccourci créé."; exit 0 }
 
     $selectedCompanions = @($Companions | ForEach-Object { Find-LaunchCompanion $config $_ })

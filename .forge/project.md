@@ -2,7 +2,7 @@
 **Generated:** 2026-09-13
 
 ## Stack
-- Language: PowerShell 5.1 (Windows PowerShell — pas de `&&`, `??`, ternaire), Batch (`install.bat`)
+- Language: PowerShell 5.1 (Windows PowerShell — pas de `&&`, `??`, ternaire), Batch (`setup.bat`)
 - Framework / CMS: aucun — WinForms (`System.Windows.Forms`, `System.Drawing`) pour le splash et le sélecteur de langues
 - Runtime / version: Windows 10/11, `powershell.exe` v1.0 (System32) appelé avec `-NoProfile -ExecutionPolicy Bypass`
 - DB: aucune — état dans `config.json` (généré, gitignoré) et `locales.json` (catalogue versionné)
@@ -11,13 +11,13 @@
 ## Key structure
 ```
 lol/  (dépôt hex-launcher)
-├── install.bat                  # Point d'entrée utilisateur : lance app\install.ps1 sans console
+├── setup.bat                  # Point d'entrée utilisateur : lance app\setup.ps1 sans console
 ├── LISEZMOI.txt                 # Démarrage rapide FR/EN
 ├── README.md / .fr.md / .ja.md  # Mention légale Riot en tête
 ├── LICENSE, .gitignore, .gitattributes
 ├── tests/                       # Pester 3.4 : *.tests.ps1 + companion-test-helpers.ps1 — Invoke-Pester -Path tests (dev, hors release)
 └── app/                         # Tout le moteur — les scripts sont relatifs à $PSScriptRoot
-    ├── install.ps1              # Assistant d'installation unique (WinForms thème LoL, machine à états pure testée, hooks CompanionUi)
+    ├── setup.ps1              # Assistant de configuration unique (WinForms thème LoL, machine à états pure testée, hooks CompanionUi)
     ├── detect-config.ps1        # Génère config.json (Riot Client, yaml, applis compagnon détectées via le catalogue) — Main gardé
     ├── manage-companion-app.ps1 # Choix multi-applis compagnon, installation des manquantes, désinstallation sur demande — Main gardé
     ├── create-shortcuts.ps1     # Raccourcis langue × compagnon (.lnk sur le Bureau) — Main gardé
@@ -36,7 +36,7 @@ lol/  (dépôt hex-launcher)
 ```
 
 ## Entry points
-- `install.bat` → `app\install.ps1` (assistant unique ; codes 0 ok, 1 erreur, 2 annulé). Les trois scripts moteur restent exécutables seuls en mode script
+- `setup.bat` → `app\setup.ps1` (assistant unique ; codes 0 ok, 1 erreur, 2 annulé). Les trois scripts moteur restent exécutables seuls en mode script
 - `manage-companion-app.ps1 -Apps <ids|none> [-UninstallOthers] [-Force] [-DryRun]` (mode script)
 - `create-shortcuts.ps1 -Locales ja_JP,ko_KR -Companions blitz,opgg` ; raccourci → `launch-lol.ps1 -Locale xx_XX [-Companion <id>]`
 - Raccourci `.lnk` → `powershell.exe -WindowStyle Hidden -File launch-lol.ps1 -Locale xx_XX`

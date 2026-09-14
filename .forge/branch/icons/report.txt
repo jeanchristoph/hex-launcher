@@ -1,0 +1,18 @@
+PROBLÈME
+Les raccourcis « langue × appli compagnon » portaient tous la même icône drapeau : impossible de distinguer
+Porofessor, Blitz, OP.GG ou Mobalytics d'un coup d'œil. Reprendre les logos des éditeurs était exclu :
+leurs conditions d'utilisation exigent un consentement écrit.
+
+SOLUTION
+Une pastille originale en haut à droite de l'icône drapeau : disque de couleur et lettre propres à chaque
+appli (P crème, B rouge, O indigo, M violet sombre), dessinée par le lanceur lui-même, sans aucun visuel tiers.
+Couleurs, lettre et couleur de lettre déclarées dans le catalogue des applis compagnon ; icône composée à
+l'installation, à toutes les tailles (couleur seule sous 32 px). Sans pastille ou en cas d'échec, le raccourci
+garde l'icône drapeau : l'installation aboutit toujours.
+
+IMPACT
+- Identification immédiate du compagnon sur le Bureau, cohérente avec l'identité HL.
+- Aucune exposition juridique : zéro logo ni marque tierce.
+- Ajouter un compagnon = une ligne de catalogue, la pastille suit.
+- Changer une couleur est pris en compte sans vider le cache d'icônes Windows.
+- Version 0.1.2 publiée.

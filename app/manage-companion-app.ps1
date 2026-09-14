@@ -4,7 +4,7 @@
     désinstalle sur demande celles qui ne sont plus voulues, et écrit la liste companionApps de config.json.
 
 .DESCRIPTION
-    Appelé par install.bat entre la détection (detect-config.ps1) et la création des raccourcis.
+    Appelé par setup.bat entre la détection (detect-config.ps1) et la création des raccourcis.
 
     - Lit companion-apps.json (catalogue) et config.json
     - Boîte de dialogue à cases à cocher (ou -Apps en mode script), pré-cochée depuis config.json, sinon depuis
@@ -57,7 +57,7 @@ $WingetFailureProbeSeconds  = 10
 $WingetArguments            = '--exact --silent --source winget --accept-package-agreements --accept-source-agreements --disable-interactivity'
 
 # Splash affiché pendant les actions (null en dehors) ; SplashTick = une seconde d'attente qui entretient sa barre.
-# CompanionUi : un hôte (install.ps1) peut recevoir les étapes (OnStep) et supprimer le splash (UseSplash)
+# CompanionUi : un hôte (setup.ps1) peut recevoir les étapes (OnStep) et supprimer le splash (UseSplash)
 $script:CompanionSplash = $null
 $script:CompanionUi     = @{ OnStep = $null; UseSplash = $true }
 $SplashTick = { Wait-WithAnimation 1 }
