@@ -73,6 +73,49 @@ Describe 'Read-CompanionCatalog' {
     }
 }
 
+Describe 'Get-CompanionBadge' {
+    It 'renvoie une pastille valide pour chaque appli du catalogue du projet' {
+        foreach ($app in Read-CompanionCatalog $ProjectCatalogPath) {
+            (Get-CompanionBadge $app).glyph | Should Match '^\S{1,2}$'
+            (Get-CompanionBadge $app).color | Should Match '^#[0-9A-Fa-f]{6}$'
+        }
+    }
+
+    It 'attribue une couleur distincte à chaque appli du catalogue du projet' {
+        $colors = @(Read-CompanionCatalog $ProjectCatalogPath | ForEach-Object { $_.badge.color.ToUpperInvariant() })
+        @($colors | Select-Object -Unique).Count | Should Be $colors.Count
+    }
+
+    It 'renvoie la pastille telle quelle quand elle est valide' {
+        $badge = Get-CompanionBadge (New-TestCompanionApp -Badge ([pscustomobject]@{ glyph = 'OP'; color = '#1fa8d8' }))
+        $badge.glyph | Should Be 'OP'
+        $badge.color | Should Be '#1fa8d8'
+    }
+
+    It 'renvoie null avec un avertissement quand la pastille est absente' {
+        Mock Write-Warning {}
+        Get-CompanionBadge (New-TestCompanionApp -Id 'sans') | Should BeNullOrEmpty
+        Assert-MockCalled Write-Warning -Scope It -Exactly 1
+    }
+
+    It 'rejette une couleur qui n''est pas #RRGGBB' {
+        Mock Write-Warning {}
+        Get-CompanionBadge (New-TestCompanionApp -Badge ([pscustomobject]@{ glyph = 'B'; color = 'red' })) | Should BeNullOrEmpty
+    }
+
+    It 'accepte une couleur de lettre explicite et rejette une couleur de lettre mal formée' {
+        Mock Write-Warning {}
+        (Get-CompanionBadge (New-TestCompanionApp -Badge ([pscustomobject]@{ glyph = 'P'; color = '#ECEAE4'; glyphColor = '#172636' }))).glyphColor | Should Be '#172636'
+        Get-CompanionBadge (New-TestCompanionApp -Badge ([pscustomobject]@{ glyph = 'P'; color = '#ECEAE4'; glyphColor = 'navy' })) | Should BeNullOrEmpty
+    }
+
+    It 'rejette une lettre vide ou de plus de deux caractères' {
+        Mock Write-Warning {}
+        Get-CompanionBadge (New-TestCompanionApp -Badge ([pscustomobject]@{ glyph = ''; color = '#000000' })) | Should BeNullOrEmpty
+        Get-CompanionBadge (New-TestCompanionApp -Badge ([pscustomobject]@{ glyph = 'ABC'; color = '#000000' })) | Should BeNullOrEmpty
+    }
+}
+
 Describe 'Find-CompanionCatalogEntry' {
     $catalog = @((New-TestCompanionApp -Id 'a'), (New-TestCompanionApp -Id 'b'))
 

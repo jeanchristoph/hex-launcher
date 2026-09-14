@@ -20,7 +20,8 @@ param(
 )
 
 $ReleaseRootFiles = @('install.bat', 'LISEZMOI.txt', 'LICENSE', 'README.md', 'README.fr.md', 'README.ja.md')
-$ReleaseExcluded  = @('config.json')
+$ReleaseExcluded     = @('config.json')
+$ReleaseExcludedDirs = @('ico\companion')   # icônes drapeau + pastille composées sur chaque poste par create-shortcuts.ps1
 
 function Get-ProjectRoot {
     return Split-Path $PSScriptRoot -Parent
@@ -34,10 +35,17 @@ function Get-ReleaseVersion([string]$Root) {
     return $version
 }
 
+# app\ico\companion\x.ico → vrai : le fichier est dans un dossier généré sur la machine
+function Test-ReleaseExcludedDir([string]$AppRoot, [string]$FullName) {
+    $relative = $FullName.Substring($AppRoot.Length).TrimStart('\')
+    foreach ($dir in $ReleaseExcludedDirs) { if ($relative.StartsWith($dir + '\', [StringComparison]::OrdinalIgnoreCase)) { return $true } }
+    return $false
+}
+
 # Fichiers de app\ à livrer : tout sauf ceux propres à la machine
 function Get-ReleaseAppFiles([string]$Root) {
     $app = Join-Path $Root 'app'
-    return @(Get-ChildItem -Path $app -Recurse -File | Where-Object { $ReleaseExcluded -notcontains $_.Name })
+    return @(Get-ChildItem -Path $app -Recurse -File | Where-Object { $ReleaseExcluded -notcontains $_.Name -and -not (Test-ReleaseExcludedDir $app $_.FullName) })
 }
 
 # Prépare un dossier hex-launcher-<version>\ avec la racine épurée et app\

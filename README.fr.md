@@ -28,11 +28,12 @@ installe, et on obtient un raccourci par langue × appli compagnon
 | `app/manage-companion-app.ps1` | Appelé par `install.bat` : choix des applis compagnon, installation des manquantes, désinstallation sur demande |
 | `app/create-shortcuts.ps1` | Appelé par `install.bat` : choix des langues et des compagnons, puis un `.lnk` par combinaison sur le Bureau (repli dans ce dossier si le Bureau est inaccessible) |
 | `app/lib/companion-app.lib.ps1` | Fonctions partagées : catalogue, détection via le registre (lecture seule), commande de désinstallation, vérification de signature Authenticode |
+| `app/lib/icon.lib.ps1` / `icon-badge.lib.ps1` | Lecture/écriture des `.ico` et composition de la pastille compagnon sur l'icône drapeau |
 | `app/lib/launch-config.lib.ps1` | Fonctions partagées : lecture/écriture de `config.json`, migration de l'ancien format à une seule appli |
 | `app/lib/splash.lib.ps1` | Splash animé partagé (lancement du jeu, installation des applis compagnon) |
 | `tests/` | Tests Pester (`Invoke-Pester -Path tests`) |
 | `app/make-flag-icons.ps1` | Outil : régénère les icônes drapeau de `ico/` à partir de l'icône de base originale (pas nécessaire à l'usage) |
-| `app/ico/` | Icônes : base originale (monogramme H) + une variante drapeau par langue (`hex-launcher-xx.ico`) |
+| `app/ico/` | Icônes : base originale (monogramme H) + une variante drapeau par langue (`hex-launcher-xx.ico`) ; `ico/companion/` reçoit les icônes drapeau + pastille composées sur ce poste |
 
 ## Installation sur une nouvelle machine
 
@@ -109,6 +110,7 @@ Une entrée dans `companion-apps.json` ; l'ordre de la liste est la priorité de
   "id": "opgg",
   "name": "OP.GG",
   "signer":       { "organization": "OP.GG", "country": "KR" },
+  "badge":        { "glyph": "O", "color": "#1FA8D8" },
   "processNames": ["OP.GG"],
   "launch":    { "path": "%LOCALAPPDATA%\\Programs\\OP.GG\\OP.GG.exe", "arguments": "" },
   "detect":    { "registryDisplayNamePattern": "^OP\\.GG", "path": "%LOCALAPPDATA%\\Programs\\OP.GG\\OP.GG.exe" },
@@ -121,6 +123,7 @@ Une entrée dans `companion-apps.json` ; l'ordre de la liste est la priorité de
 | Clé | Description |
 |---|---|
 | `signer.organization` / `signer.country` | `O=` et `C=` du certificat de signature de code de l'éditeur, exacts et sensibles à la casse. À lire avec `Get-AuthenticodeSignature <exe>` → `SignerCertificate.Subject`. Obligatoire pour chaque appli : installeurs et désinstalleurs sont refusés sinon |
+| `badge.glyph` / `badge.color` / `badge.glyphColor` | Pastille des raccourcis de cette appli : une lettre (deux au plus) sur un disque de couleur `#RRGGBB`, dessinée par le lanceur — jamais un logo tiers. `glyphColor` (optionnel) fixe la couleur de la lettre ; sinon elle est sombre sur disque clair, blanche sur disque sombre. Pastille absente ou invalide : le raccourci garde l'icône drapeau seule |
 | `processNames` | Process fermés avant une désinstallation, et après une installation qui a lancé l'appli |
 | `launch.path` / `launch.arguments` | Ce que le lanceur démarre après le jeu. Les variables `%VAR%` sont résolues |
 | `detect.registryDisplayNamePattern` | Regex comparée au `DisplayName` des clés `Uninstall` du registre (HKLM, HKLM\WOW6432Node, HKCU). OP.GG et Mobalytics mettent leur version dans le nom, d'où des motifs par préfixe |
@@ -175,6 +178,8 @@ s'appelle `League of Legends XX` (XX = partie pays du code : `ja_JP` → JP, `ko
 
 Icône : chaque raccourci reçoit la variante drapeau de sa langue (`app/ico/hex-launcher-xx.ico`, par exemple
 `hex-launcher-jp.ico` pour `ja_JP`). Sans drapeau pour une langue, l'icône de base `app/ico/hex-launcher.ico` est utilisée.
+Un raccourci avec appli compagnon porte en plus une pastille de couleur en haut à droite — P Porofessor, B Blitz,
+O OP.GG, M Mobalytics — composée à l'installation dans `app/ico/companion/` (la lettre disparaît sous 32 px, la couleur reste).
 
 Pour une langue absente du catalogue (nouvelle locale Riot) :
 1. ajouter une ligne dans `locales.json` avec le code exact tel qu'il apparaît dans `available_locales`

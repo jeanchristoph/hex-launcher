@@ -15,7 +15,8 @@ function New-TestCompanionApp {
         [string]$Fallback = 'browser',
         [string]$Notice = $null,
         [string[]]$DialogProcessNames = @(),
-        [string[]]$ProcessNames = @()
+        [string[]]$ProcessNames = @(),
+        $Badge = $null
     )
     return [pscustomobject]@{
         id           = $Id
@@ -29,6 +30,7 @@ function New-TestCompanionApp {
             timeoutSeconds = 30; fallback = $Fallback; browserUrl = 'https://example.test/download'
         }
         uninstall    = [pscustomobject]@{ mode = $Mode; dialogProcessNames = $DialogProcessNames; notice = $Notice }
+        badge        = $Badge
     }
 }
 

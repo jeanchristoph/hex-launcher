@@ -40,6 +40,7 @@ param(
 )
 
 Add-Type -AssemblyName System.Drawing
+. (Join-Path $PSScriptRoot 'lib\icon.lib.ps1')
 
 $folder       = $PSScriptRoot
 $icoFolder    = if ($OutDir) { $OutDir } else { Join-Path $folder 'ico' }
@@ -593,37 +594,13 @@ function New-BaseIconBitmap([int]$Size, $FlagDrawing, $Style = $MonogramStyle) {
     return $bmp
 }
 
-# ---------------------------------------------------------------- Fichier .ico
-
-function ConvertTo-PngBytes([System.Drawing.Bitmap]$Bmp) {
-    $ms = New-Object IO.MemoryStream
-    $Bmp.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png)
-    return , $ms.ToArray()   # la virgule évite que le pipeline déroule le byte[]
-}
+# ---------------------------------------------------------------- Fichier .ico (écriture : lib\icon.lib.ps1)
 
 # Une entrée par taille, chacune dessinée nativement
 function New-IconEntries($FlagDrawing) {
     return @(foreach ($size in $IconSizes) {
         [PSCustomObject]@{ Size = $size; Bitmap = (New-BaseIconBitmap $size $FlagDrawing) }
     })
-}
-
-# .ico à entrées PNG (supporté depuis Vista) : en-tête 6 o + 16 o par entrée, puis les données
-function Write-Ico([object[]]$Entries, [string]$Path) {
-    $pngs = @($Entries | ForEach-Object { [PSCustomObject]@{ Size = $_.Size; Bytes = (ConvertTo-PngBytes $_.Bitmap) } })
-    $stream = [IO.File]::Create($Path)
-    $w = New-Object IO.BinaryWriter($stream)
-    $w.Write([uint16]0); $w.Write([uint16]1); $w.Write([uint16]$pngs.Count)
-    $dataOffset = 6 + 16 * $pngs.Count
-    foreach ($p in $pngs) {
-        $dim = if ($p.Size -ge 256) { 0 } else { $p.Size }
-        $w.Write([byte]$dim); $w.Write([byte]$dim); $w.Write([byte]0); $w.Write([byte]0)
-        $w.Write([uint16]1); $w.Write([uint16]32)
-        $w.Write([uint32]$p.Bytes.Length); $w.Write([uint32]$dataOffset)
-        $dataOffset += $p.Bytes.Length
-    }
-    foreach ($p in $pngs) { $w.Write($p.Bytes) }
-    $w.Dispose(); $stream.Dispose()
 }
 
 # ja_JP → hex-launcher-jp.ico (même convention que create-shortcuts.ps1)
