@@ -1,3 +1,4 @@
+- [2026-09-14] Gravé : 458cdc8 sur companion-apps et master, release GitHub v0.1.0 publiée (hex-launcher-0.1.0.zip, 3,7 Mo). Version passée de 1.0.0 à 0.1.0 à la demande de l'utilisateur.
 - [2026-09-14] T24 faite : raccourcis sur ico\hex-launcher-xx.ico (repli base), plus aucune référence à league_of_legends.live.ico — 250 tests. Plan entièrement coché ; reste grave master + release v1.0.0.
 - [2026-09-14] Icônes finales HL déposées dans app/ico (28 .ico) → T24 ajoutée (raccourcis par drapeau, fin de l'intérim T23), T22 close comme obsolète.
 - [2026-09-14] Icône : 15 propositions livrées (5 presets, P1-P5, S01-S10), l'utilisateur retient S08/S10 puis fournit un modèle HL généré (anneau or, HL facetté, gemme cyan) → reproduction programmatique en cours (modele-v1, FR seul). Versionnage : jamais écraser une vN (s08-v2/v3, s10-v2/v3).
