@@ -65,3 +65,6 @@ lol/  (dépôt hex-launcher)
 - Identité visuelle : nom `hex-launcher`, mention de non-affiliation Riot en tête des README ; icônes originales générées par make-flag-icons.ps1
 - Registre et configuration Windows : lecture seule, interdiction d'écrire (règle utilisateur, CLAUDE.md global)
 - External documentation: `RiotClientInstalls.json` (`%ProgramData%\Riot Games\`) et `league_of_legends.live.product_settings.yaml` — fichiers officiels Riot lus/écrits par le lanceur ; README.md du projet (référence fonctionnelle complète)
+
+## Backlog
+- Fenêtre de setup multilingue (FR + EN + JA) : chaînes de `setup.ps1` / journal de `manage-companion-app.ps1` et `create-shortcuts.ps1` extraites dans un dictionnaire, langue de Windows par défaut (`Get-UICulture`), bascule dans la fenêtre. Décidé le 2026-09-14, branche dédiée à ouvrir quand l'utilisateur le demandera.
