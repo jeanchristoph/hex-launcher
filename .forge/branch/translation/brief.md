@@ -9,3 +9,4 @@ l'utilisateur peut basculer de langue directement dans la fenêtre. Les scripts 
 mode script.
 
 ## Scope & rules
+- Notes de release GitHub (`make-release.ps1 -Notes`) : toujours rédigées en anglais — règle utilisateur du 2026-09-16.

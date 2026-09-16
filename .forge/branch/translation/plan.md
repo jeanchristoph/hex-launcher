@@ -38,7 +38,7 @@
 **Effort:** S
 **Files:** `app/version.txt`, `README.md`, `README.fr.md`, `README.ja.md`, `LISEZMOI.txt`, `.forge/project.md`
 **Description:** `version.txt` → 0.1.4. README ×3 : l'assistant parle FR/EN/JA, langue de Windows par défaut, sélecteur dans la fenêtre, paramètre `-Language fr|en|ja` sur `setup.ps1` et les scripts moteur ; `LISEZMOI.txt` idem en deux lignes. `project.md` : lib i18n, dossier `app/i18n/`, convention « aucune chaîne utilisateur littérale dans les scripts ». Puis, sur feu vert : commit, merge `master`, `make-release.ps1 -Publish`.
-[ ] 2026-09-16 — version 0.1.4, README ×3, LISEZMOI, project.md faits ; commit / merge master / release en attente du feu vert
+[x] 2026-09-16 — version 0.1.4, README ×3, LISEZMOI, project.md ; commit 1869d7b, master fast-forwardé, release v0.1.4 publiée (zip avec i18n, sans config.json)
 
 ## Risks
 - Qualité du japonais : rédigé par Claude, relecture humaine recommandée avant release (registre, longueur des libellés dans les 230 px de la colonne).
@@ -57,5 +57,5 @@ None
 | T3 — setup.ps1 branché | M | [x] |
 | T4 — Sélecteur de langue | M | [x] |
 | T5 — Moteur multilingue | M | [x] |
-| T6 — Version 0.1.4, doc, release | S | [ ] |
+| T6 — Version 0.1.4, doc, release | S | [x] |
 | **Total** | **~XL (1,5-2 j)** | |

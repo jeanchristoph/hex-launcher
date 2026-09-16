@@ -1,0 +1,19 @@
+PROBLÈME
+  L'assistant de configuration et les scripts moteur parlaient uniquement français,
+  chaînes figées dans le code. Un utilisateur anglophone ou japonais n'avait ni fenêtre
+  ni messages console dans sa langue.
+
+SOLUTION
+  - Dictionnaires JSON par langue (fr, en, ja), mêmes clés partout, vérifiés par un test
+    de catalogue (clés, placeholders, valeurs).
+  - Langue choisie automatiquement d'après Windows, anglais par défaut, paramètre
+    -Language pour forcer.
+  - Sélecteur « Français · English · 日本語 » dans la fenêtre, bascule immédiate sans
+    perdre les cases cochées.
+  - Notices du catalogue compagnon traduites ; correction d'un double encodage qui
+    affichait des caractères corrompus.
+
+IMPACT
+  - Version 0.1.4 publiée.
+  - Ajouter une langue = un fichier JSON, sans toucher au code.
+  - Point de vigilance : traduction japonaise à relire par un locuteur natif.
