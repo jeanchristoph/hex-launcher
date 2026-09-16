@@ -13,16 +13,21 @@
 .EXAMPLE
     powershell -NoProfile -ExecutionPolicy Bypass -File detect-config.ps1
     powershell -NoProfile -ExecutionPolicy Bypass -File detect-config.ps1 -Force
+    powershell -NoProfile -ExecutionPolicy Bypass -File detect-config.ps1 -Language en
 #>
 param(
     [string]$OutputPath,
-    [switch]$Force
+    [switch]$Force,
+
+    # Langue des messages : fr, en ou ja (défaut : langue de Windows, sinon anglais)
+    [string]$Language
 )
 
 $RiotInstallsPath  = Join-Path $env:ProgramData 'Riot Games\RiotClientInstalls.json'
 $RiotClientDefault = 'C:\Riot Games\Riot Client\RiotClientServices.exe'
 $ProductSettings   = Join-Path $env:ProgramData 'Riot Games\Metadata\league_of_legends.live\league_of_legends.live.product_settings.yaml'
 
+. (Join-Path $PSScriptRoot 'lib\i18n.lib.ps1')
 . (Join-Path $PSScriptRoot 'lib\companion-app.lib.ps1')
 $CompanionCatalogPath = Join-Path $PSScriptRoot 'companion-apps.json'
 
@@ -42,7 +47,7 @@ function Find-RiotClientPath {
 # invalide ne bloque pas la détection des chemins Riot (l'appli compagnon est optionnelle).
 function Get-DetectedCompanionApps {
     try { $catalog = Read-CompanionCatalog $CompanionCatalogPath }
-    catch { Write-Warning "Applis compagnon ignorées : $($_.Exception.Message)"; return @() }
+    catch { Write-Warning (Get-Text 'detect.companionIgnored' $_.Exception.Message); return @() }
     $launchable = @(Get-InstalledCompanionApps $catalog | Where-Object { Test-Path (Expand-CompanionPath $_.App.launch.path) })
     return @($launchable | ForEach-Object { ConvertTo-LaunchCompanionEntry $_.App })
 }
@@ -59,23 +64,21 @@ function New-LaunchConfig {
 
 function Invoke-ConfigDetection([string]$OutputPath, [bool]$Force) {
     if ((Test-Path $OutputPath) -and -not $Force) {
-        "config.json existant conservé : $OutputPath"
-        "  (supprimer le fichier ou relancer avec -Force pour re-détecter)"
+        Get-Text 'detect.kept' $OutputPath
+        Get-Text 'detect.keptHint'
         return
     }
     $config = New-LaunchConfig
     Write-LaunchConfig $config $OutputPath
-    "config.json généré : $OutputPath"
-    "  Riot Client        : $($config.riotClientPath)" + $(if (Test-Path $config.riotClientPath) { '' } else { '  [INTROUVABLE]' })
-    "  Fichier de langue  : $($config.productSettingsPath)" + $(if (Test-Path $config.productSettingsPath) { '' } else { '  [INTROUVABLE — LoL est-il installé ?]' })
-    if ($config.companionApps.Count -gt 0) {
-        "  Applis compagnon   : $(($config.companionApps | ForEach-Object { $_.name }) -join ', ')"
-    } else {
-        "  Applis compagnon   : aucune détectée — choix possible à l'étape suivante"
-    }
+    Get-Text 'detect.generated' $OutputPath
+    (Get-Text 'detect.riotClientLine' $config.riotClientPath) + $(if (Test-Path $config.riotClientPath) { '' } else { Get-Text 'detect.missingMark' })
+    (Get-Text 'detect.productSettingsLine' $config.productSettingsPath) + $(if (Test-Path $config.productSettingsPath) { '' } else { Get-Text 'detect.missingLolMark' })
+    $companions = if ($config.companionApps.Count -gt 0) { ($config.companionApps | ForEach-Object { $_.name }) -join ', ' } else { Get-Text 'detect.noCompanion' }
+    Get-Text 'detect.companionsLine' $companions
 }
 
 if ($MyInvocation.InvocationName -ne '.') {
+    Initialize-Translation (Resolve-UiLanguage $Language (Get-UICulture).Name) | Out-Null
     if (-not $OutputPath) { $OutputPath = Join-Path $PSScriptRoot 'config.json' }
     Invoke-ConfigDetection $OutputPath ([bool]$Force)
 }
