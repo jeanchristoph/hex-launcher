@@ -29,6 +29,7 @@ installe, et on obtient un raccourci par langue × appli compagnon
 | `app/create-shortcuts.ps1` | Appelé par `setup.bat` : choix des langues et des compagnons, puis un `.lnk` par combinaison sur le Bureau (repli dans ce dossier si le Bureau est inaccessible) |
 | `app/lib/companion-app.lib.ps1` | Fonctions partagées : catalogue, détection via le registre (lecture seule), commande de désinstallation, vérification de signature Authenticode |
 | `app/lib/icon.lib.ps1` / `icon-badge.lib.ps1` | Lecture/écriture des `.ico` et composition de la pastille compagnon sur l'icône drapeau |
+| `app/lib/i18n.lib.ps1` / `app/i18n/` | Traductions de l'assistant et de la console : un dictionnaire `fr.json` / `en.json` / `ja.json` par langue, mêmes clés partout |
 | `app/lib/launch-config.lib.ps1` | Fonctions partagées : lecture/écriture de `config.json`, migration de l'ancien format à une seule appli |
 | `app/lib/splash.lib.ps1` | Splash animé partagé (lancement du jeu, installation des applis compagnon) |
 | `tests/` | Tests Pester (`Invoke-Pester -Path tests`) |
@@ -56,6 +57,11 @@ installe, et on obtient un raccourci par langue × appli compagnon
 3. Double-cliquer sur le raccourci de la langue et du compagnon voulus.
 
 Pour ajouter ou retirer des langues ou des applis compagnon plus tard : relancer `setup.bat`.
+
+L'assistant lui-même parle **français, anglais et japonais** : il s'ouvre dans la langue d'affichage de Windows
+(anglais pour toute autre langue) et le sélecteur en bas de la colonne de gauche bascule à tout moment sans
+perdre ce qui est coché. Pour forcer une langue : `powershell -File app\setup.ps1 -Language ja`
+(même paramètre `-Language fr|en|ja` sur `detect-config.ps1`, `manage-companion-app.ps1` et `create-shortcuts.ps1`).
 
 Si la détection s'est trompée : éditer `app\config.json` (voir ci-dessous) puis relancer `setup.bat`.
 Pour forcer une nouvelle détection : supprimer `app\config.json` puis relancer.

@@ -106,6 +106,28 @@ function New-ThemedCheckedListBox([int]$Left, [int]$Top, [int]$Width, [int]$Heig
     return $list
 }
 
+# Liste déroulante fermée : $Items = objets Key/Label, les clés sont rangées dans Tag (même indice que les libellés)
+function New-ThemedComboBox([object[]]$Items, [string]$SelectedKey, [int]$Left, [int]$Top, [int]$Width) {
+    $combo               = New-Object System.Windows.Forms.ComboBox
+    $combo.DropDownStyle = 'DropDownList'
+    $combo.FlatStyle     = 'Flat'
+    $combo.Location      = New-Object System.Drawing.Point($Left, $Top)
+    $combo.Size          = New-Object System.Drawing.Size($Width, 28)
+    $combo.BackColor     = Get-ThemeColor 'Panel'
+    $combo.ForeColor     = Get-ThemeColor 'Cream'
+    $combo.Font          = New-ThemeFont 10
+    foreach ($item in $Items) { [void]$combo.Items.Add($item.Label) }
+    $combo.Tag           = [string[]]@($Items | ForEach-Object { $_.Key })
+    $combo.SelectedIndex = [array]::IndexOf($combo.Tag, $SelectedKey)
+    return $combo
+}
+
+# Clé de l'élément sélectionné, $null si aucun
+function Get-ThemedComboBoxKey($Combo) {
+    if ($Combo.SelectedIndex -lt 0) { return $null }
+    return $Combo.Tag[$Combo.SelectedIndex]
+}
+
 # Case plate : liseré or, fond or sombre quand cochée (le glyphe seul serait invisible sur fond nuit)
 function New-ThemedCheckBox([string]$Text, [int]$Left, [int]$Top, [int]$Width) {
     $box                                      = New-Object System.Windows.Forms.CheckBox

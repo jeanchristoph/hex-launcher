@@ -33,6 +33,7 @@ Windows 向け League of Legends 起動アシスタント：デスクトップ�
 | `tests/` | Pester テスト（`Invoke-Pester -Path tests`） |
 | `app/make-flag-icons.ps1` | ツール：オリジナルの基本アイコンから `ico/` の国旗アイコンを再生成（通常の使用には不要） |
 | `app/lib/icon.lib.ps1` / `icon-badge.lib.ps1` | `.ico` の読み書きと、国旗アイコンへの補助アプリバッジの合成 |
+| `app/lib/i18n.lib.ps1` / `app/i18n/` | アシスタントとコンソールの翻訳：言語ごとの辞書 `fr.json` / `en.json` / `ja.json`（すべて同じキー） |
 | `app/ico/` | アイコン：オリジナルの基本アイコン（H モノグラム）＋言語ごとの国旗バージョン（`hex-launcher-xx.ico`）。`ico/companion/` にはこの PC で合成された国旗＋バッジのアイコンが入ります |
 
 ## 新しい PC でのセットアップ
@@ -53,6 +54,11 @@ Windows 向け League of Legends 起動アシスタント：デスクトップ�
 3. 使いたい言語と補助アプリのショートカットをダブルクリックします。
 
 後から言語や補助アプリを追加・削除するには：`setup.bat` を再実行してください。
+
+アシスタント自体は**フランス語・英語・日本語**に対応しています。Windows の表示言語で起動し（それ以外の言語では英語）、
+左の列の下にあるセレクターでいつでも切り替えられます（チェック内容は保持されます）。言語を指定するには：
+`powershell -File app\setup.ps1 -Language ja`（`detect-config.ps1`、`manage-companion-app.ps1`、`create-shortcuts.ps1` にも同じ
+`-Language fr|en|ja` があります）。
 
 検出が間違っていた場合は：`app\config.json` を編集（下記参照）して `setup.bat` を再実行。
 検出をやり直すには：`app\config.json` を削除して再実行してください。
@@ -209,10 +215,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-Pester -Path test
   **BOM 付き UTF-8** である必要があります（VS Code：ステータスバー → エンコード → 「エンコード付きで保存」）。
 - **ショートカットのアイコンが更新されない**：Windows のアイコンキャッシュです。フォルダーで右クリック → 最新の情報に更新、
   それでもだめならサインアウト／サインインしてください。
-- **「Ne pas exécuter en tant qu'administrateur」**：`setup.bat` を昇格して起動しました。通常起動してください。
-- **「winget indisponible」**：この Windows に App Installer がありません。Microsoft Store からインストールするか、
+- **「管理者として実行しないでください」**：`setup.bat` を昇格して起動しました。通常起動してください。
+- **「winget を利用できません」**：この Windows に App Installer がありません。Microsoft Store からインストールするか、
   ツールがブラウザーで開く Blitz のダウンロードページを使ってください。
-- **「désinstalleur … non signé」**：レジストリで見つかったアンインストーラーが想定した発行者の署名ではありません。
+- **「アンインストーラー … 署名がありません」**：レジストリで見つかったアンインストーラーが想定した発行者の署名ではありません。
   ツールはそれを実行しません。Windows の「インストールされているアプリ」からアンインストールしてください。
 - **「Désinstaller」の後も補助アプリが残っている**：発行者のダイアログを確認せずに閉じた（Overwolf）か、
   アンインストールに予想以上の時間がかかりました。他には何もインストールされていません。`setup.bat` を再実行してください。

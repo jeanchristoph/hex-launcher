@@ -51,6 +51,24 @@ Describe 'New-ThemedLog' {
     }
 }
 
+Describe 'New-ThemedComboBox' {
+    $items = @([pscustomobject]@{ Key = 'fr'; Label = 'Français' }, [pscustomobject]@{ Key = 'ja'; Label = '日本語' })
+
+    It 'présélectionne la clé demandée et la retrouve sans fenêtre' {
+        $combo = New-ThemedComboBox $items 'ja' 0 0 190
+        $combo.DropDownStyle | Should Be 'DropDownList'
+        $combo.Items.Count | Should Be 2
+        $combo.SelectedIndex | Should Be 1
+        Get-ThemedComboBoxKey $combo | Should Be 'ja'
+    }
+
+    It 'ne sélectionne rien pour une clé inconnue' {
+        $combo = New-ThemedComboBox $items 'xx' 0 0 190
+        $combo.SelectedIndex | Should Be -1
+        Get-ThemedComboBoxKey $combo | Should BeNullOrEmpty
+    }
+}
+
 Describe 'New-ThemedCheckBox' {
     It 'se remplit d''or sombre une fois cochée, liseré or' {
         $box = New-ThemedCheckBox 'Option' 0 0 200

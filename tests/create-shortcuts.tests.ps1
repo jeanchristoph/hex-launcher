@@ -5,6 +5,9 @@
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $here '..\app\create-shortcuts.ps1')
 
+# Les textes attendus sont français quelle que soit la langue de Windows sur la machine de test
+Initialize-Translation 'fr' | Out-Null
+
 Describe 'Get-FlagIconPath' {
     It 'dérive le nom du fichier drapeau de la partie pays du code, en minuscules' {
         Get-FlagIconPath 'ja_JP' | Should Match 'ico\\hex-launcher-jp\.ico$'

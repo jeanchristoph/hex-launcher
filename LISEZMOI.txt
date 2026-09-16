@@ -7,6 +7,7 @@ hex-launcher — lanceur League of Legends multi-langue + applis compagnon (Wind
 
 Le dossier  app\  contient le moteur (scripts, icônes, catalogues) : rien à y toucher.
 Pour changer de langue ou d'appli compagnon plus tard : relancez setup.bat.
+L'assistant s'affiche en français, anglais ou japonais selon Windows — sélecteur en bas à gauche.
 Documentation complète : README.fr.md (français), README.md (English), README.ja.md (日本語).
 
 Projet non affilié à Riot Games — voir la mention légale dans les README.
@@ -14,3 +15,4 @@ Projet non affilié à Riot Games — voir la mention légale dans les README.
 -----------------------------------------------------------------------------------
 EN — Double-click setup.bat (never as administrator), follow the wizard, then use the
 "League of Legends XX" desktop shortcuts. The app\ folder is the engine: nothing to edit there.
+The wizard follows the Windows language (FR / EN / JA) — selector at the bottom left.
