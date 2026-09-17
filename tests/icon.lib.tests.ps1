@@ -4,8 +4,8 @@
 #>
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $here '..\app\lib\icon.lib.ps1')
-$ProjectIcoPath  = Join-Path $here '..\app\ico\hex-launcher-fr.ico'
-$FlagIconsScript = Join-Path $here '..\app\make-flag-icons.ps1'
+$ProjectIcoPath  = Join-Path $here '..\app\ico\flat\hex-launcher-fr.ico'
+$FlagIconsScript = Join-Path $here '..\tools\make-flag-icons.ps1'
 
 # Bitmap unie d'une couleur, un pixel témoin distinct en (1,1)
 function New-TestBitmap([int]$Size, [string]$Fill = '#FF102030', [string]$Witness = '#FFFF8800') {

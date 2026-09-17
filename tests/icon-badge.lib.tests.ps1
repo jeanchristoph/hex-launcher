@@ -4,10 +4,12 @@
 #>
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $here '..\app\lib\icon-badge.lib.ps1')
-$SourceIco = Join-Path $here '..\app\ico\hex-launcher-fr.ico'
+$SourceIco = Join-Path $here '..\app\ico\flat\hex-launcher-fr.ico'
 $TestBadge = [pscustomobject]@{ glyph = 'I'; color = '#E0432B' }   # « I » : son centre est toujours encré
 
 function Get-Argb([string]$Hex) { return ([System.Drawing.ColorTranslator]::FromHtml($Hex)).ToArgb() }
+$VeiledStyle  = @{ NightVeil = $true; ReducedPalette = $false }
+$ReducedStyle = @{ NightVeil = $false; ReducedPalette = $true }
 
 function Get-EntryOfSize([object[]]$Entries, [int]$Size) { return $Entries | Where-Object { $_.Size -eq $Size } | Select-Object -First 1 }
 
@@ -70,6 +72,11 @@ Describe 'Get-BadgeSignature' {
         Get-BadgeSignature ([pscustomobject]@{ glyph = 'B'; color = '#ECEAE4'; glyphColor = '#E36A62' }) | Should Not Be (Get-BadgeSignature $badge)
         Get-BadgeSignature ([pscustomobject]@{ glyph = 'P'; color = '#E4103F'; glyphColor = '#E36A62' }) | Should Not Be (Get-BadgeSignature $badge)
         Get-BadgeSignature ([pscustomobject]@{ glyph = 'P'; color = '#ECEAE4' }) | Should Not Be (Get-BadgeSignature $badge)
+    }
+
+    It 'change avec le style de pastille' {
+        Get-BadgeSignature $badge $VeiledStyle | Should Not Be (Get-BadgeSignature $badge)
+        Get-BadgeSignature $badge $ReducedStyle | Should Not Be (Get-BadgeSignature $badge)
     }
 
     It 'change avec les métriques de dessin' {
@@ -136,6 +143,26 @@ Describe 'Add-CompanionBadge' {
 
     It 'renvoie le chemin de l''icône composée' {
         Add-CompanionBadge $SourceIco $TestBadge (Join-Path $TestDrive 'again.ico') | Should Be (Join-Path $TestDrive 'again.ico')
+    }
+
+    It 'passe disque et lettre sous le voile nuit quand le style le demande' {
+        $veiled = Join-Path $TestDrive 'veiled.ico'
+        Add-CompanionBadge $SourceIco ([pscustomobject]@{ glyph = 'I'; color = '#ECEAE4'; glyphColor = '#E36A62' }) $veiled $VeiledStyle | Out-Null
+        $entries = Read-IcoEntries $veiled
+        $m = Get-BadgeMetrics 256; $probe = Get-DiscProbe 256
+        (Get-EntryOfSize $entries 256).Bitmap.GetPixel($probe.X, $probe.Y).ToArgb() | Should Be (ConvertTo-VeiledColor (ConvertFrom-HexColor '#ECEAE4')).ToArgb()
+        (Get-EntryOfSize $entries 256).Bitmap.GetPixel([int]$m.Cx, [int]$m.Cy).ToArgb() | Should Be (ConvertTo-VeiledColor (ConvertFrom-HexColor '#E36A62')).ToArgb()
+        Remove-Entries $entries
+    }
+
+    It 'ramène disque et lettre à la palette réduite quand le style le demande' {
+        $reduced = Join-Path $TestDrive 'reduced.ico'
+        Add-CompanionBadge $SourceIco ([pscustomobject]@{ glyph = 'I'; color = '#ECEAE4'; glyphColor = '#E36A62' }) $reduced $ReducedStyle | Out-Null
+        $entries = Read-IcoEntries $reduced
+        $m = Get-BadgeMetrics 256; $probe = Get-DiscProbe 256
+        (Get-EntryOfSize $entries 256).Bitmap.GetPixel($probe.X, $probe.Y).ToArgb() | Should Be (Get-Argb $FlagPalette.White)
+        (Get-EntryOfSize $entries 256).Bitmap.GetPixel([int]$m.Cx, [int]$m.Cy).ToArgb() | Should Be (Get-Argb $FlagPalette.Red)
+        Remove-Entries $entries
     }
 
     It 'refuse une pastille sans couleur' {

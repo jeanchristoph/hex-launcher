@@ -34,6 +34,7 @@ function Reset-SetupTestState([hashtable]$Overrides = @{}) {
     $script:InstallState.Installed         = @()
     $script:InstallState.ExistingShortcuts = @()
     $script:InstallState.ShortcutPaths     = @()
+    $script:InstallState.IconSets          = @()
     $script:InstallState.Controls          = @{}
     foreach ($key in $Overrides.Keys) { $script:InstallState[$key] = $Overrides[$key] }
 }
@@ -180,6 +181,53 @@ Describe 'Éléments des listes' {
         $items = @(Get-ShortcutCompanionListItems @(New-TestCompanionEntry 'opgg' 'OP.GG'))
         $items[0].Key | Should Be 'opgg'
         $items[0].Label | Should Be 'OP.GG'
+    }
+
+    It 'nomme un jeu d''icônes par son dossier' {
+        $items = @(Get-IconSetListItems @(@{ Name = 'classic'; Path = 'C:\x\classic' }))
+        $items[0].Key | Should Be 'classic'
+        $items[0].Label | Should Be 'classic'
+    }
+}
+
+Describe 'Jeu d''icônes de la page Raccourcis' {
+    $sets = @(@{ Name = 'classic'; Path = 'C:\x\classic' }, @{ Name = 'flat'; Path = 'C:\x\flat' })
+
+    It 'présélectionne le jeu mémorisé dans config.json' {
+        $config = New-TestLaunchConfig; Set-LaunchIconSetName $config 'classic'
+        Get-PreselectedIconSetName $config $sets | Should Be 'classic'
+    }
+
+    It 'replie sur le jeu par défaut quand config.json cite un jeu disparu ou aucun' {
+        $config = New-TestLaunchConfig; Set-LaunchIconSetName $config 'disparu'
+        Get-PreselectedIconSetName $config $sets | Should Be 'flat'
+        Get-PreselectedIconSetName (New-TestLaunchConfig) $sets | Should Be 'flat'
+    }
+
+    It 'rend vide sans aucun jeu' {
+        Get-PreselectedIconSetName (New-TestLaunchConfig) @() | Should Be ''
+    }
+
+    It 'sélectionne le jeu présélectionné dans la liste et le retrouve sans fenêtre' {
+        $list = New-SetupIconSetList $sets 'flat' 0 0 200 60
+        $list.Items.Count | Should Be 2
+        Get-SetupSelectedIconSetName $list | Should Be 'flat'
+    }
+
+    It 'rend vide sans sélection' {
+        Get-SetupSelectedIconSetName (New-SetupIconSetList $sets 'inconnu' 0 0 200 60) | Should Be ''
+        Get-SetupSelectedIconSetName $null | Should Be ''
+    }
+
+    It 'donne en aperçu l''entrée 64 px de hex-launcher.ico du jeu livré' {
+        $flat  = Find-IconSet @(Get-IconSets (Join-Path $here '..\app\ico')) 'flat'
+        $image = New-IconSetPreviewImage $flat 64
+        try { $image.Width | Should Be 64 } finally { if ($image) { $image.Dispose() } }
+    }
+
+    It 'rend null sans jeu ou avec une icône illisible' {
+        New-IconSetPreviewImage $null 64 | Should BeNullOrEmpty
+        New-IconSetPreviewImage @{ Name = 'x'; Path = (Join-Path $TestDrive 'absent') } 64 | Should BeNullOrEmpty
     }
 }
 
@@ -515,6 +563,7 @@ Describe 'Invoke-SetupShortcutsStep' {
     Mock Write-SetupLog {}
     Mock New-SetupShortcuts { @('C:\Bureau\League of Legends JP - Blitz.lnk') }
     Mock Remove-ObsoleteShortcuts { 'Retiré : C:\Bureau\League of Legends FR.lnk' }
+    Mock Select-IconSetForConfig { @{ Name = 'classic'; Path = 'C:\x\classic' } }
 
     It 'reste sur la page sans rien créer quand aucune langue n''est cochée' {
         Reset-SetupTestState @{ Config = $config }
@@ -526,9 +575,11 @@ Describe 'Invoke-SetupShortcutsStep' {
 
     It 'crée une combinaison par langue × compagnon puis retire les raccourcis obsolètes' {
         Reset-SetupTestState @{ Config = $config }
-        Mock Get-SetupShortcutSelection { @{ Codes = @('ja_JP'); CompanionIds = @('blitz') } }
+        Mock Get-SetupShortcutSelection { @{ Codes = @('ja_JP'); CompanionIds = @('blitz'); IconSet = 'classic' } }
         Invoke-SetupShortcutsStep | Should Be $true
         $script:InstallState.ShortcutPaths.Count | Should Be 1
+        Assert-MockCalled -Scope It Select-IconSetForConfig -Exactly -Times 1 -ParameterFilter { $RequestedName -eq 'classic' -and $ConfigPath -eq $SetupConfigPath }
+        Assert-MockCalled -Scope It Write-SetupLog -Exactly -Times 1 -ParameterFilter { $Text -eq "Jeu d'icônes : classic" }
         Assert-MockCalled -Scope It New-SetupShortcuts -Exactly -Times 1 -ParameterFilter { $Combinations.Count -eq 1 -and $Combinations[0].Name -eq 'League of Legends JP - Blitz' }
         Assert-MockCalled -Scope It Remove-ObsoleteShortcuts -Exactly -Times 1
         Assert-MockCalled -Scope It Write-SetupLog -Exactly -Times 1 -ParameterFilter { $Text -match '^Retiré' }

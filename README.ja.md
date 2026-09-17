@@ -31,9 +31,9 @@ Windows 向け League of Legends 起動アシスタント：デスクトップ�
 | `app/lib/launch-config.lib.ps1` | 共通関数：`config.json` の読み書き、旧形式（単一アプリ）からの移行 |
 | `app/lib/splash.lib.ps1` | 共通のアニメーション付きスプラッシュ（ゲーム起動、補助アプリのインストール） |
 | `tests/` | Pester テスト（`Invoke-Pester -Path tests`） |
-| `app/make-flag-icons.ps1` | ツール：オリジナルの基本アイコンから `ico/` の国旗アイコンを再生成（通常の使用には不要） |
+| `tools/` | 開発専用、配布物には含まれません：`make-release.ps1`、`make-flag-icons.ps1`（ベクターロゴから `app/ico/` の全アイコンを再生成）、`logo/make-logo-svg.py` ＋ `logo/hex-launcher-logo-drawing.png` → `logo/hex-launcher-logo.svg`（オリジナル HL ロゴ、原本） |
 | `app/lib/icon.lib.ps1` / `icon-badge.lib.ps1` | `.ico` の読み書きと、国旗アイコンへの補助アプリバッジの合成 |
-| `app/ico/` | アイコン：オリジナルの基本アイコン（H モノグラム）＋言語ごとの国旗バージョン（`hex-launcher-xx.ico`）。`ico/companion/` にはこの PC で合成された国旗＋バッジのアイコンが入ります |
+| `app/ico/` | アイコンセット（フォルダーごとに 1 セット）：`flat/`（既定：HL ロゴの背後にフラットな国旗）と `classic/`（以前の立体アイコン）。各セットに基本アイコン＋言語ごとの国旗バージョン（`hex-launcher-xx.ico`）と、この PC で合成された国旗＋バッジのアイコンが入る生成フォルダー `companion/` があります |
 
 ## 新しい PC でのセットアップ
 
@@ -169,15 +169,30 @@ ID：`porofessor`、`blitz`、`opgg`、`mobalytics`、`none`。終了コード�
 Riot が提供するすべての言語が `locales.json` にあり、インストール時に選択できます。ショートカット名は
 `League of Legends XX`（XX = コードの国部分：`ja_JP` → JP、`ko_KR` → KR）で、補助アプリが付く場合は ` - <補助アプリ>` が続きます。
 
-アイコン：各ショートカットにはその言語の国旗バリエーション（`app/ico/hex-launcher-xx.ico`、例：`ja_JP` は `hex-launcher-jp.ico`）が
-設定されます。国旗がない言語には基本アイコン `app/ico/hex-launcher.ico` が使われます。
+アイコン：各ショートカットには、選んだアイコンセットのその言語の国旗バリエーション（`app/ico/<セット>/hex-launcher-xx.ico`、
+例：`ja_JP` は `hex-launcher-jp.ico`）が設定されます。国旗がなければセットの基本アイコン、次に既定セットが使われます。
+セットは `setup.bat` の「ショートカット」ページで選び（基本アイコンのプレビュー付き）、`config.json`（`iconSet`）に記憶されます。
+スクリプトモード：`create-shortcuts.ps1 -IconSet classic`。`hex-launcher.ico` を含むフォルダーを `app/ico/` に置けば、
+フォルダー名のセットとして選べるようになります（`flat` が既定）。
 補助アプリ付きのショートカットには右上に色付きバッジが加わります — P Porofessor、B Blitz、O OP.GG、M Mobalytics —
-インストール時に `app/ico/companion/` に合成されます（32 px 未満では文字が省かれ、色だけが残ります）。
+インストール時に `app/ico/<セット>/companion/` に合成されます（32 px 未満では文字が省かれ、色だけが残ります）。
+バッジの色はカタログのままです。セットのフォルダーに `badge-style.json`（`{ "nightVeil": true, "reducedPalette": false }`）を置くと、
+国旗の夜色のベールや縮小パレットをバッジに適用できます（`flat` はベールのみ、`classic` はどちらも無効）。同梱の 2 セットには全キーを明記したこのファイルが入っており、新しいセットのひな形になります。
 
 カタログにない言語（Riot の新しいロケール）を追加するには：
 1. yaml ファイルの `available_locales` にある正確なコードで `locales.json` に 1 行追加；
-2. （任意）`make-flag-icons.ps1` の `$FlagDrawings` に国旗の描画を追加し、
-   `powershell -NoProfile -ExecutionPolicy Bypass -File app\make-flag-icons.ps1 -Locales xx_XX` を実行。
+2. （任意）`tools/make-flag-icons.ps1` の `$FlagDrawings` に国旗の描画を追加し、
+   `powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-flag-icons.ps1 -Locales xx_XX` を実行。
+
+### アイコン
+
+`flat` セットはベクターロゴ `tools/logo/hex-launcher-logo.svg`（金の枠＋HL モノグラム＋宝石、背景は透明）から作られます。
+`tools/make-flag-icons.ps1` が `resvg` で 256/128/64/48/32/16 px にレンダリングし、GDI+ で描いたフラットで控えめな国旗
+（枠の内側で切り抜き）の上に合成し、`app/ico/flat/` に書き出します。PATH に `resvg` が必要です（`scoop install resvg`）。全アイコンの再生成は
+`powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-flag-icons.ps1`（`-Base` で単色の青/緑アイコンのみ、
+`-PreviewDir` で 256 px の PNG も出力）。SVG 自体は基準の下絵 `tools/logo/hex-launcher-logo-drawing.png` から
+`python tools\logo\make-logo-svg.py` で生成します（Python 3、Pillow、numpy、PATH に `potrace` と `resvg`。`--preview DIR` で確認用の画像を出力）。ロゴを際立たせるため国旗は控えめにしています：国旗の各色を 8 色のパレット（`$FlagPalette`）に丸めたうえで、
+スクリプトの `$Background` が `Saturation` 0.72 と夜色のベール（`VeilAlpha` 60/255）を適用します。
 
 ## 仕組み
 
@@ -189,6 +204,21 @@ Riot Client の「言語」設定はランチャーの言語を変えるだけ�
 2. `settings.locale` を指定の言語に書き換える（Riot が管理する `default_locale` は変更しません）。
 3. 念のため `--locale=xx_XX` を付けて Riot Client を起動する。
 4. `config.json` の他の補助アプリを閉じてから、`-Companion` で指定された補助アプリがあれば起動する。
+
+## 開発するには
+
+ランチャーを使うだけなら Windows 10/11 以外に何も要りません。開発に参加するには：
+
+| 目的 | ツール | 入手先 |
+|---|---|---|
+| スクリプトの実行、WinForms UI、GDI+ 描画 | Windows PowerShell 5.1、.NET Framework（`System.Drawing`、`System.Windows.Forms`） | Windows 標準 |
+| テスト | Pester 3.4 | Windows PowerShell 5.1 に同梱 |
+| `flat` アイコンセットの再生成（`tools/make-flag-icons.ps1`） | `resvg`（SVG → PNG） | `scoop install resvg` |
+| ロゴ SVG の再生成（`tools/logo/make-logo-svg.py`） | Python 3 ＋ Pillow ＋ numpy、`potrace`（PNG → SVG）、`resvg` | `pip install pillow numpy` · `scoop install potrace resvg` |
+| リリースの公開（`tools/make-release.ps1 -Publish`） | GitHub CLI `gh`（ログイン済み） | `scoop install gh` または https://cli.github.com |
+
+`tools/` と `tests/` の内容はリリース zip に含まれません。国旗の色は `app/lib/palette.lib.ps1` の縮小パレットと減光を通り、
+コンパニオンバッジには、それを求めるセット（`badge-style.json`）でのみ夜色のベールや縮小パレットが適用されます。
 
 ## テスト
 

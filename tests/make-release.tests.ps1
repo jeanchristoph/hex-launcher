@@ -28,11 +28,11 @@ Describe 'Get-ReleaseAppFiles' {
         $names -contains 'hex-launcher.ico' | Should Be $true
     }
 
-    It 'exclut les icônes compagnon composées sur la machine (app\ico\companion)' {
+    It 'exclut les icônes compagnon composées sur la machine (app\ico\<jeu>\companion)' {
         $root = Join-Path $env:TEMP ("release-files-{0}" -f [guid]::NewGuid())
-        New-Item -ItemType Directory -Path (Join-Path $root 'app\ico\companion') -Force | Out-Null
-        Set-Content (Join-Path $root 'app\ico\hex-launcher-fr.ico') 'flag'
-        Set-Content (Join-Path $root 'app\ico\companion\hex-launcher-fr-blitz.ico') 'composed'
+        New-Item -ItemType Directory -Path (Join-Path $root 'app\ico\flat\companion') -Force | Out-Null
+        Set-Content (Join-Path $root 'app\ico\flat\hex-launcher-fr.ico') 'flag'
+        Set-Content (Join-Path $root 'app\ico\flat\companion\hex-launcher-fr-blitz.ico') 'composed'
         $names = @(Get-ReleaseAppFiles $root | ForEach-Object { $_.Name })
         $names -contains 'hex-launcher-fr.ico' | Should Be $true
         $names -contains 'hex-launcher-fr-blitz.ico' | Should Be $false

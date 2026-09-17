@@ -32,8 +32,8 @@ installe, et on obtient un raccourci par langue × appli compagnon
 | `app/lib/launch-config.lib.ps1` | Fonctions partagées : lecture/écriture de `config.json`, migration de l'ancien format à une seule appli |
 | `app/lib/splash.lib.ps1` | Splash animé partagé (lancement du jeu, installation des applis compagnon) |
 | `tests/` | Tests Pester (`Invoke-Pester -Path tests`) |
-| `app/make-flag-icons.ps1` | Outil : régénère les icônes drapeau de `ico/` à partir de l'icône de base originale (pas nécessaire à l'usage) |
-| `app/ico/` | Icônes : base originale (monogramme H) + une variante drapeau par langue (`hex-launcher-xx.ico`) ; `ico/companion/` reçoit les icônes drapeau + pastille composées sur ce poste |
+| `tools/` | Développement uniquement, hors release : `make-release.ps1`, `make-flag-icons.ps1` (régénère toutes les icônes de `app/ico/` depuis le logo vectoriel), `logo/make-logo-svg.py` + `logo/hex-launcher-logo-drawing.png` → `logo/hex-launcher-logo.svg` (logo HL original, source de vérité) |
+| `app/ico/` | Jeux d'icônes, un dossier chacun : `flat/` (défaut : drapeau plat derrière le logo HL) et `classic/` (les anciennes icônes en relief) ; chacun contient l'icône de base + une variante drapeau par langue (`hex-launcher-xx.ico`) et un sous-dossier généré `companion/` avec les icônes drapeau + pastille composées sur ce poste |
 
 ## Mise en route sur une nouvelle machine
 
@@ -176,16 +176,34 @@ Toutes les langues que Riot propose sont dans `locales.json` et cochables à l'i
 s'appelle `League of Legends XX` (XX = partie pays du code : `ja_JP` → JP, `ko_KR` → KR), suivi de
 ` - <appli compagnon>` quand une appli lui est attachée.
 
-Icône : chaque raccourci reçoit la variante drapeau de sa langue (`app/ico/hex-launcher-xx.ico`, par exemple
-`hex-launcher-jp.ico` pour `ja_JP`). Sans drapeau pour une langue, l'icône de base `app/ico/hex-launcher.ico` est utilisée.
+Icône : chaque raccourci reçoit la variante drapeau de sa langue dans le jeu d'icônes choisi (`app/ico/<jeu>/hex-launcher-xx.ico`,
+par exemple `hex-launcher-jp.ico` pour `ja_JP`) ; sans drapeau → l'icône de base du jeu, puis le jeu par défaut. Le jeu se
+choisit sur la page *Raccourcis* de `setup.bat` (avec un aperçu de son icône de base) et reste mémorisé dans `config.json`
+(`iconSet`) ; en mode script : `create-shortcuts.ps1 -IconSet classic`. Tout dossier déposé dans `app/ico/` qui contient
+un `hex-launcher.ico` devient un jeu sélectionnable, nommé comme le dossier — `flat` est le jeu par défaut.
 Un raccourci avec appli compagnon porte en plus une pastille de couleur en haut à droite — P Porofessor, B Blitz,
-O OP.GG, M Mobalytics — composée à l'installation dans `app/ico/companion/` (la lettre disparaît sous 32 px, la couleur reste).
+O OP.GG, M Mobalytics — composée à l'installation dans `app/ico/<jeu>/companion/` (la lettre disparaît sous 32 px, la couleur reste).
+Les couleurs de pastille sont celles du catalogue ; un jeu peut les styler par un `badge-style.json` dans son dossier :
+`{ "nightVeil": true, "reducedPalette": false }` — voile nuit des drapeaux et/ou leur palette réduite (`flat` prend le
+voile, `classic` ni l'un ni l'autre). Les deux jeux livrés portent le fichier avec toutes les clés explicites, modèle pour un nouveau jeu.
 
 Pour une langue absente du catalogue (nouvelle locale Riot) :
 1. ajouter une ligne dans `locales.json` avec le code exact tel qu'il apparaît dans `available_locales`
    du fichier yaml ;
-2. (optionnel) ajouter le dessin du drapeau dans `$FlagDrawings` de `make-flag-icons.ps1` et lancer
-   `powershell -NoProfile -ExecutionPolicy Bypass -File app\make-flag-icons.ps1 -Locales xx_XX`.
+2. (optionnel) ajouter le dessin du drapeau dans `$FlagDrawings` de `tools/make-flag-icons.ps1` et lancer
+   `powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-flag-icons.ps1 -Locales xx_XX`.
+
+### Icônes
+
+Le jeu `flat` est construit à partir du logo vectoriel `tools/logo/hex-launcher-logo.svg` (cadre or +
+monogramme HL + gemme, fond transparent) : `tools/make-flag-icons.ps1` le rend avec `resvg` à 256/128/64/48/32/16 px et le
+compose sur un drapeau plat atténué, dessiné en GDI+ et découpé à l'intérieur du cadre, dans `app/ico/flat/`. Nécessite `resvg` dans le PATH
+(`scoop install resvg`) ; tout régénérer avec `powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-flag-icons.ps1`
+(`-Base` pour les seules icônes unies bleue/verte, `-PreviewDir` pour obtenir aussi des PNG 256 px). Le SVG lui-même
+est produit par `python tools\logo\make-logo-svg.py` depuis le dessin de référence `tools/logo/hex-launcher-logo-drawing.png`
+(Python 3, Pillow, numpy, `potrace` et `resvg` dans le PATH ; `--preview DOSSIER` écrit des planches de contrôle). Le drapeau est
+atténué pour que le logo ressorte : chaque couleur de drapeau est ramenée à une palette de 8 teintes (`$FlagPalette`),
+puis le bloc `$Background` applique `Saturation` 0,72 et un voile nuit (`VeilAlpha` 60/255).
 
 ## Comment ça marche
 
@@ -197,6 +215,21 @@ Le lanceur fait donc, dans l'ordre :
 2. Réécrire `settings.locale` avec la langue demandée (`default_locale`, géré par Riot, n'est pas touché).
 3. Lancer le Riot Client avec `--locale=xx_XX` en plus, par sécurité.
 4. Fermer les autres applis compagnon de `config.json`, puis lancer celle nommée par `-Companion`, s'il y en a une.
+
+## Développer
+
+Utiliser le lanceur ne demande rien de plus que Windows 10/11. Contribuer, si :
+
+| Besoin | Outil | Origine |
+|---|---|---|
+| Exécuter les scripts, interface WinForms, dessin GDI+ | Windows PowerShell 5.1, .NET Framework (`System.Drawing`, `System.Windows.Forms`) | intégrés à Windows |
+| Tests | Pester 3.4 | livré avec Windows PowerShell 5.1 |
+| Régénérer le jeu d'icônes `flat` (`tools/make-flag-icons.ps1`) | `resvg` (SVG → PNG) | `scoop install resvg` |
+| Régénérer le logo SVG (`tools/logo/make-logo-svg.py`) | Python 3 avec Pillow et numpy, `potrace` (PNG → SVG), `resvg` | `pip install pillow numpy` · `scoop install potrace resvg` |
+| Publier une release (`tools/make-release.ps1 -Publish`) | GitHub CLI `gh`, authentifié | `scoop install gh` ou https://cli.github.com |
+
+Tout ce qui est dans `tools/` et `tests/` reste hors du zip de release. Les couleurs des drapeaux passent par la palette
+réduite et l'atténuation de `app/lib/palette.lib.ps1` ; les pastilles compagnon n'en prennent le voile nuit et/ou la palette réduite que dans les jeux qui le demandent (`badge-style.json`).
 
 ## Tests
 
