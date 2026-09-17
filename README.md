@@ -28,6 +28,7 @@ they get installed for you, and you get one shortcut per language × companion a
 | `app/manage-companion-app.ps1` | Called by `setup.bat`: companion app picker, installs the missing ones, uninstalls on request |
 | `app/create-shortcuts.ps1` | Called by `setup.bat`: language + companion picker, then one `.lnk` per combination on the desktop (falls back to this folder if the desktop is not writable) |
 | `app/lib/icon.lib.ps1` / `icon-badge.lib.ps1` | `.ico` read/write and composition of the companion badge over the flag icon |
+| `app/lib/i18n.lib.ps1` / `app/i18n/` | Wizard and console translations: one `fr.json` / `en.json` / `ja.json` dictionary per language, same keys everywhere |
 | `app/lib/companion-app.lib.ps1` | Shared functions: catalogue, detection through the registry (read-only), uninstall command, Authenticode signature check |
 | `app/lib/launch-config.lib.ps1` | Shared functions: reading/writing `config.json`, migration of the old single-app format |
 | `app/lib/splash.lib.ps1` | Shared animated splash (game launch, companion app install) |
@@ -56,6 +57,11 @@ they get installed for you, and you get one shortcut per language × companion a
 3. Double-click the shortcut of the language and companion you want.
 
 To add or remove languages or companion apps later: run `setup.bat` again.
+
+The wizard itself speaks **French, English and Japanese**: it opens in the display language of Windows
+(English for any other language) and the selector at the bottom of the left column switches at any time
+without losing what you ticked. To force a language: `powershell -File app\setup.ps1 -Language ja`
+(same `-Language fr|en|ja` on `detect-config.ps1`, `manage-companion-app.ps1` and `create-shortcuts.ps1`).
 
 If detection got it wrong: edit `app\config.json` (see below) and run `setup.bat` again. To force a fresh
 detection: delete `app\config.json` and run again.
@@ -249,10 +255,10 @@ Installers, uninstallers, network and registry are mocked: the tests never touch
   **UTF-8 with BOM** (VS Code: status bar → encoding → "Save with Encoding").
 - **Shortcut icon not up to date**: Windows icon cache. Right-click → Refresh in the folder,
   otherwise sign out/in.
-- **"Ne pas exécuter en tant qu'administrateur"**: you started `setup.bat` elevated. Start it normally.
-- **"winget indisponible"**: App Installer is missing from this Windows. Install it from the Microsoft Store,
+- **"Do not run as administrator"**: you started `setup.bat` elevated. Start it normally.
+- **"winget is unavailable"**: App Installer is missing from this Windows. Install it from the Microsoft Store,
   or let the tool open the Blitz download page in your browser.
-- **"désinstalleur … non signé"**: the uninstaller found in the registry is not signed by the expected publisher;
+- **"uninstaller … not signed"**: the uninstaller found in the registry is not signed by the expected publisher;
   the tool will not run it. Uninstall the app from Windows' "Installed apps" instead.
 - **The companion app is still there after "Désinstaller"**: you closed the publisher's dialog without
   confirming (Overwolf), or the uninstall took longer than expected. Nothing else was installed; run `setup.bat` again.

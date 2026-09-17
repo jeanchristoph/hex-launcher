@@ -31,6 +31,8 @@ lol/  (dépôt hex-launcher)
     ├── lib/icon-badge.lib.ps1   # Pastille compagnon (disque couleur + lettre, haut-droite) composée sur chaque taille
     ├── lib/palette.lib.ps1      # Palette réduite (8 teintes) + atténuation ($PaletteMuting) partagées : drapeaux (générateur) et pastilles compagnon (runtime) ; voile mêlé en lumière linéaire = GDI+ HighQuality
     ├── lib/icon-set.lib.ps1     # Jeux d'icônes : Get-IconSets (sous-dossiers de ico\ avec hex-launcher.ico), défaut flat, Resolve-IconSet avec repli
+    ├── lib/i18n.lib.ps1         # Traductions : Resolve-UiLanguage, Initialize-Translation, Get-Text, Get-LocalizedValue
+    ├── i18n/{fr,en,ja}.json     # Dictionnaires plats section.cle → texte, mêmes clés partout (test de catalogue)
     ├── locales.json             # Catalogue des locales Riot (code, label natif, default)
     ├── companion-apps.json      # Catalogue des applis compagnon (signer, processNames, launch, detect, install, uninstall)
     ├── config.json              # Chemins machine (gitignoré, jamais écrasé sans -Force)
@@ -39,6 +41,7 @@ lol/  (dépôt hex-launcher)
 
 ## Entry points
 - `setup.bat` → `app\setup.ps1` (assistant unique ; codes 0 ok, 1 erreur, 2 annulé ; page Raccourcis : langues × compagnons + jeu d'icônes avec aperçu). Les trois scripts moteur restent exécutables seuls en mode script
+- `-Language fr|en|ja` (optionnel) sur `setup.ps1` et les trois scripts moteur ; défaut : `Get-UICulture` de Windows, repli anglais ; sélecteur dans la fenêtre
 - `manage-companion-app.ps1 -Apps <ids|none> [-UninstallOthers] [-Force] [-DryRun]` (mode script)
 - `create-shortcuts.ps1 -Locales ja_JP,ko_KR -Companions blitz,opgg` ; raccourci → `launch-lol.ps1 -Locale xx_XX [-Companion <id>]`
 - Raccourci `.lnk` → `powershell.exe -WindowStyle Hidden -File launch-lol.ps1 -Locale xx_XX`
@@ -52,6 +55,7 @@ lol/  (dépôt hex-launcher)
 - Extensibilité: `companion-apps.json` (ordre = priorité de détection ; stratégies winget/download/browser ; uninstall silent/interactive) ; `$FlagDrawings` (dessins de drapeaux), `$FlagPalette` (8 teintes dans `lib/palette.lib.ps1`, couleurs ramenées à la plus proche), `$CenterEmblem` (emprise commune des emblèmes centrés) et `$Background` (atténuation : saturation 0,72 + voile nuit 60/255) dans `tools/make-flag-icons.ps1` ; le logo est le SVG `tools/logo/hex-launcher-logo.svg`, régénérable depuis `tools/logo/hex-launcher-logo-drawing.png` par `tools/logo/make-logo-svg.py`
 - Tests: Pester 3.4 (livré avec PS 5.1), mocks sur registre/process/réseau, `Assert-MockCalled -Scope It -Exactly` (un Mock dans un It survit jusqu'à la fin du Describe) ; `.Count` sur un PSCustomObject seul rend vide → envelopper avec `@()` ; `return` déroule un tableau vide en rien → l'appelant enveloppe toujours dans `@()`, jamais de virgule unaire (elle imbrique quand l'appelant fait déjà `@()`)
 - Messages console dans une fonction à valeur de retour → `Write-Host`, jamais une chaîne nue (elle polluerait le pipeline de retour)
+- i18n : aucune chaîne utilisateur littérale dans `setup.ps1`, `manage-companion-app.ps1`, `create-shortcuts.ps1`, `detect-config.ps1` — tout passe par `Get-Text 'section.cle' args` (placeholders `{0}` .NET, pluriels par clés `.one`/`.many`) ; les textes sont lus à l'affichage, jamais figés dans une variable de script (la langue change en cours de route). Les throw/warnings des libs (intégrité catalogue, .ico) restent en français. Valeur traduisible d'un catalogue JSON → objet `{ fr, en, ja }` lu par `Get-LocalizedValue`. Chaque fichier de tests force `Initialize-Translation 'fr'` après le dot-sourcing : les assertions restent indépendantes de la langue de Windows. Les scripts dot-sourcés rechargent la lib i18n (état remis à `$null`) → `setup.ps1` initialise la traduction APRÈS tous ses dot-sourcings
 
 ## Critical files
 - `companion-apps.json` — point d'extension unique pour une appli compagnon ; Porofessor passe par `OverwolfLauncher.exe -launchapp <extensionId>`, sa désinstallation est interactive (menu Overwolf, Overwolf coché par défaut)
@@ -69,4 +73,4 @@ lol/  (dépôt hex-launcher)
 - External documentation: `RiotClientInstalls.json` (`%ProgramData%\Riot Games\`) et `league_of_legends.live.product_settings.yaml` — fichiers officiels Riot lus/écrits par le lanceur ; README.md du projet (référence fonctionnelle complète)
 
 ## Backlog
-- Fenêtre de setup multilingue (FR + EN + JA) : chaînes de `setup.ps1` / journal de `manage-companion-app.ps1` et `create-shortcuts.ps1` extraites dans un dictionnaire, langue de Windows par défaut (`Get-UICulture`), bascule dans la fenêtre. Décidé le 2026-09-14, branche dédiée à ouvrir quand l'utilisateur le demandera.
+- (vide) — le setup multilingue FR/EN/JA a été livré en 0.1.4 (branche `translation`, 2026-09-16).

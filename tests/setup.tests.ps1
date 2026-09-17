@@ -9,6 +9,9 @@ $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $here '..\app\setup.ps1')
 . (Join-Path $here 'companion-test-helpers.ps1')
 
+# Les textes attendus sont français quelle que soit la langue de Windows sur la machine de test
+Initialize-Translation 'fr' | Out-Null
+
 function New-TestLaunchConfig([object[]]$CompanionApps = @(), [string]$RiotPath = 'C:\Riot\RiotClientServices.exe', [string]$YamlPath = 'C:\ProgramData\lol.yaml') {
     return [pscustomobject]@{ riotClientPath = $RiotPath; productSettingsPath = $YamlPath; companionApps = $CompanionApps }
 }
@@ -17,9 +20,9 @@ function New-TestCompanionEntry([string]$Id, [string]$Name) {
     return [pscustomobject]@{ id = $Id; name = $Name; path = "C:\Apps\$Id.exe"; arguments = '' }
 }
 
-# Faux formulaire : seule la fermeture est observée
+# Faux formulaire : seuls la fermeture et le titre sont observés
 function New-FakeForm {
-    $form = [pscustomobject]@{ IsClosed = $false }
+    $form = [pscustomobject]@{ IsClosed = $false; Text = '' }
     $form | Add-Member -MemberType ScriptMethod -Name Close -Value { $this.IsClosed = $true }
     return $form
 }
@@ -35,6 +38,7 @@ function Reset-SetupTestState([hashtable]$Overrides = @{}) {
     $script:InstallState.ExistingShortcuts = @()
     $script:InstallState.ShortcutPaths     = @()
     $script:InstallState.IconSets          = @()
+    $script:InstallState.PendingSelection  = $null
     $script:InstallState.Controls          = @{}
     foreach ($key in $Overrides.Keys) { $script:InstallState[$key] = $Overrides[$key] }
 }
@@ -99,6 +103,18 @@ Describe 'Machine à états de l''assistant' {
         Get-NextButtonText 'apps' | Should Be 'Appliquer'
         Get-NextButtonText 'shortcuts' | Should Be 'Appliquer'
         Get-NextButtonText 'done' | Should Be 'Fermer'
+    }
+
+    It 'traduit titres d''étapes et boutons dès que la langue active change' {
+        try {
+            Initialize-Translation 'en' | Out-Null
+            Get-SetupStepLabel 'detect' 'apps' | Should Be '✓ 1. Welcome'
+            Get-SetupPageTitle 'shortcuts' | Should Be 'Shortcuts'
+            Get-NextButtonText 'detect' | Should Be 'Next'
+            Initialize-Translation 'ja' | Out-Null
+            Get-NextButtonText 'done' | Should Be '閉じる'
+        }
+        finally { Initialize-Translation 'fr' | Out-Null }
     }
 }
 
@@ -300,6 +316,16 @@ Describe 'Get-DetectionItems' {
     It 'ne donne pas de statut à la ligne des applis compagnon' {
         $items = @(Get-DetectionItems (New-TestLaunchConfig))
         $items[2].Status | Should Be ''
+    }
+
+    It 'porte l''état trouvé/manquant en champ, indépendamment du texte affiché' {
+        Mock Test-Path { $false } -ParameterFilter { $Path -eq 'C:\absent\RiotClientServices.exe' }
+        $items = @(Get-DetectionItems (New-TestLaunchConfig -RiotPath 'C:\absent\RiotClientServices.exe'))
+        $items[0].IsFound | Should Be $false
+        $items[0].MissingReason | Should Be 'corrigez riotClientPath dans config.json'
+        $items[1].IsFound | Should Be $true
+        $items[1].MissingReason | Should Be 'League of Legends est-il installé ?'
+        $items[2].IsFound | Should Be $true
     }
 }
 
@@ -579,7 +605,7 @@ Describe 'Invoke-SetupShortcutsStep' {
         Invoke-SetupShortcutsStep | Should Be $true
         $script:InstallState.ShortcutPaths.Count | Should Be 1
         Assert-MockCalled -Scope It Select-IconSetForConfig -Exactly -Times 1 -ParameterFilter { $RequestedName -eq 'classic' -and $ConfigPath -eq $SetupConfigPath }
-        Assert-MockCalled -Scope It Write-SetupLog -Exactly -Times 1 -ParameterFilter { $Text -eq "Jeu d'icônes : classic" }
+        Assert-MockCalled -Scope It Write-SetupLog -Exactly -Times 1 -ParameterFilter { $Text -eq (Get-Text 'setup.shortcuts.iconSetChosen' 'classic') }
         Assert-MockCalled -Scope It New-SetupShortcuts -Exactly -Times 1 -ParameterFilter { $Combinations.Count -eq 1 -and $Combinations[0].Name -eq 'League of Legends JP - Blitz' }
         Assert-MockCalled -Scope It Remove-ObsoleteShortcuts -Exactly -Times 1
         Assert-MockCalled -Scope It Write-SetupLog -Exactly -Times 1 -ParameterFilter { $Text -match '^Retiré' }
@@ -656,6 +682,84 @@ Describe 'Invoke-SetupNext' {
         Invoke-SetupNext
         $form.IsClosed | Should Be $true
         $script:InstallState.ExitCode | Should Be 0
+        Assert-MockCalled -Scope It Show-SetupPage -Exactly -Times 0
+    }
+}
+
+Describe 'Saisie conservée au redessin de la page' {
+    $appItems = @(@{ Key = 'blitz'; Label = 'Blitz' }, @{ Key = 'opgg'; Label = 'OP.GG' })
+
+    It 'relève les cases cochées et la case de désinstallation de la page courante' {
+        Reset-SetupTestState
+        $script:InstallState.Controls.AppList      = New-SetupCheckedList $appItems @('opgg') 0 0 200 100
+        $script:InstallState.Controls.UninstallBox = New-ThemedCheckBox 'x' 0 0 200
+        $script:InstallState.Controls.UninstallBox.Checked = $true
+        $selection = Get-SetupPageSelection
+        $selection.AppList -join ',' | Should Be 'opgg'
+        $selection.UninstallOthers | Should Be $true
+        $selection.ContainsKey('LocaleList') | Should Be $false
+    }
+
+    It 'rend une saisie vide sur une page sans liste' {
+        Reset-SetupTestState
+        (Get-SetupPageSelection).Count | Should Be 0
+    }
+
+    It 'présélectionne par défaut sans saisie en attente' {
+        Reset-SetupTestState
+        (Get-SetupPreselection 'AppList' @('blitz')) -join ',' | Should Be 'blitz'
+        Get-SetupPendingUninstallOthers | Should Be $false
+    }
+
+    It 'fait primer la saisie en attente sur la présélection par défaut' {
+        Reset-SetupTestState @{ PendingSelection = @{ AppList = @('opgg'); UninstallOthers = $true } }
+        (Get-SetupPreselection 'AppList' @('blitz')) -join ',' | Should Be 'opgg'
+        (Get-SetupPreselection 'LocaleList' @('fr_FR')) -join ',' | Should Be 'fr_FR'
+        Get-SetupPendingUninstallOthers | Should Be $true
+    }
+
+    It 'restaure la saisie en attente dans la liste reconstruite' {
+        Reset-SetupTestState @{ PendingSelection = @{ AppList = @('blitz') } }
+        $list = New-SetupCheckedList $appItems (Get-SetupPreselection 'AppList' @('opgg')) 0 0 200 100
+        (Get-SetupCheckedKeys $list) -join ',' | Should Be 'blitz'
+    }
+}
+
+Describe 'Set-SetupLanguage' {
+    Mock Show-SetupPage {}
+    $appItems = @(@{ Key = 'blitz'; Label = 'Blitz' }, @{ Key = 'opgg'; Label = 'OP.GG' })
+    AfterEach { Initialize-Translation 'fr' | Out-Null }
+
+    It 'change la langue, retitre la fenêtre et redessine la page courante avec la saisie relevée' {
+        $form = New-FakeForm
+        Reset-SetupTestState @{ StepId = 'apps'; Form = $form }
+        $script:InstallState.Controls.AppList = New-SetupCheckedList $appItems @('opgg') 0 0 200 100
+        Set-SetupLanguage 'en' | Should Be $true
+        Get-UiLanguage | Should Be 'en'
+        $form.Text | Should Be 'hex-launcher — setup'
+        $script:InstallState.PendingSelection.AppList -join ',' | Should Be 'opgg'
+        Assert-MockCalled -Scope It Show-SetupPage -Exactly -Times 1 -ParameterFilter { $StepId -eq 'apps' }
+    }
+
+    It 'aligne le sélecteur de langue quand la bascule vient du programme' {
+        Reset-SetupTestState @{ StepId = 'detect' }
+        $script:InstallState.Controls.LanguageBox = New-ThemedComboBox (Get-UiLanguageItems) 'fr' 0 0 190
+        Set-SetupLanguage 'ja' | Should Be $true
+        Get-ThemedComboBoxKey $script:InstallState.Controls.LanguageBox | Should Be 'ja'
+    }
+
+    It 'ignore la bascule pendant une action longue' {
+        Reset-SetupTestState @{ StepId = 'apps'; IsBusy = $true }
+        Set-SetupLanguage 'en' | Should Be $false
+        Get-UiLanguage | Should Be 'fr'
+        Assert-MockCalled -Scope It Show-SetupPage -Exactly -Times 0
+    }
+
+    It 'ignore une langue inconnue ou déjà active' {
+        Reset-SetupTestState @{ StepId = 'detect' }
+        Set-SetupLanguage 'xx' | Should Be $false
+        Set-SetupLanguage 'fr' | Should Be $false
+        Get-UiLanguage | Should Be 'fr'
         Assert-MockCalled -Scope It Show-SetupPage -Exactly -Times 0
     }
 }

@@ -19,20 +19,31 @@
 .EXAMPLE
     powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File setup.ps1
     powershell -NoProfile -ExecutionPolicy Bypass -File setup.ps1 -Destination "D:\Jeux"
+    powershell -NoProfile -ExecutionPolicy Bypass -File setup.ps1 -Language ja
 #>
 param(
     # Dossier où créer les raccourcis (défaut : Bureau de l'utilisateur courant)
-    [string]$Destination = [Environment]::GetFolderPath('Desktop')
+    [string]$Destination = [Environment]::GetFolderPath('Desktop'),
+
+    # Langue de l'assistant : fr, en ou ja (défaut : langue de Windows, sinon anglais)
+    [string]$Language
 )
 
+. (Join-Path $PSScriptRoot 'lib\i18n.lib.ps1')
 . (Join-Path $PSScriptRoot 'lib\theme.lib.ps1')
 . (Join-Path $PSScriptRoot 'detect-config.ps1')
 . (Join-Path $PSScriptRoot 'manage-companion-app.ps1')
 . (Join-Path $PSScriptRoot 'create-shortcuts.ps1') -Destination $Destination
 
+# Après les dot-sourcings : chaque moteur recharge la lib i18n, qui remet son état à zéro
+Initialize-Translation (Resolve-UiLanguage $Language (Get-UICulture).Name) | Out-Null
+
 $SetupConfigPath  = Join-Path $PSScriptRoot 'config.json'
 $SetupCatalogPath = Join-Path $PSScriptRoot 'companion-apps.json'
-$SetupWindowTitle = 'hex-launcher — configuration'
+
+function Get-SetupWindowTitle {
+    return Get-Text 'setup.windowTitle'
+}
 
 # État partagé par les pages et les gestionnaires d'événements (les variables locales d'une page ne survivent pas au clic)
 $script:InstallState = @{
@@ -48,19 +59,31 @@ $script:InstallState = @{
     IconSets         = @()
     ExistingShortcuts = @()
     ShortcutPaths    = @()
+    PendingSelection = $null   # cases cochées à restaurer au redessin de la page (changement de langue)
     Form             = $null
     Layout           = $null
     Controls         = @{}
 }
 
+# Contrôles propres à une page : remis à zéro à chaque affichage, pour ne jamais lire un contrôle détruit
+$SetupPageControlNames = @('Log', 'AppList', 'UninstallBox', 'LocaleList', 'CompanionList')
+
 # ---------------------------------------------------------------- Machine à états (pure, sans WinForms)
 
-$SetupSteps      = @('detect', 'apps', 'shortcuts', 'done')
-$SetupStepTitles = @{ detect = '1. Bienvenue'; apps = '2. Applis compagnon'; shortcuts = '3. Raccourcis'; done = '4. Terminé' }
-$SetupPageTitles = @{ detect = 'Bienvenue'; apps = 'Applis compagnon'; shortcuts = 'Raccourcis'; done = 'Terminé' }
+$SetupSteps = @('detect', 'apps', 'shortcuts', 'done')
 
 function Get-SetupStepIndex([string]$Id) {
     return [array]::IndexOf($SetupSteps, $Id)
+}
+
+# Textes lus à chaque affichage, jamais figés au chargement : la langue peut changer en cours de route
+function Get-SetupPageTitle([string]$Id) {
+    return Get-Text "setup.page.$Id"
+}
+
+# « 1. Bienvenue » : rang de l'étape + titre de la page
+function Get-SetupStepTitle([string]$Id) {
+    return "$((Get-SetupStepIndex $Id) + 1). $(Get-SetupPageTitle $Id)"
 }
 
 function Get-NextInstallStep([string]$Id) {
@@ -91,7 +114,7 @@ function Get-SetupStepStatus([string]$Id, [string]$CurrentId) {
 }
 
 function Get-SetupStepLabel([string]$Id, [string]$CurrentId) {
-    $title = $SetupStepTitles[$Id]
+    $title = Get-SetupStepTitle $Id
     if ((Get-SetupStepStatus $Id $CurrentId) -eq 'Done') { return "✓ $title" }
     return $title
 }
@@ -106,11 +129,11 @@ function Get-SetupStepColor([string]$Status) {
 
 function Get-NextButtonText([string]$Id) {
     switch ($Id) {
-        'apps'      { return 'Appliquer' }
-        'shortcuts' { return 'Appliquer' }
-        'done'      { return 'Fermer' }
+        'apps'      { return Get-Text 'common.apply' }
+        'shortcuts' { return Get-Text 'common.apply' }
+        'done'      { return Get-Text 'setup.button.close' }
     }
-    return 'Suivant'
+    return Get-Text 'setup.button.next'
 }
 
 # Géométrie déduite de la zone cliente : colonne des étapes à gauche, page au centre, barre et boutons en bas
@@ -191,38 +214,45 @@ function Test-SetupPathPresent([string]$Path) {
     return [bool](Test-Path $Path)
 }
 
-# Un élément détecté : libellé, valeur affichée dans un encadré, statut sous l'encadré (Accent = trouvé, Danger = manquant)
-function New-DetectionItem([string]$Label, [string]$Path, [string]$MissingText) {
-    if (Test-SetupPathPresent $Path) { return [pscustomobject]@{ Label = $Label; Value = $Path; Status = 'Trouvé'; Color = 'Accent' } }
-    return [pscustomobject]@{ Label = $Label; Value = $Path; Status = "Introuvable — $MissingText"; Color = 'Danger' }
+# Un élément détecté : libellé, valeur affichée dans un encadré, statut sous l'encadré (Accent = trouvé, Danger = manquant).
+# IsFound et MissingReason portent l'état ; Status n'est que son texte affiché.
+function New-DetectionItem([string]$Label, [string]$Path, [string]$MissingReason) {
+    $isFound = Test-SetupPathPresent $Path
+    $status  = if ($isFound) { Get-Text 'setup.detect.found' } else { Get-Text 'setup.detect.missing' $MissingReason }
+    return [pscustomobject]@{
+        Label = $Label; Value = $Path; IsFound = $isFound; MissingReason = $MissingReason
+        Status = $status; Color = $(if ($isFound) { 'Accent' } else { 'Danger' })
+    }
 }
 
 function Get-CompanionNamesText([object[]]$CompanionApps) {
     $names = @($CompanionApps | ForEach-Object { $_.name } | Where-Object { $_ })
-    if ($names.Count -eq 0) { return 'aucune' }
+    if ($names.Count -eq 0) { return Get-Text 'common.none' }
     return ($names -join ', ')
 }
 
 function Get-DetectionItems($Config) {
     return @(
-        (New-DetectionItem 'Riot Client' $Config.riotClientPath "corrigez riotClientPath dans config.json")
-        (New-DetectionItem 'Fichier de langue de LoL' $Config.productSettingsPath "League of Legends est-il installé ?")
-        [pscustomobject]@{ Label = 'Applis compagnon déjà installées'; Value = (Get-CompanionNamesText @($Config.companionApps)); Status = ''; Color = 'Cream' }
+        (New-DetectionItem (Get-Text 'setup.detect.riotClient') $Config.riotClientPath (Get-Text 'setup.detect.fixRiotClient'))
+        (New-DetectionItem (Get-Text 'setup.detect.productSettings') $Config.productSettingsPath (Get-Text 'setup.detect.isLolInstalled'))
+        [pscustomobject]@{
+            Label = (Get-Text 'setup.detect.installedApps'); Value = (Get-CompanionNamesText @($Config.companionApps))
+            IsFound = $true; MissingReason = ''; Status = ''; Color = 'Cream'
+        }
     )
 }
 
 # Vue en lignes (Text + Color) des éléments détectés, pour les résumés et les tests
 function Get-DetectionSummaryLines($Config) {
     return @(Get-DetectionItems $Config | ForEach-Object {
-        $text = "$($_.Label) : $($_.Value)"
-        if ($_.Color -eq 'Danger') { $text += " — introuvable ($($_.Status -replace '^Introuvable — ', ''))" }
-        [pscustomobject]@{ Text = $text; Color = $(if ($_.Color -eq 'Danger') { 'Danger' } else { 'Cream' }) }
+        if ($_.IsFound) { [pscustomobject]@{ Text = (Get-Text 'setup.detect.summary' $_.Label, $_.Value); Color = 'Cream' } }
+        else { [pscustomobject]@{ Text = (Get-Text 'setup.detect.summaryMissing' $_.Label, $_.Value, $_.MissingReason); Color = 'Danger' } }
     })
 }
 
 function Get-ConfigStatusText([bool]$Created, [string]$Path) {
-    if ($Created) { return "Un fichier de réglages (config.json) a été créé pour cet ordinateur." }
-    return "Vos réglages existants (config.json) sont conservés tels quels."
+    if ($Created) { return Get-Text 'setup.detect.configCreated' }
+    return Get-Text 'setup.detect.configKept'
 }
 
 # Un config.json existant n'est jamais écrasé : les réglages faits à la main sont conservés (même règle que detect-config.ps1)
@@ -235,13 +265,9 @@ function Initialize-SetupConfig([string]$Path) {
 # ---------------------------------------------------------------- Bilans (pure)
 
 function Get-CompanionOutcomeLines($Result) {
-    $lines = @(foreach ($name in @($Result.UninstallFailed)) {
-        "Erreur : $name est toujours présente — rien n'a été installé, config.json inchangé. Corrigez puis cliquez à nouveau sur Appliquer."
-    })
-    $lines += @(foreach ($name in @($Result.InstallFailed)) {
-        "Avertissement : $name n'est pas installée pour l'instant — le lanceur l'ignorera tant qu'elle est absente."
-    })
-    if ($lines.Count -eq 0) { $lines = @('Applis compagnon à jour.') }
+    $lines = @(foreach ($name in @($Result.UninstallFailed)) { Get-Text 'setup.apps.uninstallFailed' $name })
+    $lines += @(foreach ($name in @($Result.InstallFailed)) { Get-Text 'common.warning' (Get-Text 'companion.notInstalledYet' $name) })
+    if ($lines.Count -eq 0) { $lines = @(Get-Text 'setup.apps.upToDate') }
     return $lines
 }
 
@@ -251,16 +277,16 @@ function Resolve-ShortcutCompanions($Config, [string[]]$Ids) {
 
 function Get-ShortcutCountText([string[]]$Paths) {
     $paths = @($Paths | Where-Object { $_ })
-    if ($paths.Count -eq 0) { return 'Raccourcis : aucun créé' }
+    if ($paths.Count -eq 0) { return Get-Text 'setup.done.shortcuts.none' }
     $folders = @($paths | ForEach-Object { Split-Path $_ -Parent } | Select-Object -Unique)
-    $plural  = if ($paths.Count -gt 1) { 's' } else { '' }
-    return "Raccourcis : $($paths.Count) créé$plural dans $($folders -join ', ')"
+    $key     = if ($paths.Count -gt 1) { 'setup.done.shortcuts.many' } else { 'setup.done.shortcuts.one' }
+    return Get-Text $key $paths.Count, ($folders -join ', ')
 }
 
 function Get-CompletionSummaryLines($Config, [string]$ConfigPath, [string[]]$ShortcutPaths) {
     return @(
-        "Configuration : $ConfigPath"
-        "Applis compagnon retenues : $(Get-CompanionNamesText @($Config.companionApps))"
+        (Get-Text 'setup.done.config' $ConfigPath)
+        (Get-Text 'setup.done.companions' (Get-CompanionNamesText @($Config.companionApps)))
         (Get-ShortcutCountText $ShortcutPaths)
     )
 }
@@ -281,20 +307,20 @@ function Write-SetupLog([string]$Text) {
 function Invoke-SetupLogged([scriptblock]$Action) {
     $result = $null
     & $Action 3>&1 | ForEach-Object {
-        if ($_ -is [System.Management.Automation.WarningRecord]) { Write-SetupLog "Avertissement : $($_.Message)" }
+        if ($_ -is [System.Management.Automation.WarningRecord]) { Write-SetupLog (Get-Text 'common.warning' $_.Message) }
         else { $result = $_ }
     } | Out-Null
     return $result
 }
 
 function Show-SetupErrorBox([string]$Text) {
-    [void][System.Windows.Forms.MessageBox]::Show($Text, $SetupWindowTitle, 'OK', 'Error')
+    [void][System.Windows.Forms.MessageBox]::Show($Text, (Get-SetupWindowTitle), 'OK', 'Error')
 }
 
 function Stop-SetupOnError([string]$Message) {
     $script:InstallState.ExitCode = 1
     $script:InstallState.IsBusy   = $false
-    Show-SetupErrorBox "L'installation a échoué :`r`n`r`n$Message"
+    Show-SetupErrorBox (Get-Text 'setup.error.failed' $Message)
     if ($null -ne $script:InstallState.Form) { $script:InstallState.Form.Close() }
 }
 
@@ -325,16 +351,28 @@ function New-SetupSidebar([int]$Height) {
         $panel.Controls.Add($label)
     }
     $script:InstallState.Controls.StepLabels = $labels
+    $panel.Controls.AddRange([System.Windows.Forms.Control[]](New-SetupLanguageControls $Height))
     return $panel
+}
+
+# Libellé + liste déroulante des langues ; SelectionChangeCommitted ne réagit qu'au choix de l'utilisateur
+function New-SetupLanguageControls([int]$SidebarHeight) {
+    $controls = $script:InstallState.Controls
+    $controls.LanguageLabel = New-ThemedLabel '' 20 ($SidebarHeight - 100) 190 22 'Muted' 9
+    $controls.LanguageBox   = New-ThemedComboBox (Get-UiLanguageItems) (Get-UiLanguage) 20 ($SidebarHeight - 76) 190
+    $controls.LanguageBox.Add_SelectionChangeCommitted({
+        Invoke-SetupSafely { Set-SetupLanguage (Get-ThemedComboBoxKey $script:InstallState.Controls.LanguageBox) | Out-Null }
+    })
+    return @($controls.LanguageLabel, $controls.LanguageBox)
 }
 
 function New-SetupFooter($Layout) {
     $controls = $script:InstallState.Controls
     $right    = $Layout.ContentLeft + $Layout.ContentWidth
     $controls.Progress = New-ThemedProgressBar $Layout.ContentLeft $Layout.ProgressTop $Layout.ContentWidth
-    $controls.Cancel   = New-ThemedButton 'Annuler' $Layout.ContentLeft $Layout.ButtonsTop $Layout.ButtonWidth
-    $controls.Back     = New-ThemedButton 'Retour' ($right - 2 * $Layout.ButtonWidth - 10) $Layout.ButtonsTop $Layout.ButtonWidth
-    $controls.Next     = New-ThemedButton 'Suivant' ($right - $Layout.ButtonWidth) $Layout.ButtonsTop $Layout.ButtonWidth 34 $true
+    $controls.Cancel   = New-ThemedButton '' $Layout.ContentLeft $Layout.ButtonsTop $Layout.ButtonWidth
+    $controls.Back     = New-ThemedButton '' ($right - 2 * $Layout.ButtonWidth - 10) $Layout.ButtonsTop $Layout.ButtonWidth
+    $controls.Next     = New-ThemedButton '' ($right - $Layout.ButtonWidth) $Layout.ButtonsTop $Layout.ButtonWidth 34 $true
     $controls.Cancel.Add_Click({ Invoke-SetupSafely { Invoke-SetupCancel } })
     $controls.Back.Add_Click({ Invoke-SetupSafely { Invoke-SetupBack } })
     $controls.Next.Add_Click({ Invoke-SetupSafely { Invoke-SetupNext } })
@@ -343,7 +381,7 @@ function New-SetupFooter($Layout) {
 
 function New-SetupWindow {
     $state    = $script:InstallState
-    $form     = New-ThemedForm $SetupWindowTitle 800 560
+    $form     = New-ThemedForm (Get-SetupWindowTitle) 800 560
     $layout   = Get-SetupLayout $form.ClientSize.Width $form.ClientSize.Height
     $controls = $state.Controls
     $controls.PageTitle = New-ThemedTitle '' $layout.ContentLeft 24 $layout.ContentWidth
@@ -366,17 +404,23 @@ function Update-SetupSidebar([string]$CurrentId) {
         $labels[$id].ForeColor = Get-ThemeColor (Get-SetupStepColor $status)
         $labels[$id].Font      = New-ThemeFont 10 $style
     }
+    $languageLabel = $script:InstallState.Controls.LanguageLabel
+    if ($null -ne $languageLabel) { $languageLabel.Text = Get-Text 'setup.language' }
 }
 
 function Update-SetupNavigation {
     $state    = $script:InstallState
     $controls = $state.Controls
     $isDone   = $state.StepId -eq 'done'
+    $controls.Cancel.Text    = Get-Text 'common.cancel'
+    $controls.Back.Text      = Get-Text 'setup.button.back'
     $controls.Next.Text      = Get-NextButtonText $state.StepId
     $controls.Back.Visible   = Test-CanGoBack $state.StepId
     $controls.Cancel.Visible = -not $isDone
     $state.Form.AcceptButton = $controls.Next
     $state.Form.CancelButton = if ($isDone) { $controls.Next } else { $controls.Cancel }
+    # Le focus revient au bouton principal : laissé sur le sélecteur de langue, il le surlignerait aux couleurs système
+    $state.Form.ActiveControl = $controls.Next
 }
 
 # Gèle la navigation et les saisies pendant une action longue ; la barre marquee signale l'attente
@@ -384,7 +428,7 @@ function Set-SetupBusy([bool]$Busy) {
     $state    = $script:InstallState
     $controls = $state.Controls
     $state.IsBusy = $Busy
-    foreach ($button in @($controls.Cancel, $controls.Back, $controls.Next)) { $button.Enabled = -not $Busy }
+    foreach ($control in @($controls.Cancel, $controls.Back, $controls.Next, $controls.LanguageBox)) { if ($null -ne $control) { $control.Enabled = -not $Busy } }
     foreach ($control in @($controls.Inputs)) { $control.Enabled = -not $Busy }
     $controls.Progress.Visible = $Busy
     Invoke-SplashTick
@@ -420,15 +464,42 @@ function Get-SetupCheckedKeys($List, [int]$PendingIndex = -1, [bool]$PendingChec
     return Get-CheckedItemIds $List.Tag @($List.CheckedIndices) $PendingIndex $PendingChecked
 }
 
+# Saisie de la page courante : clés cochées par liste présente, état de la case de désinstallation
+function Get-SetupPageSelection {
+    $controls  = $script:InstallState.Controls
+    $selection = @{}
+    foreach ($name in @('AppList', 'LocaleList', 'CompanionList')) {
+        if ($null -ne $controls[$name]) { $selection[$name] = @(Get-SetupCheckedKeys $controls[$name]) }
+    }
+    if ($null -ne $controls.IconSetList) { $selection.IconSetList = @(Get-SetupSelectedIconSetName $controls.IconSetList) }
+    if ($null -ne $controls.UninstallBox) { $selection.UninstallOthers = [bool]$controls.UninstallBox.Checked }
+    return $selection
+}
+
+# Présélection d'une liste : la saisie en attente (redessin) prime sur le calcul par défaut
+function Get-SetupPreselection([string]$ListName, [string[]]$Default) {
+    $pending = $script:InstallState.PendingSelection
+    if ($null -ne $pending -and $pending.ContainsKey($ListName)) { return @($pending[$ListName]) }
+    return @($Default)
+}
+
+function Get-SetupPendingUninstallOthers([bool]$Default = $false) {
+    $pending = $script:InstallState.PendingSelection
+    if ($null -ne $pending -and $pending.ContainsKey('UninstallOthers')) { return [bool]$pending.UninstallOthers }
+    return $Default
+}
+
 # ---------------------------------------------------------------- Page 1 : détection
 
 function Initialize-SetupDetection {
     $state = $script:InstallState
-    if ($null -ne $state.Config) { return }
-    $detection = Initialize-SetupConfig $SetupConfigPath
-    $state.Config         = $detection.Config
-    $state.ConfigCreated  = $detection.Created
-    $state.DetectionItems = @(Get-DetectionItems $detection.Config)
+    if ($null -eq $state.Config) {
+        $detection = Initialize-SetupConfig $SetupConfigPath
+        $state.Config        = $detection.Config
+        $state.ConfigCreated = $detection.Created
+    }
+    # Recalculé à chaque affichage : les libellés suivent la langue active
+    $state.DetectionItems = @(Get-DetectionItems $state.Config)
 }
 
 # Libellé, encadré (2 lignes, retour à la ligne) et statut ; retourne les contrôles et la hauteur occupée
@@ -447,7 +518,7 @@ function Show-SetupDetectPage {
     $state = $script:InstallState
     $width = $state.Layout.ContentWidth
     $controls = @(
-        (New-ThemedLabel "Bienvenue ! Voici ce que nous avons trouvé sur cet ordinateur — rien n'est modifié à cette étape. Si un emplacement est faux, vous pourrez le corriger dans config.json et relancer l'installation." 0 0 $width 48 'Muted')
+        (New-ThemedLabel (Get-Text 'setup.detect.intro') 0 0 $width 48 'Muted')
         (New-ThemedLabel (Get-ConfigStatusText $state.ConfigCreated $SetupConfigPath) 0 52 $width 22 'Accent')
     )
     $top = 86
@@ -480,18 +551,19 @@ function New-SetupAppsControls {
     $controls = $state.Controls
     $width    = $state.Layout.ContentWidth
     $items    = @(Get-CompanionListItems $state.Catalog $state.Installed)
-    $controls.AppList      = New-SetupCheckedList $items (Get-PreselectedCompanionIds $state.Catalog $state.Installed $state.Config) 0 50 $width (24 * [Math]::Max(1, $items.Count) + 8)
+    $controls.AppList      = New-SetupCheckedList $items (Get-SetupPreselection 'AppList' (Get-PreselectedCompanionIds $state.Catalog $state.Installed $state.Config)) 0 50 $width (24 * [Math]::Max(1, $items.Count) + 8)
     $checkTop              = 50 + $controls.AppList.Height + 10
-    $controls.UninstallBox = New-ThemedCheckBox 'Désinstaller les applis décochées présentes sur ce PC' 0 $checkTop $width
+    $controls.UninstallBox = New-ThemedCheckBox (Get-Text 'companion.uninstallOthers') 0 $checkTop $width
+    $controls.UninstallBox.Checked = Get-SetupPendingUninstallOthers
     $controls.Log          = New-ThemedLog 0 ($checkTop + 62) $width ($state.Layout.ContentHeight - $checkTop - 62)
     $controls.Inputs       = @($controls.AppList, $controls.UninstallBox)
     $controls.AppList.Add_ItemCheck({ param($sender, $e) Invoke-SetupSafely { Update-SetupCompanionSummary $e.Index ($e.NewValue -eq 'Checked') } })
     $controls.UninstallBox.Add_CheckedChanged({ Invoke-SetupSafely { Update-SetupCompanionSummary } })
     return @(
-        (New-ThemedLabel 'Applis lancées après le jeu (un raccourci par appli cochée). Les applis cochées absentes seront installées.' 0 0 $width 44 'Muted')
+        (New-ThemedLabel (Get-Text 'companion.hint') 0 0 $width 44 'Muted')
         $controls.AppList
         $controls.UninstallBox
-        (New-ThemedLabel 'Actions prévues' 0 ($checkTop + 36) $width 22 'Gold' 10 'Bold')
+        (New-ThemedLabel (Get-Text 'companion.plannedActions') 0 ($checkTop + 36) $width 22 'Gold' 10 'Bold')
         $controls.Log
     )
 }
@@ -509,7 +581,7 @@ function Invoke-SetupCompanionActions($Actions) {
     Set-SetupBusy $true
     try {
         Write-SetupLog ''
-        Write-SetupLog 'Application des changements…'
+        Write-SetupLog (Get-Text 'setup.apps.applying')
         $result = Invoke-SetupLogged { Invoke-CompanionActions $Actions }
     }
     finally { Set-SetupBusy $false }
@@ -543,19 +615,19 @@ function New-SetupShortcutsControls {
     $companionHeight = [Math]::Min(110, 24 * $companionRows + 8)
     $iconSetsTop     = 72 + $companionHeight + 12
     $previewSize     = 64
-    $controls.LocaleList    = New-SetupCheckedList (Get-LocaleListItems $state.Locales) (Get-PreselectedCodes $state.Locales $state.ExistingShortcuts) 0 72 $columnWidth 230
-    $controls.CompanionList = New-SetupCheckedList (Get-ShortcutCompanionListItems $companionApps) (Get-PreselectedShortcutCompanionIds $companionApps $state.ExistingShortcuts) $rightColumn 72 $columnWidth $companionHeight
-    $controls.IconSetList   = New-SetupIconSetList $state.IconSets (Get-PreselectedIconSetName $state.Config $state.IconSets) $rightColumn ($iconSetsTop + 24) ($columnWidth - $previewSize - 12) $previewSize
+    $controls.LocaleList    = New-SetupCheckedList (Get-LocaleListItems $state.Locales) (Get-SetupPreselection 'LocaleList' (Get-PreselectedCodes $state.Locales $state.ExistingShortcuts)) 0 72 $columnWidth 230
+    $controls.CompanionList = New-SetupCheckedList (Get-ShortcutCompanionListItems $companionApps) (Get-SetupPreselection 'CompanionList' (Get-PreselectedShortcutCompanionIds $companionApps $state.ExistingShortcuts)) $rightColumn 72 $columnWidth $companionHeight
+    $controls.IconSetList   = New-SetupIconSetList $state.IconSets (Get-SetupPreselectedIconSetName $state) $rightColumn ($iconSetsTop + 24) ($columnWidth - $previewSize - 12) $previewSize
     $controls.IconSetPreview = New-ThemedPicture ($rightColumn + $columnWidth - $previewSize) ($iconSetsTop + 24) $previewSize
     $controls.Log           = New-ThemedLog 0 312 $layout.ContentWidth ($layout.ContentHeight - 312)
     $controls.Inputs        = @($controls.LocaleList, $controls.CompanionList, $controls.IconSetList)
     $controls.IconSetList.Add_SelectedIndexChanged({ Invoke-SetupSafely { Update-SetupIconSetPreview } })
     Update-SetupIconSetPreview
     return @(
-        (New-ThemedLabel "Un raccourci par langue cochée × appli compagnon cochée, dans $Destination. Sans appli cochée : un raccourci par langue, sans compagnon." 0 0 $layout.ContentWidth 44 'Muted')
-        (New-ThemedLabel 'Langues' 0 48 $columnWidth 22 'Gold' 10 'Bold')
-        (New-ThemedLabel 'Applis compagnon' $rightColumn 48 $columnWidth 22 'Gold' 10 'Bold')
-        (New-ThemedLabel "Jeu d'icônes" $rightColumn $iconSetsTop $columnWidth 22 'Gold' 10 'Bold')
+        (New-ThemedLabel (Get-Text 'setup.shortcuts.intro' $Destination) 0 0 $layout.ContentWidth 44 'Muted')
+        (New-ThemedLabel (Get-Text 'shortcuts.languages') 0 48 $columnWidth 22 'Gold' 10 'Bold')
+        (New-ThemedLabel (Get-Text 'setup.shortcuts.companions') $rightColumn 48 $columnWidth 22 'Gold' 10 'Bold')
+        (New-ThemedLabel (Get-Text 'setup.shortcuts.iconSet') $rightColumn $iconSetsTop $columnWidth 22 'Gold' 10 'Bold')
         $controls.LocaleList
         $controls.CompanionList
         $controls.IconSetList
@@ -573,6 +645,13 @@ function New-SetupIconSetList([object[]]$Sets, [string]$Preselected, [int]$Left,
     $index = [Array]::IndexOf($list.Tag, $Preselected)
     if ($index -ge 0) { $list.SelectedIndex = $index }
     return $list
+}
+
+# Jeu présélectionné : saisie en attente (redessin) sinon config.json / défaut
+function Get-SetupPreselectedIconSetName($State) {
+    $pending = @(Get-SetupPreselection 'IconSetList' @())
+    if ($pending.Count -gt 0) { return [string]$pending[0] }
+    return Get-PreselectedIconSetName $State.Config $State.IconSets
 }
 
 function Get-SetupSelectedIconSetName($List) {
@@ -609,7 +688,7 @@ function Get-SetupShortcutSelection {
 function New-SetupShortcuts([object[]]$Combinations) {
     $created = foreach ($combination in $Combinations) {
         $path = Invoke-SetupLogged { New-LaunchShortcutWithFallback $combination }
-        Write-SetupLog "Créé : $path"
+        Write-SetupLog (Get-Text 'shortcuts.created' $path)
         $path
     }
     return @($created | Where-Object { $_ })
@@ -620,11 +699,11 @@ function Invoke-SetupShortcutsStep {
     $state     = $script:InstallState
     $selection = Get-SetupShortcutSelection
     if ($selection.Codes.Count -eq 0) {
-        Write-SetupLog 'Aucune langue cochée : cochez au moins une langue pour créer un raccourci.'
+        Write-SetupLog (Get-Text 'setup.shortcuts.noLanguage')
         return $false
     }
     $iconSet = Select-IconSetForConfig $state.Config $SetupConfigPath $selection.IconSet
-    if ($iconSet) { Write-SetupLog "Jeu d'icônes : $($iconSet.Name)" }
+    if ($iconSet) { Write-SetupLog (Get-Text 'setup.shortcuts.iconSetChosen' $iconSet.Name) }
     $combinations = Get-ShortcutCombinations $selection.Codes (Resolve-ShortcutCompanions $state.Config $selection.CompanionIds)
     $state.ShortcutPaths = @(New-SetupShortcuts $combinations)
     foreach ($line in @(Remove-ObsoleteShortcuts $state.ExistingShortcuts $combinations)) { Write-SetupLog $line }
@@ -637,13 +716,13 @@ function Show-SetupDonePage {
     $state = $script:InstallState
     $width = $state.Layout.ContentWidth
     $state.ExitCode = 0
-    $controls = @(New-ThemedLabel 'Installation terminée.' 0 0 $width 26 'Accent' 11 'Bold')
+    $controls = @(New-ThemedLabel (Get-Text 'setup.done.title') 0 0 $width 26 'Accent' 11 'Bold')
     $top = 44
     foreach ($line in Get-CompletionSummaryLines $state.Config $SetupConfigPath $state.ShortcutPaths) {
         $controls += New-ThemedLabel $line 0 $top $width 46 'Cream'
         $top += 52
     }
-    $controls += New-ThemedLabel 'Double-cliquez sur un raccourci pour lancer le jeu dans la langue voulue. Relancez setup.bat pour ajouter ou retirer des langues ou des applis compagnon.' 0 ($top + 8) $width 60 'Muted'
+    $controls += New-ThemedLabel (Get-Text 'setup.done.hint') 0 ($top + 8) $width 60 'Muted'
     Add-SetupContent $controls
 }
 
@@ -651,19 +730,42 @@ function Show-SetupDonePage {
 
 function Show-SetupPage([string]$StepId) {
     $state = $script:InstallState
-    $state.StepId          = $StepId
-    $state.Controls.Log    = $null
+    $state.StepId = $StepId
+    foreach ($name in $SetupPageControlNames) { $state.Controls[$name] = $null }
     $state.Controls.Inputs = @()
     Clear-SetupContent
     Update-SetupSidebar $StepId
-    Set-SetupPageTitle $SetupPageTitles[$StepId]
-    switch ($StepId) {
-        'detect'    { Show-SetupDetectPage }
-        'apps'      { Show-SetupAppsPage }
-        'shortcuts' { Show-SetupShortcutsPage }
-        'done'      { Show-SetupDonePage }
+    Set-SetupPageTitle (Get-SetupPageTitle $StepId)
+    try {
+        switch ($StepId) {
+            'detect'    { Show-SetupDetectPage }
+            'apps'      { Show-SetupAppsPage }
+            'shortcuts' { Show-SetupShortcutsPage }
+            'done'      { Show-SetupDonePage }
+        }
     }
+    finally { $state.PendingSelection = $null }
     Update-SetupNavigation
+}
+
+# Change la langue active et redessine la page courante sans perdre la saisie ; rend vrai si la langue a changé.
+# Ignoré pendant une action longue (le journal en cours resterait dans l'ancienne langue) ou pour une langue inconnue.
+function Set-SetupLanguage([string]$Language) {
+    $state = $script:InstallState
+    if ($state.IsBusy -or -not (Test-UiLanguageSupported $Language) -or $Language -eq (Get-UiLanguage)) { return $false }
+    $state.PendingSelection = Get-SetupPageSelection
+    Initialize-Translation $Language | Out-Null
+    if ($null -ne $state.Form) { $state.Form.Text = Get-SetupWindowTitle }
+    Sync-SetupLanguageBox $Language
+    Show-SetupPage $state.StepId
+    return $true
+}
+
+# Aligne le sélecteur sur la langue active (bascule par programme) ; sans effet s'il l'affiche déjà
+function Sync-SetupLanguageBox([string]$Language) {
+    $box = $script:InstallState.Controls.LanguageBox
+    if ($null -eq $box -or (Get-ThemedComboBoxKey $box) -eq $Language) { return }
+    $box.SelectedIndex = [array]::IndexOf($box.Tag, $Language)
 }
 
 # Action d'une page au clic sur Suivant/Appliquer ; rend vrai si l'on peut avancer
@@ -696,7 +798,7 @@ function Invoke-SetupCancel {
 # Rend le code de sortie du script
 function Start-SetupWizard {
     if (Test-CompanionElevated) {
-        Show-SetupErrorBox "Ne pas exécuter en tant qu'administrateur : les installeurs sont per-user et les désinstalleurs sont lus dans le registre utilisateur.`r`n`r`nRelancez setup.bat normalement."
+        Show-SetupErrorBox "$(Get-Text 'common.notElevated')`r`n`r`n$(Get-Text 'setup.error.elevatedHint')"
         return 1
     }
     Register-SetupCompanionUi
@@ -711,5 +813,5 @@ function Start-SetupWizard {
 
 if ($MyInvocation.InvocationName -ne '.') {
     try   { [int]$exitCode = Start-SetupWizard; exit $exitCode }
-    catch { Show-SetupErrorBox "L'installation a échoué :`r`n`r`n$($_.Exception.Message)"; exit 1 }
+    catch { Show-SetupErrorBox (Get-Text 'setup.error.failed' $_.Exception.Message); exit 1 }
 }

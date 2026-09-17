@@ -22,6 +22,7 @@
     powershell -NoProfile -ExecutionPolicy Bypass -File create-shortcuts.ps1 -Locales ja_JP,ko_KR
     powershell -NoProfile -ExecutionPolicy Bypass -File create-shortcuts.ps1 -Locales ja_JP -Companions blitz,opgg
     powershell -NoProfile -ExecutionPolicy Bypass -File create-shortcuts.ps1 -Destination "D:\Jeux"
+    powershell -NoProfile -ExecutionPolicy Bypass -File create-shortcuts.ps1 -Language ja
 #>
 param(
     # Codes de langue à installer (ex. ja_JP,fr_FR). Absent → boîte de dialogue.
@@ -34,11 +35,15 @@ param(
     [string]$Destination = [Environment]::GetFolderPath('Desktop'),
 
     # Jeu d'icônes : nom d'un sous-dossier de ico\ (défaut : iconSet de config.json, sinon le jeu par défaut). Mémorisé dans config.json.
-    [string]$IconSet
+    [string]$IconSet,
+
+    # Langue des messages et de la boîte de dialogue : fr, en ou ja (défaut : langue de Windows, sinon anglais)
+    [string]$Language
 )
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
+. (Join-Path $PSScriptRoot 'lib\i18n.lib.ps1')
 . (Join-Path $PSScriptRoot 'lib\launch-config.lib.ps1')
 . (Join-Path $PSScriptRoot 'lib\companion-app.lib.ps1')
 . (Join-Path $PSScriptRoot 'lib\icon-badge.lib.ps1')
@@ -59,7 +64,7 @@ $shell       = New-Object -ComObject WScript.Shell
 # ---------------------------------------------------------------- Catalogue
 
 function Read-LocaleCatalog([string]$Path) {
-    if (-not (Test-Path $Path)) { throw "locales.json introuvable : $Path" }
+    if (-not (Test-Path $Path)) { throw (Get-Text 'shortcuts.localesMissing' $Path) }
     return Read-JsonCatalog $Path
 }
 
@@ -119,7 +124,7 @@ function Read-CompanionBadges([string]$Path) {
             if ($badge) { $badges[$app.id] = $badge }
         }
     } catch {
-        Write-Warning "Pastilles compagnon indisponibles ($($_.Exception.Message)) — icônes drapeau seules"
+        Write-Warning (Get-Text 'shortcuts.badgesUnavailable' $_.Exception.Message)
     }
     return $badges
 }
@@ -163,7 +168,7 @@ function Resolve-CompanionIconPath([string]$Code, $Companion) {
         Remove-StaleCompanionIcons $Code $Companion $target
         return Add-CompanionBadge $flagIcon $badge $target (Get-ActiveBadgeStyle)
     } catch {
-        Write-Warning "Icône compagnon '$($Companion.name)' non composée ($($_.Exception.Message)) — icône drapeau seule"
+        Write-Warning (Get-Text 'shortcuts.iconNotComposed' $Companion.name, $_.Exception.Message)
         return $flagIcon
     }
 }
@@ -250,7 +255,7 @@ function Show-ShortcutPicker([object[]]$Catalog, [string[]]$PreselectedCodes, [o
     $buttonsTop    = $companionsTop + 24 + 24 * $companionRows + 20
 
     $form                 = New-Object System.Windows.Forms.Form
-    $form.Text            = 'League of Legends — raccourcis à installer'
+    $form.Text            = Get-Text 'shortcuts.pickerTitle'
     $form.Size            = New-Object System.Drawing.Size(400, ($buttonsTop + 80))
     $form.StartPosition   = 'CenterScreen'
     $form.FormBorderStyle = 'FixedDialog'
@@ -259,14 +264,14 @@ function Show-ShortcutPicker([object[]]$Catalog, [string[]]$PreselectedCodes, [o
     $form.Font            = New-Object System.Drawing.Font('Segoe UI', 10)
 
     $hint          = New-Object System.Windows.Forms.Label
-    $hint.Text     = 'Un raccourci sera créé sur le Bureau par langue cochée, et par appli compagnon cochée.'
+    $hint.Text     = Get-Text 'shortcuts.pickerHint'
     $hint.Location = New-Object System.Drawing.Point(12, 12)
     $hint.Size     = New-Object System.Drawing.Size(360, 40)
 
-    $locales    = New-PickerList 'Langues' 56 300 @($Catalog | ForEach-Object { $_.code }) @($Catalog | ForEach-Object { "$($_.code)   $($_.label)" }) $PreselectedCodes
-    $companions = New-PickerList 'Applis compagnon (aucune cochée = raccourci sans compagnon)' $companionsTop (24 * $companionRows) @($CompanionApps | ForEach-Object { $_.id }) @($CompanionApps | ForEach-Object { $_.name }) $PreselectedCompanionIds
-    $ok     = New-PickerButton 'Installer' 180 $buttonsTop 'OK'
-    $cancel = New-PickerButton 'Annuler'   282 $buttonsTop 'Cancel'
+    $locales    = New-PickerList (Get-Text 'shortcuts.languages') 56 300 @($Catalog | ForEach-Object { $_.code }) @($Catalog | ForEach-Object { "$($_.code)   $($_.label)" }) $PreselectedCodes
+    $companions = New-PickerList (Get-Text 'shortcuts.pickerCompanions') $companionsTop (24 * $companionRows) @($CompanionApps | ForEach-Object { $_.id }) @($CompanionApps | ForEach-Object { $_.name }) $PreselectedCompanionIds
+    $ok     = New-PickerButton (Get-Text 'shortcuts.button.install') 180 $buttonsTop 'OK'
+    $cancel = New-PickerButton (Get-Text 'common.cancel')            282 $buttonsTop 'Cancel'
 
     $form.Controls.AddRange(@($hint, $locales.Label, $locales.List, $companions.Label, $companions.List, $ok, $cancel))
     $form.AcceptButton = $ok
@@ -285,14 +290,14 @@ function Show-ShortcutPicker([object[]]$Catalog, [string[]]$PreselectedCodes, [o
 # ignore lui-même une appli compagnon introuvable
 function Test-LaunchConfig($Config) {
     if (-not (Test-Path $Config.riotClientPath)) {
-        Write-Warning "riotClientPath introuvable : $($Config.riotClientPath) — corriger config.json"
+        Write-Warning (Get-Text 'shortcuts.riotClientMissing' $Config.riotClientPath)
     }
     if (-not (Test-Path $Config.productSettingsPath)) {
-        Write-Warning "productSettingsPath introuvable : $($Config.productSettingsPath) — LoL est-il installé ?"
+        Write-Warning (Get-Text 'shortcuts.productSettingsMissing' $Config.productSettingsPath)
     }
     foreach ($app in @($Config.companionApps)) {
         if (-not (Test-Path $app.path)) {
-            Write-Warning "Application compagnon '$($app.name)' introuvable : $($app.path) — elle sera ignorée au lancement (voir README.md)"
+            Write-Warning (Get-Text 'shortcuts.companionMissing' $app.name, $app.path)
         }
     }
 }
@@ -325,9 +330,15 @@ function New-LaunchShortcut($Combination, [string]$Directory) {
     $shortcut.WorkingDirectory = $folder
     $shortcut.IconLocation     = "$(Resolve-ShortcutIconPath $Combination),0"
     $shortcut.WindowStyle      = 7   # Réduite : aucune console visible
-    $shortcut.Description      = "Lance League of Legends en $($Combination.Code)$(if ($Combination.Companion) { " avec $($Combination.Companion.name)" })"
+    $shortcut.Description      = Get-ShortcutDescription $Combination
     $shortcut.Save()
     return $path
+}
+
+# Infobulle du raccourci, dans la langue de l'installation
+function Get-ShortcutDescription($Combination) {
+    if ($Combination.Companion) { return Get-Text 'shortcuts.descriptionWithCompanion' $Combination.Code, $Combination.Companion.name }
+    return Get-Text 'shortcuts.description' $Combination.Code
 }
 
 # Bureau en priorité ; si l'écriture y échoue (dossier protégé, OneDrive verrouillé, chemin absent),
@@ -336,7 +347,7 @@ function New-LaunchShortcutWithFallback($Combination) {
     try {
         return New-LaunchShortcut $Combination $Destination
     } catch {
-        Write-Warning "Impossible d'écrire dans $Destination ($($_.Exception.Message)) — repli dans $folder"
+        Write-Warning (Get-Text 'shortcuts.destinationFallback' $Destination, $_.Exception.Message, $folder)
         return New-LaunchShortcut $Combination $folder
     }
 }
@@ -347,7 +358,7 @@ function Remove-ObsoleteShortcuts([object[]]$Existing, [object[]]$Wanted) {
     foreach ($shortcut in $Existing) {
         if ($wantedNames -contains (Split-Path $shortcut.Path -Leaf)) { continue }
         Remove-Item -Path $shortcut.Path -Force
-        "Retiré : $($shortcut.Path)"
+        Get-Text 'shortcuts.removed' $shortcut.Path
     }
 }
 
@@ -359,6 +370,7 @@ function Split-ListArgument([string[]]$Values) {
 # ---------------------------------------------------------------- Main (ignoré quand le script est dot-sourcé par setup.ps1 ou les tests)
 
 if ($MyInvocation.InvocationName -ne '.') {
+    Initialize-Translation (Resolve-UiLanguage $Language (Get-UICulture).Name) | Out-Null
     $catalog = Read-LocaleCatalog $localesPath
     $config  = Read-LaunchConfig $configPath
     Test-LaunchConfig $config
@@ -368,7 +380,7 @@ if ($MyInvocation.InvocationName -ne '.') {
 
     if (-not $Locales) {
         $choice = Show-ShortcutPicker $catalog (Get-PreselectedCodes $catalog $existing) $companionApps (Get-PreselectedShortcutCompanionIds $companionApps $existing)
-        if ($null -eq $choice) { "Annulé : aucun raccourci créé."; exit 2 }
+        if ($null -eq $choice) { Get-Text 'shortcuts.cancelled'; exit 2 }
         $Locales    = $choice.Codes
         $Companions = $choice.CompanionIds
     }
@@ -377,15 +389,15 @@ if ($MyInvocation.InvocationName -ne '.') {
     $Companions = Split-ListArgument $Companions
 
     $unknown = @($Locales | Where-Object { $_ -notin $catalog.code })
-    if ($unknown.Count -gt 0) { throw "Langue(s) inconnue(s) dans locales.json : $($unknown -join ', ')" }
+    if ($unknown.Count -gt 0) { throw (Get-Text 'shortcuts.unknownLocales' ($unknown -join ', ')) }
     $unknownCompanions = @($Companions | Where-Object { -not (Find-LaunchCompanion $config $_) })
-    if ($unknownCompanions.Count -gt 0) { throw "Appli(s) compagnon absente(s) de config.json : $($unknownCompanions -join ', ') — relancer setup.bat" }
-    if ($Locales.Count -eq 0) { "Aucune langue cochée : aucun raccourci créé."; exit 0 }
+    if ($unknownCompanions.Count -gt 0) { throw (Get-Text 'shortcuts.unknownCompanions' ($unknownCompanions -join ', ')) }
+    if ($Locales.Count -eq 0) { Get-Text 'shortcuts.noLanguage'; exit 0 }
 
     $selectedCompanions = @($Companions | ForEach-Object { Find-LaunchCompanion $config $_ })
     $combinations = Get-ShortcutCombinations $Locales $selectedCompanions
     foreach ($combination in $combinations) {
-        "Créé : $(New-LaunchShortcutWithFallback $combination)"
+        Get-Text 'shortcuts.created' (New-LaunchShortcutWithFallback $combination)
     }
     Remove-ObsoleteShortcuts $existing $combinations
 }
