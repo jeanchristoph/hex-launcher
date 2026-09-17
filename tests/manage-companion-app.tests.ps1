@@ -8,6 +8,9 @@ $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $here '..\app\manage-companion-app.ps1')
 . (Join-Path $here 'companion-test-helpers.ps1')
 
+# Les textes attendus sont français quelle que soit la langue de Windows sur la machine de test
+Initialize-Translation 'fr' | Out-Null
+
 function New-TestOptions([hashtable]$Overrides = @{}) {
     $options = @{
         RequestedIds = @(); HasRequest = $false; UninstallOthers = $false; Force = $false; DryRun = $false
@@ -85,6 +88,22 @@ Describe 'Format-CompanionActions' {
 
     It 'indique qu''il n''y a rien à faire' {
         Format-CompanionActions (Get-CompanionActions @(New-TestCompanionApp -Id 'blitz') @() (New-TestChoice @())) | Should Match 'Aucune installation'
+    }
+
+    It 'affiche la notice dans la langue active quand le catalogue la traduit' {
+        $poro = New-TestCompanionApp -Id 'porofessor'
+        $poro.install | Add-Member -NotePropertyName notice -NotePropertyValue ([pscustomobject]@{ fr = 'Suivez Overwolf'; en = 'Follow Overwolf' }) -Force
+        $actions = Get-CompanionActions @($poro) @() (New-TestChoice @('porofessor'))
+        try {
+            Format-CompanionActions $actions | Should Match 'Suivez Overwolf'
+            Initialize-Translation 'en' | Out-Null
+            $text = Format-CompanionActions $actions
+            $text | Should Match '- Install porofessor'
+            $text | Should Match 'Follow Overwolf'
+            Initialize-Translation 'ja' | Out-Null
+            Format-CompanionActions $actions | Should Match 'Follow Overwolf'
+        }
+        finally { Initialize-Translation 'fr' | Out-Null }
     }
 }
 

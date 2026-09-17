@@ -18,14 +18,22 @@
       "url": "https://download.overwolf.com/install/Download?Name=Porofessor.gg&ExtensionId=pibhbkkgefgheeglaeemkkfjlhidhcedalapdggh&Channel=web_dl_btn",
       "arguments": "/S",
       "timeoutSeconds": 300,
-      "notice": "Si Overwolf n'est pas encore installÃ©, son installeur affiche sa fenÃªtre : suivez ses Ã©tapes (environ 1 min).",
+      "notice": {
+        "fr": "Si Overwolf n'est pas encore installé, son installeur affiche sa fenêtre : suivez ses étapes (environ 1 min).",
+        "en": "If Overwolf is not installed yet, its installer shows its own window: follow its steps (about 1 min).",
+        "ja": "Overwolf が未インストールの場合、そのインストーラーのウィンドウが表示されます。手順に従ってください（約 1 分）。"
+      },
       "fallback": "browser",
       "browserUrl": "https://www.overwolf.com/app/trebonius-porofessor.gg"
     },
     "uninstall": {
       "mode": "interactive",
       "dialogProcessNames": ["OWUninstallMenu"],
-      "notice": "Overwolf va ouvrir son menu de dÃ©sinstallation avec Overwolf ET Porofessor cochÃ©s. DÃ©cochez Overwolf si vous l'utilisez pour d'autres applications, puis cliquez sur Uninstall."
+      "notice": {
+        "fr": "Overwolf va ouvrir son menu de désinstallation avec Overwolf ET Porofessor cochés. Décochez Overwolf si vous l'utilisez pour d'autres applications, puis cliquez sur Uninstall.",
+        "en": "Overwolf will open its uninstall menu with Overwolf AND Porofessor checked. Uncheck Overwolf if you use it for other applications, then click Uninstall.",
+        "ja": "Overwolf のアンインストールメニューが、Overwolf と Porofessor の両方にチェックが入った状態で開きます。他のアプリで Overwolf を使っている場合はチェックを外してから、Uninstall をクリックしてください。"
+      }
     }
   },
   {
