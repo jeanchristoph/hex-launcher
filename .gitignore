@@ -4,8 +4,8 @@ config.json
 # Raccourcis générés (chemins absolus, propres à la machine)
 *.lnk
 
-# Icônes compagnon composées par create-shortcuts.ps1 (drapeau + pastille)
-app/ico/companion/
+# Icônes compagnon composées par create-shortcuts.ps1 (drapeau + pastille), dans chaque jeu d'icônes
+app/ico/*/companion/
 
 # Windows / éditeurs
 Thumbs.db

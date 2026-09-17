@@ -7,7 +7,8 @@
         . (Join-Path $PSScriptRoot 'lib\launch-config.lib.ps1')
 
     config.json :
-        riotClientPath, productSettingsPath, companionApps = [ { id, name, path, arguments }, … ]
+        riotClientPath, productSettingsPath, companionApps = [ { id, name, path, arguments }, … ],
+        iconSet = nom du jeu d'icônes choisi dans setup.bat (dossier de app\ico ; absent → jeu par défaut)
 
     Un config.json antérieur (bloc unique companionApp { enabled, name, path, arguments }) est migré à la lecture :
     l'entrée activée devient la seule ligne de companionApps, avec un id dérivé de son nom.
@@ -60,6 +61,16 @@ function Read-LaunchConfig([string]$Path) {
     $config | Add-Member -NotePropertyName companionApps -NotePropertyValue $companionApps -Force
     if ($null -ne $config.PSObject.Properties['companionApp']) { $config.PSObject.Properties.Remove('companionApp') }
     return $config
+}
+
+# Nom du jeu d'icônes retenu ('' si jamais choisi)
+function Get-LaunchIconSetName($Config) {
+    if ($null -ne $Config.iconSet) { return [string]$Config.iconSet }
+    return ''
+}
+
+function Set-LaunchIconSetName($Config, [string]$Name) {
+    $Config | Add-Member -NotePropertyName iconSet -NotePropertyValue $Name -Force
 }
 
 function Write-LaunchConfig($Config, [string]$Path) {

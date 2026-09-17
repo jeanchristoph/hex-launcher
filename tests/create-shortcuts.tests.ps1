@@ -7,11 +7,25 @@ $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 Describe 'Get-FlagIconPath' {
     It 'dérive le nom du fichier drapeau de la partie pays du code, en minuscules' {
-        Get-FlagIconPath 'ja_JP' | Should Match 'ico\\hex-launcher-jp\.ico$'
+        Get-FlagIconPath 'ja_JP' | Should Match 'hex-launcher-jp\.ico$'
     }
 
-    It 'cible le dossier ico à côté du script' {
-        Get-FlagIconPath 'fr_FR' | Should Be (Join-Path $folder 'ico\hex-launcher-fr.ico')
+    It 'cible le jeu d''icônes par défaut (ico\flat) à côté du script' {
+        Get-FlagIconPath 'fr_FR' | Should Be (Join-Path $folder 'ico\flat\hex-launcher-fr.ico')
+    }
+
+    It 'suit le jeu courant après Set-ActiveIconSet' {
+        Set-ActiveIconSet 'classic' | Out-Null
+        try { Get-FlagIconPath 'fr_FR' | Should Be (Join-Path $folder 'ico\classic\hex-launcher-fr.ico') }
+        finally { Set-ActiveIconSet '' | Out-Null }
+    }
+}
+
+Describe 'Set-ActiveIconSet' {
+    It 'replie sur le jeu par défaut avec avertissement pour un nom inconnu' {
+        Mock Write-Warning {}
+        (Set-ActiveIconSet 'inconnu').Name | Should Be 'flat'
+        Assert-MockCalled Write-Warning -Scope It -Exactly 1
     }
 }
 
@@ -23,14 +37,30 @@ Describe 'Resolve-IconPath' {
         }
     }
 
-    Context 'drapeau absent' {
-        Mock Test-Path { $false }
-        It 'replie sur l''icône de base du projet' {
-            Resolve-IconPath 'xx_XX' | Should Match 'ico\\hex-launcher\.ico$'
+    Context 'drapeau absent du jeu courant' {
+        Mock Test-Path { $Path -match 'flat\\hex-launcher\.ico$' }
+        It 'replie sur l''icône de base du jeu' {
+            Resolve-IconPath 'xx_XX' | Should Match 'ico\\flat\\hex-launcher\.ico$'
         }
     }
 
-    Context 'icônes livrées dans app\ico' {
+    Context 'jeu courant incomplet' {
+        Set-ActiveIconSet 'classic' | Out-Null
+        Mock Test-Path { $Path -match 'flat\\hex-launcher-kr\.ico$' }
+        It 'replie sur le drapeau du jeu par défaut' {
+            try { Resolve-IconPath 'ko_KR' | Should Match 'ico\\flat\\hex-launcher-kr\.ico$' }
+            finally { Set-ActiveIconSet '' | Out-Null }
+        }
+    }
+
+    Context 'aucune icône nulle part' {
+        Mock Test-Path { $false }
+        It 'rend quand même le chemin de base du jeu par défaut, sans interrompre l''installation' {
+            Resolve-IconPath 'xx_XX' | Should Match 'ico\\flat\\hex-launcher\.ico$'
+        }
+    }
+
+    Context 'icônes livrées dans app\ico\flat' {
         It 'trouve un drapeau pour chaque langue du catalogue' {
             $catalog = Read-LocaleCatalog (Join-Path $here '..\app\locales.json')
             $missing = @($catalog.code | Where-Object { (Resolve-IconPath $_) -notmatch 'hex-launcher-[a-z]{2}\.ico$' })
@@ -55,9 +85,16 @@ Describe 'Read-CompanionBadges' {
 }
 
 Describe 'Get-CompanionIconPath' {
-    It 'nomme l''icône composée par le pays, l''identifiant du compagnon et l''empreinte de la pastille, dans ico\companion' {
+    It 'nomme l''icône composée par le pays, l''identifiant du compagnon et l''empreinte de la pastille, dans ico\<jeu>\companion' {
         $badge = [pscustomobject]@{ glyph = 'B'; color = '#E4103F' }
-        Get-CompanionIconPath 'ja_JP' ([pscustomobject]@{ id = 'blitz' }) $badge | Should Be (Join-Path $folder "ico\companion\hex-launcher-jp-blitz-$(Get-BadgeSignature $badge).ico")
+        Get-CompanionIconPath 'ja_JP' ([pscustomobject]@{ id = 'blitz' }) $badge | Should Be (Join-Path $folder "ico\flat\companion\hex-launcher-jp-blitz-$(Get-BadgeSignature $badge).ico")
+    }
+
+    It 'suit le dossier du jeu courant' {
+        $badge = [pscustomobject]@{ glyph = 'B'; color = '#E4103F' }
+        Set-ActiveIconSet 'classic' | Out-Null
+        try { Get-CompanionIconPath 'ja_JP' ([pscustomobject]@{ id = 'blitz' }) $badge | Should Match 'ico\\classic\\companion\\hex-launcher-jp-blitz' }
+        finally { Set-ActiveIconSet '' | Out-Null }
     }
 
     It 'change de chemin quand la pastille change, pour contourner le cache d''icônes de Windows' {
@@ -100,11 +137,19 @@ Describe 'Resolve-ShortcutIconPath' {
     Context 'compagnon avec pastille' {
         $script:CompanionBadges = @{ blitz = $badge }
         Mock New-Item {}
-        Mock Add-CompanionBadge { param($SourceIco, $Badge, $DestinationIco) $DestinationIco }
+        Mock Add-CompanionBadge { param($SourceIco, $Badge, $DestinationIco, $Style) $DestinationIco }
 
-        It 'compose drapeau + pastille dans ico\companion' {
+        It 'compose drapeau + pastille dans ico\<jeu>\companion, avec le style du jeu (voile nuit pour flat)' {
             Resolve-ShortcutIconPath (New-ShortcutCombination 'ja_JP' $blitz) | Should Be (Get-CompanionIconPath 'ja_JP' $blitz $badge)
-            Assert-MockCalled Add-CompanionBadge -Scope It -Exactly 1 -ParameterFilter { $SourceIco -eq (Get-FlagIconPath 'ja_JP') -and $Badge.glyph -eq 'B' }
+            Assert-MockCalled Add-CompanionBadge -Scope It -Exactly 1 -ParameterFilter { $SourceIco -eq (Get-FlagIconPath 'ja_JP') -and $Badge.glyph -eq 'B' -and $Style.NightVeil -eq $true }
+        }
+
+        It 'compose aux couleurs brutes du catalogue pour le jeu classic' {
+            Set-ActiveIconSet 'classic' | Out-Null
+            try {
+                Resolve-ShortcutIconPath (New-ShortcutCombination 'ja_JP' $blitz) | Out-Null
+                Assert-MockCalled Add-CompanionBadge -Scope It -Exactly 1 -ParameterFilter { $Style.NightVeil -eq $false }
+            } finally { Set-ActiveIconSet '' | Out-Null }
         }
     }
 
@@ -140,7 +185,7 @@ Describe 'New-LaunchShortcut avec compagnon' {
         $lnk = New-LaunchShortcut (New-ShortcutCombination 'fr_FR' $blitz) $TestDrive
         $lnk | Should Exist
         $icon = $shell.CreateShortcut($lnk).IconLocation
-        $icon | Should Be "$(Join-Path $companionIconFolder "hex-launcher-fr-blitz-$(Get-BadgeSignature $script:CompanionBadges['blitz']).ico"),0"
+        $icon | Should Be "$(Join-Path $companionIconFolder "hex-launcher-fr-blitz-$(Get-BadgeSignature $script:CompanionBadges['blitz'] (Get-ActiveBadgeStyle)).ico"),0"
         $entries = Read-IcoEntries ($icon -replace ',0$')
         @($entries).Count | Should Be 6
         $entries | ForEach-Object { $_.Bitmap.Dispose() }

@@ -45,6 +45,7 @@ $script:InstallState = @{
     Catalog          = @()
     Installed        = @()
     Locales          = @()
+    IconSets         = @()
     ExistingShortcuts = @()
     ShortcutPaths    = @()
     Form             = $null
@@ -150,6 +151,33 @@ function Get-CompanionListItems([object[]]$Catalog, [object[]]$Installed) {
 
 function Get-LocaleListItems([object[]]$Locales) {
     return @($Locales | ForEach-Object { New-SetupListItem $_.code "$($_.code)   $($_.label)" })
+}
+
+# Un jeu d'icônes par sous-dossier de ico\ ; le nom du dossier est le libellé
+function Get-IconSetListItems([object[]]$Sets) {
+    return @($Sets | ForEach-Object { New-SetupListItem $_.Name $_.Name })
+}
+
+# Jeu présélectionné : celui de config.json s'il existe encore, sinon le jeu par défaut
+function Get-PreselectedIconSetName($Config, [object[]]$Sets) {
+    $wanted = Find-IconSet $Sets (Get-LaunchIconSetName $Config)
+    if ($wanted) { return $wanted.Name }
+    $default = Get-DefaultIconSet $Sets
+    if ($default) { return $default.Name }
+    return ''
+}
+
+# Image d'aperçu d'un jeu : l'entrée de hex-launcher.ico de la taille demandée (ou la plus grande en dessous) ; $null si illisible
+function New-IconSetPreviewImage($Set, [int]$Size) {
+    if (-not $Set) { return $null }
+    try {
+        $entries = @(Read-IcoEntries (Get-IconSetFilePath $Set $IconSetBaseIcon))
+        $chosen  = @($entries | Where-Object { $_.Size -le $Size } | Sort-Object Size -Descending | Select-Object -First 1)
+        if ($chosen.Count -eq 0) { $chosen = @($entries | Sort-Object Size | Select-Object -First 1) }
+        $image = $chosen[0].Bitmap.Clone()
+        $entries | ForEach-Object { $_.Bitmap.Dispose() }
+        return $image
+    } catch { return $null }
 }
 
 function Get-ShortcutCompanionListItems([object[]]$CompanionApps) {
@@ -512,24 +540,60 @@ function New-SetupShortcutsControls {
     $columnWidth   = [int](($layout.ContentWidth - 20) / 2)
     $rightColumn   = $columnWidth + 20
     $companionRows = [Math]::Max(1, $companionApps.Count)
+    $companionHeight = [Math]::Min(110, 24 * $companionRows + 8)
+    $iconSetsTop     = 72 + $companionHeight + 12
+    $previewSize     = 64
     $controls.LocaleList    = New-SetupCheckedList (Get-LocaleListItems $state.Locales) (Get-PreselectedCodes $state.Locales $state.ExistingShortcuts) 0 72 $columnWidth 230
-    $controls.CompanionList = New-SetupCheckedList (Get-ShortcutCompanionListItems $companionApps) (Get-PreselectedShortcutCompanionIds $companionApps $state.ExistingShortcuts) $rightColumn 72 $columnWidth ([Math]::Min(230, 24 * $companionRows + 8))
+    $controls.CompanionList = New-SetupCheckedList (Get-ShortcutCompanionListItems $companionApps) (Get-PreselectedShortcutCompanionIds $companionApps $state.ExistingShortcuts) $rightColumn 72 $columnWidth $companionHeight
+    $controls.IconSetList   = New-SetupIconSetList $state.IconSets (Get-PreselectedIconSetName $state.Config $state.IconSets) $rightColumn ($iconSetsTop + 24) ($columnWidth - $previewSize - 12) $previewSize
+    $controls.IconSetPreview = New-ThemedPicture ($rightColumn + $columnWidth - $previewSize) ($iconSetsTop + 24) $previewSize
     $controls.Log           = New-ThemedLog 0 312 $layout.ContentWidth ($layout.ContentHeight - 312)
-    $controls.Inputs        = @($controls.LocaleList, $controls.CompanionList)
+    $controls.Inputs        = @($controls.LocaleList, $controls.CompanionList, $controls.IconSetList)
+    $controls.IconSetList.Add_SelectedIndexChanged({ Invoke-SetupSafely { Update-SetupIconSetPreview } })
+    Update-SetupIconSetPreview
     return @(
         (New-ThemedLabel "Un raccourci par langue cochée × appli compagnon cochée, dans $Destination. Sans appli cochée : un raccourci par langue, sans compagnon." 0 0 $layout.ContentWidth 44 'Muted')
         (New-ThemedLabel 'Langues' 0 48 $columnWidth 22 'Gold' 10 'Bold')
         (New-ThemedLabel 'Applis compagnon' $rightColumn 48 $columnWidth 22 'Gold' 10 'Bold')
+        (New-ThemedLabel "Jeu d'icônes" $rightColumn $iconSetsTop $columnWidth 22 'Gold' 10 'Bold')
         $controls.LocaleList
         $controls.CompanionList
+        $controls.IconSetList
+        $controls.IconSetPreview
         $controls.Log
     )
+}
+
+# Liste des jeux, le jeu présélectionné sélectionné ; les clés (noms de dossier) dans Tag comme les listes à cocher
+function New-SetupIconSetList([object[]]$Sets, [string]$Preselected, [int]$Left, [int]$Top, [int]$Width, [int]$Height) {
+    $list = New-ThemedListBox $Left $Top $Width $Height
+    $items = @(Get-IconSetListItems $Sets)
+    foreach ($item in $items) { $list.Items.Add($item.Label) | Out-Null }
+    $list.Tag = [string[]]@($items | ForEach-Object { $_.Key })
+    $index = [Array]::IndexOf($list.Tag, $Preselected)
+    if ($index -ge 0) { $list.SelectedIndex = $index }
+    return $list
+}
+
+function Get-SetupSelectedIconSetName($List) {
+    if ($null -eq $List -or $List.SelectedIndex -lt 0) { return '' }
+    return $List.Tag[$List.SelectedIndex]
+}
+
+# Aperçu = hex-launcher.ico du jeu sélectionné ; l'image précédente est libérée
+function Update-SetupIconSetPreview {
+    $controls = $script:InstallState.Controls
+    $set      = Find-IconSet $script:InstallState.IconSets (Get-SetupSelectedIconSetName $controls.IconSetList)
+    $previous = $controls.IconSetPreview.Image
+    $controls.IconSetPreview.Image = New-IconSetPreviewImage $set $controls.IconSetPreview.Width
+    if ($previous) { $previous.Dispose() }
 }
 
 function Show-SetupShortcutsPage {
     $state = $script:InstallState
     $state.Locales           = @(Read-LocaleCatalog $localesPath)
     $state.ExistingShortcuts = @(Get-ExistingLaunchShortcuts $Destination)
+    $state.IconSets          = @(Get-IconSets $icoRoot)
     Add-SetupContent (New-SetupShortcutsControls)
 }
 
@@ -538,6 +602,7 @@ function Get-SetupShortcutSelection {
     return @{
         Codes        = @(Get-SetupCheckedKeys $controls.LocaleList)
         CompanionIds = @(Get-SetupCheckedKeys $controls.CompanionList)
+        IconSet      = Get-SetupSelectedIconSetName $controls.IconSetList
     }
 }
 
@@ -558,6 +623,8 @@ function Invoke-SetupShortcutsStep {
         Write-SetupLog 'Aucune langue cochée : cochez au moins une langue pour créer un raccourci.'
         return $false
     }
+    $iconSet = Select-IconSetForConfig $state.Config $SetupConfigPath $selection.IconSet
+    if ($iconSet) { Write-SetupLog "Jeu d'icônes : $($iconSet.Name)" }
     $combinations = Get-ShortcutCombinations $selection.Codes (Resolve-ShortcutCompanions $state.Config $selection.CompanionIds)
     $state.ShortcutPaths = @(New-SetupShortcuts $combinations)
     foreach ($line in @(Remove-ObsoleteShortcuts $state.ExistingShortcuts $combinations)) { Write-SetupLog $line }

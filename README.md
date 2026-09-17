@@ -32,8 +32,8 @@ they get installed for you, and you get one shortcut per language × companion a
 | `app/lib/launch-config.lib.ps1` | Shared functions: reading/writing `config.json`, migration of the old single-app format |
 | `app/lib/splash.lib.ps1` | Shared animated splash (game launch, companion app install) |
 | `tests/` | Pester tests (`Invoke-Pester -Path tests`) |
-| `app/make-flag-icons.ps1` | Tool: regenerates the flag icons in `ico/` from the original base icon (not needed for normal use) |
-| `app/ico/` | Icons: original base icon (H monogram) + one flag variant per language (`hex-launcher-xx.ico`); `ico/companion/` holds the flag + badge icons composed on this machine |
+| `tools/` | Development only, not shipped: `make-release.ps1`, `make-flag-icons.ps1` (rebuilds the `flat` icon set from the vector logo), `logo/make-logo-svg.py` + `logo/hex-launcher-logo-drawing.png` → `logo/hex-launcher-logo.svg` (the original HL logo, source of truth) |
+| `app/ico/` | Icon sets, one folder each: `flat/` (default: flat flag behind the HL logo) and `classic/` (the former embossed icons); each holds the base icon + one flag variant per language (`hex-launcher-xx.ico`), and a generated `companion/` subfolder with the flag + badge icons composed on this machine |
 
 ## Setting up on a new machine
 
@@ -176,15 +176,33 @@ Every language Riot offers is in `locales.json` and can be ticked at install tim
 named `League of Legends XX` (XX = country part of the code: `ja_JP` → JP, `ko_KR` → KR), followed by
 ` - <companion app>` when one is attached.
 
-Icon: each shortcut gets the flag variant of its language (`app/ico/hex-launcher-xx.ico`, e.g. `hex-launcher-jp.ico`
-for `ja_JP`). If no flag exists for a language, the base icon `app/ico/hex-launcher.ico` is used.
+Icon: each shortcut gets the flag variant of its language from the chosen icon set (`app/ico/<set>/hex-launcher-xx.ico`,
+e.g. `hex-launcher-jp.ico` for `ja_JP`); missing flag → the set's base icon, then the default set. The set is picked on
+the *Shortcuts* page of `setup.bat` (with a preview of its base icon) and remembered in `config.json` (`iconSet`);
+in script mode: `create-shortcuts.ps1 -IconSet classic`. Any folder dropped in `app/ico/` that contains a
+`hex-launcher.ico` becomes a selectable set, named after the folder — `flat` is the default.
 A shortcut with a companion app also carries a coloured badge in the top-right corner — P Porofessor, B Blitz,
-O OP.GG, M Mobalytics — composed at install time into `app/ico/companion/` (the letter is dropped below 32 px, the colour stays).
+O OP.GG, M Mobalytics — composed at install time into `app/ico/<set>/companion/` (the letter is dropped below 32 px, the colour stays).
+Badge colours are those of the catalogue; a set can style them with a `badge-style.json` in its folder:
+`{ "nightVeil": true, "reducedPalette": false }` — the flags' night veil and/or their reduced palette (`flat` uses the veil,
+`classic` neither). Both shipped sets carry the file with every key spelled out, as a template for new sets.
 
 For a language missing from the catalogue (new Riot locale):
 1. add a line to `locales.json` with the exact code as it appears in `available_locales` of the yaml file;
-2. (optional) add the flag drawing to `$FlagDrawings` in `make-flag-icons.ps1` and run
-   `powershell -NoProfile -ExecutionPolicy Bypass -File app\make-flag-icons.ps1 -Locales xx_XX`.
+2. (optional) add the flag drawing to `$FlagDrawings` in `tools/make-flag-icons.ps1` and run
+   `powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-flag-icons.ps1 -Locales xx_XX`.
+
+### Icons
+
+The `flat` set is built from the vector logo `tools/logo/hex-launcher-logo.svg` (gold frame + HL monogram + gem,
+transparent background): `tools/make-flag-icons.ps1` renders it with `resvg` at 256/128/64/48/32/16 px and composes it
+over a flat, muted flag drawn in GDI+ and clipped to the inside of the frame, into `app/ico/flat/`. Requires `resvg` in the PATH
+(`scoop install resvg`); regenerate everything with `powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-flag-icons.ps1`
+(`-Base` for the plain blue/green icons only, `-PreviewDir` to also get 256 px PNGs). The SVG itself is produced by
+`python tools\logo\make-logo-svg.py` from the reference drawing `tools/logo/hex-launcher-logo-drawing.png`
+(Python 3, Pillow, numpy, `potrace` and `resvg` in the PATH; `--preview DIR` writes control sheets). The flag is toned down so the
+logo stands out: every flag colour is snapped to an 8-colour palette (`$FlagPalette`), then `$Background`
+applies `Saturation` 0.72 and a night veil (`VeilAlpha` 60/255).
 
 ## How it works
 
@@ -196,6 +214,21 @@ So the launcher does, in order:
 2. Rewrite `settings.locale` with the requested language (`default_locale`, managed by Riot, is left alone).
 3. Start the Riot Client with `--locale=xx_XX` as well, for good measure.
 4. Close the other companion apps of `config.json`, then start the one named by `-Companion`, if any.
+
+## Developing
+
+Running the launcher needs nothing beyond Windows 10/11. Contributing does:
+
+| Need | Tool | Where it comes from |
+|---|---|---|
+| Run the scripts, WinForms UI, GDI+ drawing | Windows PowerShell 5.1, .NET Framework (`System.Drawing`, `System.Windows.Forms`) | built into Windows |
+| Tests | Pester 3.4 | ships with Windows PowerShell 5.1 |
+| Rebuild the `flat` icon set (`tools/make-flag-icons.ps1`) | `resvg` (SVG → PNG) | `scoop install resvg` |
+| Rebuild the logo SVG (`tools/logo/make-logo-svg.py`) | Python 3 with Pillow and numpy, `potrace` (PNG → SVG), `resvg` | `pip install pillow numpy` · `scoop install potrace resvg` |
+| Publish a release (`tools/make-release.ps1 -Publish`) | GitHub CLI `gh`, signed in | `scoop install gh` or https://cli.github.com |
+
+Everything in `tools/` and `tests/` stays out of the release zip. Flag colours go through the reduced palette and muting of
+`app/lib/palette.lib.ps1`; companion badges take its night veil and/or its reduced palette only in sets that ask for it (`badge-style.json`).
 
 ## Tests
 

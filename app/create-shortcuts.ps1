@@ -14,7 +14,7 @@
     reflète toujours le dernier choix.
 
     Un raccourci avec compagnon reçoit l'icône drapeau surmontée de la pastille du compagnon (couleur + lettre
-    déclarées dans companion-apps.json), composée dans ico\companion\ à chaque exécution. Sans pastille ou en
+    déclarées dans companion-apps.json), composée dans ico\<jeu>\companion\ à chaque exécution. Sans pastille ou en
     cas d'échec de composition, le raccourci garde l'icône drapeau seule.
 
 .EXAMPLE
@@ -31,7 +31,10 @@ param(
     [string[]]$Companions,
 
     # Dossier où créer les raccourcis (défaut : Bureau de l'utilisateur courant)
-    [string]$Destination = [Environment]::GetFolderPath('Desktop')
+    [string]$Destination = [Environment]::GetFolderPath('Desktop'),
+
+    # Jeu d'icônes : nom d'un sous-dossier de ico\ (défaut : iconSet de config.json, sinon le jeu par défaut). Mémorisé dans config.json.
+    [string]$IconSet
 )
 
 Add-Type -AssemblyName System.Windows.Forms
@@ -39,16 +42,18 @@ Add-Type -AssemblyName System.Drawing
 . (Join-Path $PSScriptRoot 'lib\launch-config.lib.ps1')
 . (Join-Path $PSScriptRoot 'lib\companion-app.lib.ps1')
 . (Join-Path $PSScriptRoot 'lib\icon-badge.lib.ps1')
+. (Join-Path $PSScriptRoot 'lib\icon-set.lib.ps1')
 
 $folder      = $PSScriptRoot
 $launcher    = Join-Path $folder 'launch-lol.ps1'
 $configPath  = Join-Path $folder 'config.json'
 $localesPath = Join-Path $folder 'locales.json'
 $powershell  = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-$defaultIcon = Join-Path $folder 'ico\hex-launcher.ico'
+$icoRoot     = Join-Path $folder 'ico'
 $catalogPath = Join-Path $folder 'companion-apps.json'
-$companionIconFolder = Join-Path $folder 'ico\companion'
 $CompanionBadges     = $null   # pastilles par identifiant, lues du catalogue à la première demande
+$ActiveIconSet       = $null   # jeu d'icônes courant et son dossier ico\<jeu>\companion, posés par Set-ActiveIconSet (ci-dessous, après les fonctions)
+$companionIconFolder = $null
 $shell       = New-Object -ComObject WScript.Shell
 
 # ---------------------------------------------------------------- Catalogue
@@ -65,17 +70,43 @@ function Get-ShortcutName([string]$Code, $Companion) {
     return $name
 }
 
-# ja_JP → ico\hex-launcher-jp.ico (même convention que make-flag-icons.ps1)
-function Get-FlagIconPath([string]$Code) {
-    return Join-Path $folder "ico\hex-launcher-$($Code.Split('_')[1].ToLower()).ico"
+# ---------------------------------------------------------------- Jeu d'icônes
+
+function Get-ActiveIconSet { return $script:ActiveIconSet }
+
+# Change le jeu courant ; nom inconnu ou vide → jeu par défaut (Resolve-IconSet avertit)
+function Set-ActiveIconSet([string]$Name) {
+    $script:ActiveIconSet       = Resolve-IconSet $icoRoot $Name
+    $script:companionIconFolder = Join-Path (Get-IconSetFolder $script:ActiveIconSet) 'companion'
+    return $script:ActiveIconSet
 }
 
-# Icône drapeau de la langue si présente, sinon l'icône de base du projet
-function Resolve-IconPath([string]$Code) {
-    $flagIcon = Get-FlagIconPath $Code
-    if (Test-Path $flagIcon) { return $flagIcon }
-    return $defaultIcon
+
+# ja_JP → hex-launcher-jp.ico (même convention que tools\make-flag-icons.ps1)
+function Get-FlagIconFileName([string]$Code) {
+    return "hex-launcher-$($Code.Split('_')[1].ToLower()).ico"
 }
+
+# ja_JP → ico\<jeu>\hex-launcher-jp.ico dans le jeu courant
+function Get-FlagIconPath([string]$Code) {
+    return Join-Path (Get-IconSetFolder (Get-ActiveIconSet)) (Get-FlagIconFileName $Code)
+}
+
+# Dossier d'un jeu ; sans aucun jeu, celui du jeu par défaut (chemin attendu, même absent)
+function Get-IconSetFolder($Set) {
+    return (Get-IconSetFolderOrDefault $Set $icoRoot).Path
+}
+
+# Drapeau du jeu courant, sinon sa base, sinon le drapeau puis la base du jeu par défaut : l'installation aboutit toujours
+function Resolve-IconPath([string]$Code) {
+    $fileName = Get-FlagIconFileName $Code
+    $folders  = @((Get-IconSetFolder (Get-ActiveIconSet)), (Get-IconSetFolder (Get-DefaultIconSet @(Get-IconSets $icoRoot))))
+    $candidates = @(foreach ($dir in $folders) { (Join-Path $dir $fileName); (Join-Path $dir $IconSetBaseIcon) })
+    foreach ($candidate in $candidates) { if (Test-Path $candidate) { return $candidate } }
+    return $candidates[-1]
+}
+
+Set-ActiveIconSet $IconSet | Out-Null
 
 # ---------------------------------------------------------------- Icône compagnon (drapeau + pastille)
 
@@ -103,10 +134,15 @@ function Get-CompanionIconStem([string]$Code, $Companion) {
     return "hex-launcher-$($Code.Split('_')[1].ToLower())-$($Companion.id)"
 }
 
-# ja_JP + blitz → ico\companion\hex-launcher-jp-blitz-3f9a12c4.ico : l'empreinte du rendu dans le nom change le chemin
+# ja_JP + blitz → ico\<jeu>\companion\hex-launcher-jp-blitz-3f9a12c4.ico : l'empreinte du rendu dans le nom change le chemin
 # dès que la pastille change, sinon Explorer garde l'ancienne image dans son cache d'icônes
 function Get-CompanionIconPath([string]$Code, $Companion, $Badge) {
-    return Join-Path $companionIconFolder "$(Get-CompanionIconStem $Code $Companion)-$(Get-BadgeSignature $Badge).ico"
+    return Join-Path $companionIconFolder "$(Get-CompanionIconStem $Code $Companion)-$(Get-BadgeSignature $Badge (Get-ActiveBadgeStyle)).ico"
+}
+
+# Style des pastilles du jeu courant (badge-style.json du jeu)
+function Get-ActiveBadgeStyle {
+    return Get-IconSetBadgeStyle (Get-ActiveIconSet)
 }
 
 # Retire les variantes d'une autre couleur de la même combinaison
@@ -125,7 +161,7 @@ function Resolve-CompanionIconPath([string]$Code, $Companion) {
         New-Item -ItemType Directory -Path $companionIconFolder -Force | Out-Null
         $target = Get-CompanionIconPath $Code $Companion $badge
         Remove-StaleCompanionIcons $Code $Companion $target
-        return Add-CompanionBadge $flagIcon $badge $target
+        return Add-CompanionBadge $flagIcon $badge $target (Get-ActiveBadgeStyle)
     } catch {
         Write-Warning "Icône compagnon '$($Companion.name)' non composée ($($_.Exception.Message)) — icône drapeau seule"
         return $flagIcon
@@ -263,6 +299,18 @@ function Test-LaunchConfig($Config) {
 
 # ---------------------------------------------------------------- Raccourcis
 
+# Jeu retenu pour cette exécution : -IconSet si donné, sinon celui de config.json, sinon le défaut ; le choix est
+# mémorisé dans config.json quand il change, pour les prochaines exécutions (setup.bat, mode script)
+function Select-IconSetForConfig($Config, [string]$ConfigPath, [string]$RequestedName) {
+    $name = if ($RequestedName) { $RequestedName } else { Get-LaunchIconSetName $Config }
+    $set  = Set-ActiveIconSet $name
+    if ($set -and (Get-LaunchIconSetName $Config) -ne $set.Name) {
+        Set-LaunchIconSetName $Config $set.Name
+        Write-LaunchConfig $Config $ConfigPath
+    }
+    return $set
+}
+
 function Get-LauncherArguments($Combination) {
     $arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$launcher`" -Locale $($Combination.Code)"
     if ($Combination.Companion) { $arguments += " -Companion $($Combination.Companion.id)" }
@@ -314,6 +362,7 @@ if ($MyInvocation.InvocationName -ne '.') {
     $catalog = Read-LocaleCatalog $localesPath
     $config  = Read-LaunchConfig $configPath
     Test-LaunchConfig $config
+    Select-IconSetForConfig $config $configPath $IconSet | Out-Null
     $companionApps = @($config.companionApps)
     $existing      = Get-ExistingLaunchShortcuts $Destination
 

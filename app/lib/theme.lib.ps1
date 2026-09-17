@@ -33,8 +33,12 @@ function New-ThemeFont([single]$Size = 10, [string]$Style = 'Regular', [string]$
     return New-Object System.Drawing.Font($Family, $Size, [System.Drawing.FontStyle]::$Style)
 }
 
+. (Join-Path $PSScriptRoot 'icon-set.lib.ps1')
+
+# Icône des fenêtres : hex-launcher.ico du jeu d'icônes par défaut (chemin attendu même s'il manque : l'appelant vérifie)
 function Get-ThemeIconPath {
-    return Join-Path (Split-Path $PSScriptRoot -Parent) 'ico\hex-launcher.ico'
+    $icoRoot = Join-Path (Split-Path $PSScriptRoot -Parent) 'ico'
+    return Get-IconSetFilePath (Get-IconSetFolderOrDefault (Get-DefaultIconSet @(Get-IconSets $icoRoot)) $icoRoot) $IconSetBaseIcon
 }
 
 function New-ThemedForm([string]$Title, [int]$Width, [int]$Height) {
@@ -104,6 +108,28 @@ function New-ThemedCheckedListBox([int]$Left, [int]$Top, [int]$Width, [int]$Heig
     $list.CheckOnClick = $true
     $list.Font         = New-ThemeFont 10
     return $list
+}
+
+# Liste à choix unique, même habillage que la liste à cocher
+function New-ThemedListBox([int]$Left, [int]$Top, [int]$Width, [int]$Height) {
+    $list             = New-Object System.Windows.Forms.ListBox
+    $list.Location    = New-Object System.Drawing.Point($Left, $Top)
+    $list.Size        = New-Object System.Drawing.Size($Width, $Height)
+    $list.BackColor   = Get-ThemeColor 'Background'
+    $list.ForeColor   = Get-ThemeColor 'Cream'
+    $list.BorderStyle = 'FixedSingle'
+    $list.Font        = New-ThemeFont 10
+    return $list
+}
+
+# Aperçu d'image carré, centré dans son cadre
+function New-ThemedPicture([int]$Left, [int]$Top, [int]$Size) {
+    $picture           = New-Object System.Windows.Forms.PictureBox
+    $picture.Location  = New-Object System.Drawing.Point($Left, $Top)
+    $picture.Size      = New-Object System.Drawing.Size($Size, $Size)
+    $picture.SizeMode  = 'CenterImage'
+    $picture.BackColor = Get-ThemeColor 'Background'
+    return $picture
 }
 
 # Case plate : liseré or, fond or sombre quand cochée (le glyphe seul serait invisible sur fond nuit)

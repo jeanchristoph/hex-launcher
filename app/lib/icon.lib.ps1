@@ -3,7 +3,7 @@
     Lecture et écriture de fichiers .ico multi-tailles (entrées PNG ou DIB).
 
 .DESCRIPTION
-    Chargé par dot-sourcing depuis make-flag-icons.ps1 et icon-badge.lib.ps1 :
+    Chargé par dot-sourcing depuis tools\make-flag-icons.ps1 et icon-badge.lib.ps1 :
         . (Join-Path $PSScriptRoot 'lib\icon.lib.ps1')
 
     Une entrée = [PSCustomObject]@{ Size = <int> ; Bitmap = <System.Drawing.Bitmap> }. Les bitmaps rendus par

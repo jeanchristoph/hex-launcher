@@ -40,6 +40,22 @@
 **Description:** `version.txt` → 0.1.2. README ×3 : une ligne « les raccourcis compagnon portent une pastille de couleur (P/B/O/M) » + note que le rafraîchissement du cache d'icônes Windows peut demander une déconnexion (documenté, jamais exécuté). `project.md` : nouvelles libs et dossier `ico\companion\`. Puis, sur feu vert : commit, merge `master`, `make-release.ps1 -Publish`.
 [x] 2026-09-14 — version 0.1.2, README ×3, project.md ; commit c5bbf4e, master fast-forwardé, release v0.1.2 publiée (zip sans ico/companion)
 
+### T7 — Aplat des icônes drapeau
+**Effort:** M
+**Files:** `.forge/branch/icons/output/20260916-flatten-icon.ps1`, `tmp/flat_icons/`, puis `app/ico/*.ico`
+**Description:** Les `.ico` de `app/ico` sont des images raster déposées (pas générées par `make-flag-icons.ps1`) ; un outil GDI+ retraite chaque entrée : cadre extérieur → or plat (reflets supprimés, liserés sombres et ombre extérieure conservés) ; drapeau → bandes plates sans pliures (masque du drapeau par remplissage depuis le cadre intérieur, arrêt sur le contour sombre du logo) ; logo HL intact. Étape 1 : essai sur FR dans `tmp/flat_icons/` (PNG 256 + `.ico`), validation visuelle. Étape 2 : extension aux 27 autres icônes, 6 tailles, puis régénération des pastilles compagnon.
+[x] T7.1 — 2026-09-16 : logo HL vectoriel validé (SVG dans output/, cadre or + logo, fond transparent) — le raster aplati a été abandonné au profit du vectoriel
+[x] T7.2 — 2026-09-17 : générateur réécrit autour du SVG (resvg + drapeaux GDI+), 29 .ico régénérés, tests verts, docs à jour
+[x] 2026-09-17 — Logo vectoriel original (SVG source de vérité) + 29 icônes plates ; reste : contrôle sur le Bureau, version, release
+
+### T8 — Jeux d'icônes sélectionnables
+**Effort:** M
+**Files:** `app/ico/flat/` (défaut) et `app/ico/classic/` (anciennes icônes restaurées), `app/lib/icon-set.lib.ps1` (nouveau), `app/create-shortcuts.ps1`, `app/lib/launch-config.lib.ps1`, `app/setup.ps1`, `tools/make-flag-icons.ps1`, `tests/icon-set.lib.tests.ps1` (nouveau), `tests/create-shortcuts.tests.ps1`, `tests/setup.tests.ps1`, README ×3, `.forge/project.md`
+**Description:** Un jeu d'icônes = un sous-dossier de `app/ico/` contenant `hex-launcher.ico`, découvert dynamiquement (`Get-IconSets`) ; pas de manifeste : le nom du dossier est le nom du jeu, `flat` est le défaut (repli : premier dossier par ordre alphabétique). `setup.bat` (page Raccourcis) propose le jeu, présélection = `iconSet` de `config.json` ou défaut, choix enregistré dans `config.json` puis raccourcis créés avec ce jeu ; mode script `create-shortcuts.ps1 -IconSet classic`. `Resolve-IconPath` cherche dans le jeu choisi, repli sur le jeu par défaut (jeu ou icône absents). Pastilles compagnon nommées avec le jeu. `tools/make-flag-icons.ps1` écrit dans `app/ico/flat`. Tests : découverte (deux jeux, dossier sans hex-launcher.ico ignoré, racine vide), défaut, repli, `iconSet` persisté, liste de la page setup.
+[x] T8.1 — 2026-09-17 : app/ico/flat (générées) + app/ico/classic (anciennes restaurées depuis git), lib icon-set (11 tests), générateur vers flat
+[x] T8.2 — 2026-09-17 : -IconSet, Set-ActiveIconSet, repli en chaîne, pastilles dans ico/<jeu>/companion (choix utilisateur), iconSet mémorisé par Select-IconSetForConfig, .gitignore et release
+[x] T8.3 — 2026-09-17 : liste des jeux + aperçu hex-launcher.ico (PictureBox 64 px) sur la page Raccourcis, icône de fenêtre depuis le jeu par défaut ; 322 tests verts ; README ×3, project.md
+
 ## Risks
 - `.ico` à entrées DIB (non PNG) : le repli `System.Drawing.Icon` ne rend pas l'entrée 256 px → la lib lève un throw explicite plutôt qu'une icône incomplète ; nos `.ico` actuels sont tous PNG.
 - Cache d'icônes Explorer : une pastille modifiée peut ne pas s'afficher avant relance d'Explorer — documenté, pas d'action système.
@@ -54,4 +70,6 @@
 | T4 — Raccourcis sur icône composée | S | [x] |
 | T5 — Release sans icônes générées | XS | [x] |
 | T6 — Version 0.1.2, doc, release | S | [x] |
-| **Total** | **~L (4-6 h)** | |
+| T7 — Aplat des icônes drapeau | M | [x] |
+| T8 — Jeux d'icônes sélectionnables | M | [x] |
+| **Total** | **~XL (8-11 h)** | |
