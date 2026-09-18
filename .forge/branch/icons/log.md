@@ -1,5 +1,6 @@
 # Log â€” icons
 
+- [2026-09-17 02:12] Gravé : 84df5b0 sur icons, dev (créée depuis master, poussée) et master ; release GitHub v0.1.5 publiée (hex-launcher-0.1.5.zip, 5,5 Mo, flat + classic, sans tools/tests/companion).
 - [2026-09-17 02:11] Gravure interrompue : master avait avancé (1869d7b setup multilingue, v0.1.4 déjà publiée). master fusionné dans icons, 6 conflits résolus (page Raccourcis : présélections mémorisées + clés i18n setup.shortcuts.iconSet/iconSetChosen dans fr/en/ja ; theme.lib : ListBox/Picture + ComboBox ; create-shortcuts : -IconSet + -Language). Version → 0.1.5. Pester 381 verts.
 - [2026-09-17 02:01] badge-style.json livré dans les deux jeux avec toutes les clés explicites (classic : tout à false) — modèle pour un nouveau jeu.
 - [2026-09-17 02:00] badge-style.json : clé reducedPalette ajoutée (palette réduite des drapeaux sur les pastilles, avant le voile) ; flat = { nightVeil: true, reducedPalette: false }.
