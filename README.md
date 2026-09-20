@@ -42,7 +42,7 @@ they get installed for you, and you get one shortcut per language × companion a
 0. **[Download the latest release](https://github.com/jeanchristoph/hex-launcher/releases/latest)** (`hex-launcher-x.y.z.zip`) and unzip it — or clone the repository.
 1. Copy this folder anywhere (e.g. `Documents\hex-launcher`) — **without** `config.json` if it comes
    from another machine, so detection can run.
-2. Double-click **Hex Launcher** (the shortcut shipped at the root, or `setup.bat` — same thing; never "Run as administrator": the tool refuses, on purpose). One window, three steps:
+2. Double-click the **Hex Launcher** shortcut shipped at the root — if nothing happens (shortcut moved, `.lnk` blocked), double-click **`setup.bat`**, which is what it runs. Never "Run as administrator": the tool refuses, on purpose. One window, three steps:
    - **[1/3] Detection** — finds the Riot Client (via `RiotClientInstalls.json`, Riot's official file) and every
      companion app of the catalogue already installed, then writes `config.json` (never overwritten if it already
      exists: manual settings are preserved). Both Riot paths are shown in editable fields with a *Browse…* button:

@@ -42,7 +42,7 @@ installe, et on obtient un raccourci par langue × appli compagnon
 0. **[Télécharger la dernière version](https://github.com/jeanchristoph/hex-launcher/releases/latest)** (`hex-launcher-x.y.z.zip`) et la décompresser — ou cloner le dépôt.
 1. Copier ce dossier où on veut (ex. `Documents\hex-launcher`) — **sans** `config.json` s'il vient
    d'une autre machine, pour que la détection se fasse.
-2. Double-cliquer sur **Hex Launcher** (le raccourci livré à la racine, ou `setup.bat` — même chose ; jamais « Exécuter en tant qu'administrateur » : l'outil refuse, volontairement). Une fenêtre, trois étapes :
+2. Double-cliquer sur le raccourci **Hex Launcher** livré à la racine — s'il ne réagit pas (raccourci déplacé, `.lnk` bloqué), double-cliquer **`setup.bat`**, c'est lui qu'il lance. Jamais « Exécuter en tant qu'administrateur » : l'outil refuse, volontairement. Une fenêtre, trois étapes :
    - **[1/3] Détection** — trouve le Riot Client (via `RiotClientInstalls.json`, le fichier officiel de Riot) et toutes
      les applis compagnon du catalogue déjà installées, puis écrit `config.json` (jamais écrasé s'il existe déjà :
      les réglages manuels sont conservés). Les deux chemins Riot sont affichés dans des champs modifiables avec un
