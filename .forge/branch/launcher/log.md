@@ -1,5 +1,6 @@
 ﻿# Log — launcher
 
+- [2026-09-20 14:50] Gravé : b507f2e sur launcher (T14 à T19), fusionné dans dev (648c155) et master (cc8b2a8), les trois poussées. Suite : la branche icons, extraite dans le worktree D:\www\perso\hex-launcher-icons.
 - [2026-09-20 14:40] T19 terminée. Mesuré : `IWshShortcut.RelativePath` attend le chemin complet du .lnk (IShellLink::SetRelativePath), pas un chemin relatif — avec 'setup.bat' le drapeau n'est pas posé (le shell retrouvait quand même la cible par recherche à côté du .lnk). IconLocation relatif (`app\ico\…`) affiché par le shell depuis un répertoire courant étranger, contrairement à la réserve initiale. Archive réelle extraite ailleurs : lien résolu, engrenage OK.
 - [2026-09-20 14:20] T19 ajoutée (question utilisateur « raccourci relatif vers setup.bat dans le build ? ») : possible via RelativePath du .lnk ; réserve sur l'icône (pas de résolution relative) et sur le déplacement hors du dossier. À exécuter avant la gravure.
 - [2026-09-20 14:10] Nom de produit « Hex Launcher » (règle utilisateur) : titres des README ×3 et mention Riot, LISEZMOI, titre de la fenêtre de l'assistant ×3, infobulle du raccourci ×3, titre de release GitHub. hex-launcher (minuscule, tiret) ne désigne plus que le dépôt, l'archive, les dossiers et les fichiers .ico. Le splash n'a pas de barre de titre.
