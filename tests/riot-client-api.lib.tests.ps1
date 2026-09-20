@@ -82,49 +82,56 @@ Describe 'Test-HttpSuccessStatus' {
 
 Describe 'Invoke-RiotClientRequest' {
     It 'appelle l''API locale sur le port du lockfile, en HTTPS sur la boucle locale' {
-        Mock Send-WinHttpRequest { return 200 }
+        Mock Invoke-WinHttpRequest { return [pscustomobject]@{ Status = 200; Text = '' } }
         Invoke-RiotClientRequest -Method GET -Path '/riotclient/region-locale' -Lockfile (New-TestLockfile 4711) | Out-Null
-        Assert-MockCalled Send-WinHttpRequest -Scope It -Exactly 1 -ParameterFilter { $Uri -eq 'https://127.0.0.1:4711/riotclient/region-locale' -and $Method -eq 'GET' }
+        Assert-MockCalled Invoke-WinHttpRequest -Scope It -Exactly 1 -ParameterFilter { $Uri -eq 'https://127.0.0.1:4711/riotclient/region-locale' -and $Method -eq 'GET' }
     }
 
     It 'authentifie chaque appel avec le mot de passe du lockfile' {
-        Mock Send-WinHttpRequest { return 200 }
+        Mock Invoke-WinHttpRequest { return [pscustomobject]@{ Status = 200; Text = '' } }
         Invoke-RiotClientRequest -Method GET -Path '/x' -Lockfile (New-TestLockfile) | Out-Null
-        Assert-MockCalled Send-WinHttpRequest -Scope It -Exactly 1 -ParameterFilter { $Authorization -eq (Get-RiotClientAuthorization (New-TestLockfile)) }
+        Assert-MockCalled Invoke-WinHttpRequest -Scope It -Exactly 1 -ParameterFilter { $Authorization -eq (Get-RiotClientAuthorization (New-TestLockfile)) }
     }
 
     It 'transmet le corps JSON quand la requête en porte un' {
-        Mock Send-WinHttpRequest { return 204 }
+        Mock Invoke-WinHttpRequest { return [pscustomobject]@{ Status = 204; Text = '' } }
         Invoke-RiotClientRequest -Method POST -Path '/x' -Lockfile (New-TestLockfile) -Body '{"a":1}' | Out-Null
-        Assert-MockCalled Send-WinHttpRequest -Scope It -Exactly 1 -ParameterFilter { $Body -eq '{"a":1}' }
+        Assert-MockCalled Invoke-WinHttpRequest -Scope It -Exactly 1 -ParameterFilter { $Body -eq '{"a":1}' }
     }
 
     It 'rend le succès et le code de la réponse' {
-        Mock Send-WinHttpRequest { return 204 }
+        Mock Invoke-WinHttpRequest { return [pscustomobject]@{ Status = 204; Text = '' } }
         $result = Invoke-RiotClientRequest -Method POST -Path '/x' -Lockfile (New-TestLockfile)
         $result.Success    | Should Be $true
         $result.StatusCode | Should Be 204
     }
 
     It 'rend un échec avec son code quand l''API refuse la route' {
-        Mock Send-WinHttpRequest { return 404 }
+        Mock Invoke-WinHttpRequest { return [pscustomobject]@{ Status = 404; Text = '' } }
         $result = Invoke-RiotClientRequest -Method POST -Path '/x' -Lockfile (New-TestLockfile)
         $result.Success    | Should Be $false
         $result.StatusCode | Should Be 404
     }
 
     It 'rend un échec sans lever d''exception quand la connexion n''aboutit pas' {
-        Mock Send-WinHttpRequest { throw 'connexion refusée' }
+        Mock Invoke-WinHttpRequest { throw 'connexion refusée' }
         $result = Invoke-RiotClientRequest -Method POST -Path '/x' -Lockfile (New-TestLockfile)
         $result.Success    | Should Be $false
         $result.StatusCode | Should Be 0
     }
 
+    It 'nomme le motif d''un 424 — patch en cours — sans garder le corps' {
+        Mock Invoke-WinHttpRequest { return [pscustomobject]@{ Status = 424; Text = '{"errorCode":"424","errorDescription":"product-launcher: Product ''league_of_legends'' patchline ''live'' not up to date"}' } }
+        $result = Invoke-RiotClientRequest -Method POST -Path '/x' -Lockfile (New-TestLockfile)
+        $result.WaitReason | Should Be 'updating'
+        ($result.PSObject.Properties.Name -contains 'Text') | Should Be $false
+    }
+
     It 'journalise le chemin de substitution quand le vrai chemin porte un secret' {
-        Mock Send-WinHttpRequest { return 204 }
+        Mock Invoke-WinHttpRequest { return [pscustomobject]@{ Status = 204; Text = '' } }
         Mock Write-LaunchLogLine { }
         Invoke-RiotClientRequest -Method DELETE -Path '/sessions/jeton-secret' -Lockfile (New-TestLockfile) -LoggedPath '/sessions/<session>' | Out-Null
-        Assert-MockCalled Send-WinHttpRequest -Scope It -Exactly 1 -ParameterFilter { $Uri -like '*/sessions/jeton-secret' }
+        Assert-MockCalled Invoke-WinHttpRequest -Scope It -Exactly 1 -ParameterFilter { $Uri -like '*/sessions/jeton-secret' }
         Assert-MockCalled Write-LaunchLogLine -Scope It -Exactly 1 -ParameterFilter { $Detail -like '*/sessions/<session>*' -and $Detail -notlike '*jeton-secret*' }
     }
 }
@@ -450,6 +457,90 @@ Describe 'Wait-RiotClientOperation' {
     }
 }
 
+Describe 'Get-RiotClientWaitReason' {
+    It 'reconnaît un patch en cours derrière un 424' {
+        Get-RiotClientWaitReason 424 'product-launcher: Product ''league_of_legends'' patchline ''live'' not up to date' | Should Be 'updating'
+    }
+
+    It 'prend tout autre 424 pour une session à libérer' {
+        Get-RiotClientWaitReason 424 '{"errorCode":"424","message":"session"}' | Should Be 'releasing'
+        Get-RiotClientWaitReason 424 '' | Should Be 'releasing'
+    }
+
+    It 'ne donne aucun motif aux autres codes' {
+        Get-RiotClientWaitReason 464 'not up to date' | Should Be ''
+        Get-RiotClientWaitReason 200 '' | Should Be ''
+    }
+}
+
+Describe 'Wait-RiotClientOperation, motif d''attente' {
+    AfterEach { Remove-TestTempFiles }
+
+    It 'signale le motif une fois par changement, jamais à chaque tour' {
+        $path = New-TempLockfile
+        $script:answers = @('updating', 'updating', 'releasing', '')
+        $script:turn = 0
+        $script:reasons = @()
+        $operation = {
+            param($Lockfile)
+            $reason = $script:answers[$script:turn]; $script:turn++
+            if ($reason -eq '') { return [pscustomobject]@{ Success = $true; StatusCode = 200; WaitReason = '' } }
+            return [pscustomobject]@{ Success = $false; StatusCode = 424; WaitReason = $reason }
+        }
+        Wait-RiotClientOperation -Operation $operation -FailureMessage 'x' -LockfilePath $path -TimeoutSeconds 10 -OnTick { } -OnWait { param($Reason) $script:reasons += $Reason } | Out-Null
+        ($script:reasons -join ',') | Should Be 'updating,releasing'
+    }
+
+    It 'ne signale rien sans motif — un 464 n''en a pas' {
+        $path = New-TempLockfile
+        $script:calls = 0
+        $script:turn = 0
+        $operation = { param($Lockfile) $script:turn++; if ($script:turn -ge 2) { return [pscustomobject]@{ Success = $true; StatusCode = 200; WaitReason = '' } }; return [pscustomobject]@{ Success = $false; StatusCode = 464; WaitReason = '' } }
+        Wait-RiotClientOperation -Operation $operation -FailureMessage 'x' -LockfilePath $path -TimeoutSeconds 10 -OnTick { } -OnWait { $script:calls++ } | Out-Null
+        $script:calls | Should Be 0
+    }
+}
+
+Describe 'Test-WaitBudgetExhausted' {
+    It 'épuise un budget fini au temps dit' {
+        Test-WaitBudgetExhausted ([pscustomobject]@{ Elapsed = [timespan]::FromSeconds(29) }) 30 | Should Be $false
+        Test-WaitBudgetExhausted ([pscustomobject]@{ Elapsed = [timespan]::FromSeconds(30) }) 30 | Should Be $true
+    }
+
+    It 'n''épuise jamais un budget sans limite' {
+        Test-WaitBudgetExhausted ([pscustomobject]@{ Elapsed = [timespan]::FromHours(5) }) $NoTimeLimitSeconds | Should Be $false
+    }
+}
+
+Describe 'Wait-RiotClientOperation sans limite de temps' {
+    AfterEach { Remove-TestTempFiles }
+
+    It 'attend autant qu''il faut tant que le Riot Client répond « pas encore »' {
+        $path = New-TempLockfile
+        $script:attempts = 0
+        $operation = { param($Lockfile) $script:attempts++; if ($script:attempts -ge 5) { return [pscustomobject]@{ Success = $true; StatusCode = 200 } }; return [pscustomobject]@{ Success = $false; StatusCode = 424 } }
+        $result = Wait-RiotClientOperation -Operation $operation -FailureMessage 'x' -LockfilePath $path -TimeoutSeconds $NoTimeLimitSeconds -OnTick { }
+        $result.Success | Should Be $true
+        $script:attempts | Should Be 5
+    }
+
+    It 'rend la main sur demande d''arrêt, seule sortie d''une attente sans limite' {
+        $path = New-TempLockfile
+        $script:ticks = 0
+        $operation = { param($Lockfile) return [pscustomobject]@{ Success = $false; StatusCode = 424 } }
+        $result = Wait-RiotClientOperation -Operation $operation -FailureMessage 'x' -LockfilePath $path -TimeoutSeconds $NoTimeLimitSeconds -OnTick { $script:ticks++ } -ShouldStop { $script:ticks -ge 3 }
+        $result.Success | Should Be $false
+        $result.Kind | Should Be 'cancelled'
+    }
+
+    It 'bascule tout de suite sur un refus franc, même sans limite' {
+        $path = New-TempLockfile
+        Mock Write-Warning { }
+        $operation = { param($Lockfile) return [pscustomobject]@{ Success = $false; StatusCode = 404 } }
+        (Wait-RiotClientOperation -Operation $operation -FailureMessage 'x' -LockfilePath $path -TimeoutSeconds $NoTimeLimitSeconds -OnTick { }).Kind | Should Be 'route'
+    }
+}
+
 Describe 'Wait-RiotProductLocale' {
     AfterEach { Remove-TestTempFiles }
 
@@ -482,6 +573,15 @@ Describe 'Wait-RiotProductLaunch' {
         Mock Start-RiotProduct { return [pscustomobject]@{ Success = $true; StatusCode = 200 } }
         Wait-RiotProductLaunch -ProductId 'league_of_legends' -PatchlineId 'live' -LockfilePath $path -TimeoutSeconds 5 -OnTick { } | Select-Object -ExpandProperty Success | Should Be $true
         Assert-MockCalled Start-RiotProduct -Scope It -Exactly 1 -ParameterFilter { $ProductId -eq 'league_of_legends' -and $PatchlineId -eq 'live' }
+    }
+
+    It 'transmet le motif d''attente à l''appelant' {
+        $path = New-TempLockfile
+        $script:turn = 0
+        Mock Start-RiotProduct { $script:turn++; if ($script:turn -ge 2) { return [pscustomobject]@{ Success = $true; StatusCode = 200; WaitReason = '' } }; return [pscustomobject]@{ Success = $false; StatusCode = 424; WaitReason = 'updating' } }
+        $script:seen = ''
+        Wait-RiotProductLaunch -ProductId 'league_of_legends' -PatchlineId 'live' -LockfilePath $path -TimeoutSeconds 5 -OnTick { } -OnWait { param($Reason) $script:seen = $Reason } | Out-Null
+        $script:seen | Should Be 'updating'
     }
 
     It 'transmet la sonde de succès : un produit déjà lancé n''est pas redemandé' {

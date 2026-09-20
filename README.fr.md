@@ -268,8 +268,12 @@ Le lanceur fait donc, dans l'ordre :
 4. À défaut : le démarrage manuel reprend la main — tout Riot fermé, `settings.locale` réécrit
    (`default_locale`, géré par Riot, n'est jamais touché), relance avec `--launch-product`, et c'est à vous
    d'appuyer sur **Jouer** dans le Riot Client : le lanceur n'échoue jamais. `-NoLocalApi` force ce démarrage manuel.
-   Si l'attente s'éternise (plus de 1 min 30), le splash propose **Forcer en démarrage manuel** : un clic passe en
-   démarrage manuel pour ce lancement seulement — rien n'est mémorisé.
+   Si l'attente s'éternise (plus de 2 min), le splash propose **Forcer en démarrage manuel** : un clic passe en
+   démarrage manuel pour ce lancement seulement — rien n'est mémorisé. La croix ✕ en haut à droite du splash arrête
+   le lanceur sans rien faire d'autre — rien n'est fermé, Riot et le jeu restent en l'état, pour réessayer plus tard.
+   À partir de quatre démarrages du jeu en moins de cinq minutes, Vanguard affiche l'erreur VAN 216 et ferme le
+   client, quelle que soit la manière dont il a été fermé. Un redémarrage de Windows est alors nécessaire — le
+   splash prévient dès le troisième lancement.
 5. Fermer les autres applis compagnon de `config.json`, puis lancer celle nommée par `-Companion`, s'il y en a une.
 
 Le lanceur n'a pas de mémoire : le lancement direct est tenté à chaque fois. S'il échoue régulièrement sur votre

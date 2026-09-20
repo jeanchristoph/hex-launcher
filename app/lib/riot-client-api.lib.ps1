@@ -97,8 +97,21 @@ function Get-RiotClientAuthorization($Lockfile) {
     return 'Basic ' + [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(('riot:{0}' -f $Lockfile.Password)))
 }
 
-function New-RiotClientResult([bool]$Success, [int]$StatusCode) {
-    return [pscustomobject]@{ Success = $Success; StatusCode = $StatusCode }
+function New-RiotClientResult([bool]$Success, [int]$StatusCode, [string]$WaitReason = '') {
+    return [pscustomobject]@{ Success = $Success; StatusCode = $StatusCode; WaitReason = $WaitReason }
+}
+
+# Un 424 couvre deux attentes très différentes, que seul le corps distingue : 'updating' quand Riot patche le
+# jeu (« Product 'league_of_legends' patchline 'live' not up to date », des minutes à des heures selon la
+# connexion — relevé du 2026-09-20 17:14), 'releasing' sinon (session précédente à libérer, 3 s à 1 min).
+# Vide pour tout autre code. Le corps est lu ici et oublié : jamais journalisé, jamais rendu.
+$RiotClientWaitReasonUpdating  = 'updating'
+$RiotClientWaitReasonReleasing = 'releasing'
+
+function Get-RiotClientWaitReason([int]$StatusCode, [string]$Text) {
+    if ($StatusCode -ne 424) { return '' }
+    if ($Text -match 'not up to date') { return $RiotClientWaitReasonUpdating }
+    return $RiotClientWaitReasonReleasing
 }
 
 # Seul point de contact avec WinHTTP : statut et corps de la réponse, lève si la connexion n'aboutit pas.
@@ -126,10 +139,6 @@ function Invoke-WinHttpRequest([string]$Method, [string]$Uri, [string]$Authoriza
     }
 }
 
-function Send-WinHttpRequest([string]$Method, [string]$Uri, [string]$Authorization, [string]$Body, [int]$TimeoutSeconds) {
-    return (Invoke-WinHttpRequest $Method $Uri $Authorization $Body $TimeoutSeconds).Status
-}
-
 # -LoggedPath : ce que le journal montre à la place du chemin, quand celui-ci porte un secret (identifiant de
 # session d'un produit : c'est aussi le jeton d'authentification de son client de jeu)
 function Invoke-RiotClientRequest {
@@ -145,8 +154,8 @@ function Invoke-RiotClientRequest {
     $uri = 'https://127.0.0.1:{0}{1}' -f $Lockfile.Port, $Path
     $chrono = [Diagnostics.Stopwatch]::StartNew()
     try {
-        $status = Send-WinHttpRequest $Method $uri (Get-RiotClientAuthorization $Lockfile) $Body $TimeoutSeconds
-        $result = New-RiotClientResult (Test-HttpSuccessStatus $status) $status
+        $response = Invoke-WinHttpRequest $Method $uri (Get-RiotClientAuthorization $Lockfile) $Body $TimeoutSeconds
+        $result = New-RiotClientResult (Test-HttpSuccessStatus $response.Status) $response.Status (Get-RiotClientWaitReason $response.Status $response.Text)
     } catch {
         $result = New-RiotClientResult $false 0
     }
@@ -299,6 +308,9 @@ function Stop-RiotProduct {
 # NTP, changement d'heure) rendrait une échéance calculée sur (Get-Date) inatteignable pendant tout le décalage.
 # Le budget est aussi vérifié après l'opération : une requête qui consomme son propre délai ne le fait pas déborder.
 #
+# -OnWait : appelé avec le motif d'attente ('updating', 'releasing') quand Riot répond 424 et que le motif change —
+# une fois par changement, jamais à chaque tour : l'appelant s'en sert pour dire au joueur pourquoi ça dure.
+#
 # -SuccessProbe : sonde évaluée avant chaque tentative ; vraie → l'opération est acquise (Kind 'probe'), quel que
 # soit le dernier code. Mesuré le 2026-09-20 : une demande de lancement peut expirer côté client (code 0 après 7 s)
 # alors que Riot l'a exécutée — les tentatives suivantes répondent 423 « un client de jeu tourne » jusqu'au bout du
@@ -311,12 +323,14 @@ function Wait-RiotClientOperation {
         [int]$TimeoutSeconds = 30,
         [scriptblock]$OnTick,
         [scriptblock]$ShouldStop,
-        [scriptblock]$SuccessProbe
+        [scriptblock]$SuccessProbe,
+        [scriptblock]$OnWait
     )
 
     $chrono = [Diagnostics.Stopwatch]::StartNew()
     $lastStatus = 0
-    while ($chrono.Elapsed.TotalSeconds -lt $TimeoutSeconds) {
+    $lastWaitReason = ''
+    while (-not (Test-WaitBudgetExhausted $chrono $TimeoutSeconds)) {
         if (Test-StopRequested $ShouldStop) { return New-RiotClientOperationResult $false 'cancelled' $lastStatus }
         if (Test-SuccessProbed $SuccessProbe) { return New-RiotClientOperationResult $true 'probe' $lastStatus }
         $lockfile = Read-RiotClientLockfile $LockfilePath -Quiet
@@ -332,8 +346,12 @@ function Wait-RiotClientOperation {
                 Write-Warning ('{0} (code {1}).' -f $FailureMessage, $result.StatusCode)
                 return New-RiotClientOperationResult $false 'route' $result.StatusCode
             }
+            if ($OnWait -and $result.WaitReason -and $result.WaitReason -ne $lastWaitReason) {
+                $lastWaitReason = $result.WaitReason
+                & $OnWait $result.WaitReason
+            }
         }
-        if ($chrono.Elapsed.TotalSeconds -ge $TimeoutSeconds) { break }
+        if (Test-WaitBudgetExhausted $chrono $TimeoutSeconds) { break }
         if ($OnTick) { & $OnTick } else { Start-Sleep -Seconds 1 }
     }
 
@@ -341,6 +359,15 @@ function Wait-RiotClientOperation {
     if (Test-SuccessProbed $SuccessProbe) { return New-RiotClientOperationResult $true 'probe' $lastStatus }
     Write-Warning ('{0} : rien accepté en {1} s.' -f $FailureMessage, $TimeoutSeconds)
     return New-RiotClientOperationResult $false 'timeout' $lastStatus
+}
+
+# -TimeoutSeconds 0 : aucune limite — la boucle ne rend la main que sur succès, refus définitif ou demande d'arrêt.
+# Un patch du jeu sur une connexion lente peut durer des heures ; c'est le bouton du splash qui décide, pas un compteur
+$NoTimeLimitSeconds = 0
+
+function Test-WaitBudgetExhausted($Chrono, [int]$TimeoutSeconds) {
+    if ($TimeoutSeconds -eq $NoTimeLimitSeconds) { return $false }
+    return $Chrono.Elapsed.TotalSeconds -ge $TimeoutSeconds
 }
 
 function Test-StopRequested([scriptblock]$ShouldStop) {
@@ -383,10 +410,11 @@ function Wait-RiotProductLaunch {
         [int]$TimeoutSeconds = 30,
         [scriptblock]$OnTick,
         [scriptblock]$ShouldStop,
-        [scriptblock]$SuccessProbe
+        [scriptblock]$SuccessProbe,
+        [scriptblock]$OnWait
     )
 
     $message = 'Riot Client : lancement de {0} refusé par l''API locale' -f $ProductId
     return Wait-RiotClientOperation -Operation { param($Lockfile) Start-RiotProduct -ProductId $ProductId -PatchlineId $PatchlineId -Lockfile $Lockfile } `
-        -FailureMessage $message -LockfilePath $LockfilePath -TimeoutSeconds $TimeoutSeconds -OnTick $OnTick -ShouldStop $ShouldStop -SuccessProbe $SuccessProbe
+        -FailureMessage $message -LockfilePath $LockfilePath -TimeoutSeconds $TimeoutSeconds -OnTick $OnTick -ShouldStop $ShouldStop -SuccessProbe $SuccessProbe -OnWait $OnWait
 }

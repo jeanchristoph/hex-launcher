@@ -73,6 +73,42 @@ Describe 'Limit-LaunchLogSize' {
     }
 }
 
+Describe 'Get-RecentLaunchCount' {
+    function New-LogAt([datetime]$At, [string]$Step, [string]$Detail) { return '{0}  {1,-7} {2}' -f $At.ToString('yyyy-MM-dd HH:mm:ss'), $Step, $Detail }
+    $now = Get-Date
+
+    It 'compte les lancements de la fenêtre, pas les plus anciens' {
+        $path = Join-Path $TestDrive 'launch.log'
+        @(
+            (New-LogAt $now.AddMinutes(-9) 'START' 'locale=ja_JP companion=aucun chemin=rapide riot=139')
+            (New-LogAt $now.AddMinutes(-4) 'START' 'locale=fr_FR companion=aucun chemin=rapide riot=139')
+            (New-LogAt $now.AddMinutes(-4) 'API'   'PUT /x -> 201 en 0,1s')
+            (New-LogAt $now.AddMinutes(-1) 'START' 'locale=ja_JP companion=aucun chemin=rapide riot=139')
+        ) | Set-Content -Path $path -Encoding UTF8
+        Get-RecentLaunchCount $path $now.AddMinutes(-5) | Should Be 2
+    }
+
+    It 'ignore un lancement refusé — il n''a pas démarré le jeu' {
+        $path = Join-Path $TestDrive 'launch.log'
+        @(
+            (New-LogAt $now.AddMinutes(-2) 'START' 'locale=ja_JP companion=aucun chemin=rapide riot=139')
+            (New-LogAt $now.AddMinutes(-1) 'START' 'refusé — lancement déjà en cours (locale=fr_FR demandée)')
+        ) | Set-Content -Path $path -Encoding UTF8
+        Get-RecentLaunchCount $path $now.AddMinutes(-5) | Should Be 1
+    }
+
+    It 'rend zéro sans journal' {
+        Get-RecentLaunchCount (Join-Path $TestDrive 'absent.log') $now.AddMinutes(-5) | Should Be 0
+    }
+
+    It 'rend zéro sans lever d''exception sur une ligne mal formée' {
+        $path = Join-Path $TestDrive 'launch.log'
+        'n''importe quoi  START   locale=ja_JP' | Set-Content -Path $path -Encoding UTF8
+        { Get-RecentLaunchCount $path $now.AddMinutes(-5) } | Should Not Throw
+        Get-RecentLaunchCount $path $now.AddMinutes(-5) | Should Be 0
+    }
+}
+
 Describe 'Format-LaunchLogDuration' {
     It 'rend une durée en secondes, à la décimale' {
         Format-LaunchLogDuration ([pscustomobject]@{ Elapsed = [timespan]::FromSeconds(10.44) }) | Should Match '^10[.,]4s$'

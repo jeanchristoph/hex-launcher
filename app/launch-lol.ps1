@@ -13,8 +13,10 @@
     Un Riot Client replié sur son icône dont la partie s'est terminée n'a plus ni fenêtre ni API (toutes ses
     routes répondent 404, son serveur a changé de port) : le chemin rapide le relance sans argument — la même
     instance rouvre sa fenêtre et recharge son API en deux secondes, sans kill ni session serveur abandonnée.
-    Passé 1 min 30 d'attente, le splash montre « Forcer en démarrage manuel » : un clic abandonne le chemin rapide et
+    Passé 2 min d'attente, le splash montre « Forcer en démarrage manuel » : un clic abandonne le chemin rapide et
     passe en démarrage manuel (Riot relancé, Jouer à cliquer) pour ce lancement seulement — rien n'est mémorisé.
+    La croix en haut à droite du splash arrête le lanceur sans rien faire d'autre : rien n'est tué, Riot et le jeu
+    restent en l'état, pour réessayer plus tard.
     Chaque étape est tracée dans launch.log, une ligne horodatée par événement, appels d'API compris.
     Le lanceur n'a pas de mémoire : l'API est tentée à chaque lancement, sauf -NoLocalApi ou la case
     « Démarrage manuel » de setup.bat. Une mémoire des échecs a existé (0.2.0, retirée) : elle transformait un
@@ -71,16 +73,17 @@ $RiotProcessNames = @('LeagueClientUxRender', 'LeagueClientUx', 'LeagueClient', 
 $LeagueProductId   = 'league_of_legends'
 $LeaguePatchlineId = 'live'
 
-# Budget total du chemin rapide : pose de la langue ET acceptation du lancement, dans une seule enveloppe.
-# Un seul budget plutôt qu'un par étape — une machine lente peut consommer l'essentiel sur l'une ou sur l'autre
-# sans que le total dérive. Les mesures de développement (3,4 s à chaud, 8,2 s à froid) viennent d'un poste
-# rapide : elles ne servent pas de seuil — sur un poste ordinaire, un lancement approche la minute (2026-09-20),
-# d'où cinq minutes avant le repli en démarrage manuel ; le bouton du splash reste là pour abréger.
-$LocalApiBudgetSeconds = 300
+# Chemin rapide sans limite de temps (0 = aucune, voir $NoTimeLimitSeconds) : tant que Riot répond « pas encore »
+# — patch du jeu en cours, qui peut durer des heures sur une connexion lente, session à libérer — le lanceur
+# attend. Seuls un refus franc de l'API ou le bouton « Forcer en démarrage manuel » du splash font basculer.
+# Un budget de 60 s, puis 6 min, a existé : sur un poste lent il basculait en démarrage manuel au milieu d'un patch
+# (décision de l'utilisateur, 2026-09-20).
+$LocalApiBudgetSeconds = $NoTimeLimitSeconds
 
-# Un lancement accepté ne prouve rien : le client de jeu doit apparaître. Large, car c'est l'étape qui souffre
-# le plus d'un disque lent ou d'un Vanguard qui démarre.
-$GameClientStartTimeoutSeconds = 90
+# Un lancement accepté ne prouve rien : le client de jeu doit apparaître. Sans limite (0, voir $NoTimeLimitSeconds) :
+# c'est l'étape qui souffre le plus d'un disque lent ou d'un Vanguard qui démarre, et basculer en démarrage manuel
+# tuerait un client peut-être en train de venir. Le bouton « Forcer » du splash reste la sortie (utilisateur, 2026-09-20).
+$GameClientStartTimeoutSeconds = $NoTimeLimitSeconds
 
 # Temps laissé au client de jeu pour disparaître après une fermeture acceptée par l'API (mesuré : 0,5 s) ; au-delà,
 # le kill reprend la main
@@ -89,14 +92,38 @@ $GameClientStopTimeoutSeconds = 5
 # Délai avant de proposer « Forcer en démarrage manuel » : un lancement normal tient en 8 à 13 s sur un poste rapide,
 # près d'une minute sur un poste ordinaire — le bouton ne doit tenter personne quand tout va bien, il n'a de sens
 # que sur une attente qui s'éternise (session à libérer, API muette)
-$ForceStartButtonDelaySeconds = 90
+$ForceStartButtonDelaySeconds = 120
 
-# Temps laissé au Riot Client pour rouvrir sa fenêtre et recharger son API après une relance sans argument
-# (mesuré : 2 s sur ce poste). Large, et l'échéance n'est pas un échec : le chemin rapide tente l'API quand même.
-$RiotClientInterfaceTimeoutSeconds = 15
+# Réveil du Riot Client (relance sans argument pour rouvrir sa fenêtre et recharger son API, mesuré : 2 à 4 s) :
+# sans échéance. Une échéance de 15 puis 30 s a existé — passée, la première requête partait vers une API absente,
+# 404, démarrage manuel par erreur (17:00 le 2026-09-20). La relance est rejouée : à 5 s d'abord, car tombée
+# pendant la bascule de Riot en arrière-plan (le joueur vient de fermer le jeu, Riot démonte ses plugins ~2 s)
+# la première est perdue — la nouvelle instance dit « Client already running, exiting » à une instance qui
+# n'écoute plus — puis toutes les 30 s, jusqu'à la fenêtre ou au clic de l'utilisateur (« Forcer », croix).
+$RiotClientInterfaceRetrySeconds   = 5
+$RiotClientRelaunchIntervalSeconds = 30
 
 # Process de l'interface du Riot Client (avec une espace) : présent tant que sa fenêtre existe, réduite ou non
 $RiotClientInterfaceProcessName = 'Riot Client'
+
+# Un seul lanceur à la fois : deux raccourcis cliqués à 3 s d'écart ont donné deux boucles en parallèle, puis deux
+# démarrages manuels qui se tuaient l'un l'autre (journal du 2026-09-20 17:14). Mutex et non sémaphore : un lanceur
+# tué par le Gestionnaire des tâches le libère (abandonné), un sémaphore resterait pris jusqu'au redémarrage.
+$LaunchMutexName = 'Local\HexLauncher.Launch'
+
+# Temps d'affichage du splash « lancement déjà en cours » avant de s'effacer
+$LaunchRefusedSplashSeconds = 3
+
+# Temps d'affichage de « Lancement interrompu » après un clic sur la croix
+$LaunchAbortedSplashSeconds = 1
+
+# BUSINESS_RULE : Vanguard refuse le client de jeu (VAN 216, redémarrage de Windows requis) à partir du 4ᵉ
+# démarrage en moins de 5 min, que la fermeture soit un kill ou un arrêt propre par l'API — mesuré trois fois le
+# 2026-09-20 (~15 cycles, 4 en 3 min, 5 en 5 min). Le lanceur ne peut pas l'empêcher : il prévient au 3ᵉ, et continue.
+$LaunchBurstWindowMinutes    = 5
+$LaunchBurstWarningThreshold = 3
+$LaunchBurstWarningSeconds   = 3
+$LaunchBurstWarningMessage   = 'Trop de lancements rapprochés : risque d''erreur Vanguard VAN 216 (redémarrage de Windows requis)'
 
 # ---------------------------------------------------------------- Config
 
@@ -106,6 +133,34 @@ function Get-LocaleLabel([string]$Code, [string]$CatalogPath) {
     $entry = Read-JsonCatalog $CatalogPath | Where-Object { $_.code -eq $Code }
     if ($entry) { return $entry.label }
     return $Code
+}
+
+# ---------------------------------------------------------------- Verrou
+
+# Rend le mutex pris, ou $null si un autre lanceur le tient. Un mutex abandonné (lanceur précédent tué) est repris
+function Enter-LaunchLock([string]$Name = $LaunchMutexName) {
+    $mutex = New-Object Threading.Mutex($false, $Name)
+    try {
+        if ($mutex.WaitOne(0)) { return $mutex }
+    } catch [Threading.AbandonedMutexException] {
+        return $mutex
+    }
+    $mutex.Dispose()
+    return $null
+}
+
+function Exit-LaunchLock($Mutex) {
+    if (-not $Mutex) { return }
+    try { $Mutex.ReleaseMutex() } catch { }
+    $Mutex.Dispose()
+}
+
+# Vrai à partir du 3ᵉ lancement journalisé dans la fenêtre — celui-ci compris, son START étant déjà écrit
+function Test-LaunchBurst([string]$LogPath) {
+    $count = Get-RecentLaunchCount $LogPath (Get-Date).AddMinutes(-$LaunchBurstWindowMinutes)
+    if ($count -lt $LaunchBurstWarningThreshold) { return $false }
+    Write-LaunchLogLine 'WARN' ('{0} lancements en {1} min — avertissement Vanguard affiché' -f $count, $LaunchBurstWindowMinutes) | Out-Null
+    return $true
 }
 
 # ---------------------------------------------------------------- Étapes
@@ -196,7 +251,7 @@ function Stop-GameClient([scriptblock]$OnTick) {
 # S'arrête aussi sur demande de l'appelant (-ShouldStop) : c'est lui qui distingue ensuite l'abandon de l'échéance
 function Wait-GameClientStart([int]$TimeoutSeconds, [scriptblock]$OnTick, [scriptblock]$ShouldStop) {
     $chrono = [Diagnostics.Stopwatch]::StartNew()
-    while ($chrono.Elapsed.TotalSeconds -lt $TimeoutSeconds) {
+    while (-not (Test-WaitBudgetExhausted $chrono $TimeoutSeconds)) {
         if (Test-GameClientRunning) { return $true }
         if (Test-StopRequested $ShouldStop) { return $false }
         if ($OnTick) { & $OnTick } else { Start-Sleep -Seconds 1 }
@@ -233,14 +288,32 @@ function Wait-RiotClientInterface([int]$TimeoutSeconds, [scriptblock]$OnTick, [s
 # argument réveille la même instance : fenêtre rouverte, API rechargée en 2 s. Jamais de kill — il laisserait
 # une session serveur à expirer, jusqu'à 57 s de 424 au démarrage suivant. Rend vrai quand l'API répond, faux
 # sinon — l'appelant tente alors l'API quand même, le repli restant là pour le pire cas.
+# Rend vrai quand fenêtre et API sont là ; faux seulement si l'exécutable est introuvable ou si l'utilisateur a
+# demandé l'arrêt — jamais sur une échéance
 function Restore-RiotClientInterface([string]$Path, [scriptblock]$OnTick, [scriptblock]$ShouldStop) {
     if (Test-RiotClientInterfaceRunning) { return $true }
     Write-LaunchLogLine 'RIOT' 'Riot Client sans interface (replié après une partie) — relance pour rouvrir sa fenêtre et son API' | Out-Null
-    if (-not (Start-RiotClient $Path)) { return $false }
     $chrono = [Diagnostics.Stopwatch]::StartNew()
-    $restored = Wait-RiotClientInterface $RiotClientInterfaceTimeoutSeconds $OnTick $ShouldStop
-    Write-LaunchLogLine 'RIOT' $(if ($restored) { 'interface et API revenues en {0}' -f (Format-LaunchLogDuration $chrono) } else { 'interface toujours absente après {0} — API tentée quand même' -f (Format-LaunchLogDuration $chrono) }) | Out-Null
-    return $restored
+    $relaunches = 0
+    $waitSeconds = $RiotClientInterfaceRetrySeconds
+    do {
+        $relaunches++
+        if (-not (Start-RiotClient $Path)) { return $false }
+        if (Wait-RiotClientInterface $waitSeconds $OnTick $ShouldStop) {
+            Write-LaunchLogLine 'RIOT' ('interface et API revenues en {0}' -f (Format-LaunchLogDuration $chrono)) | Out-Null
+            return $true
+        }
+        if (Test-StopRequested $ShouldStop) { break }
+        Write-LaunchLogLine 'RIOT' (Format-RiotRelaunchReason ($relaunches + 1) $chrono) | Out-Null
+        $waitSeconds = $RiotClientRelaunchIntervalSeconds
+    } while ($true)
+    Write-LaunchLogLine 'RIOT' ('réveil interrompu par l''utilisateur après {0}' -f (Format-LaunchLogDuration $chrono)) | Out-Null
+    return $false
+}
+
+function Format-RiotRelaunchReason([int]$Number, $Chrono) {
+    if ($Number -eq 2) { return 'relance n° 2 après {0} — la première a pu tomber pendant la bascule en arrière-plan' -f (Format-LaunchLogDuration $Chrono) }
+    return 'relance n° {0} après {1} — fenêtre et API toujours absentes' -f $Number, (Format-LaunchLogDuration $Chrono)
 }
 
 # Le Riot Client doit rester debout tant que le chemin rapide n'a pas abouti : son API est notre seul moyen d'agir
@@ -250,10 +323,23 @@ function Assert-RiotClientRunning([string]$Path) {
     return (Start-RiotClient $Path)
 }
 
+# Une fenêtre Riot refermée pendant l'attente (croix → repli en arrière-plan, API déchargée) laisserait la boucle
+# sur des codes 0 jusqu'au budget (journal du 2026-09-20 17:14 : fermée à 28 s, 3 min de code 0). Vue puis
+# disparue → réveil, une fois par disparition ; jamais vue (Riot en train de démarrer) → rien, son interface arrive
+function Watch-RiotClientInterface([string]$Path, [scriptblock]$OnTick, [scriptblock]$ShouldStop) {
+    if (Test-RiotClientInterfaceRunning) { $script:RiotInterfaceSeen = $true; return }
+    if (-not $script:RiotInterfaceSeen) { return }
+    $script:RiotInterfaceSeen = $false
+    Write-LaunchLogLine 'RIOT' 'interface disparue pendant l''attente — réveil' | Out-Null
+    Restore-RiotClientInterface $Path $OnTick $ShouldStop | Out-Null
+}
+
 # Chemin rapide : la session du Riot Client est réutilisée si elle existe, démarrée sinon — jamais fermée.
 # La langue lui est posée (il écrit alors le yaml lui-même), puis le jeu est lancé comme par le bouton Play.
-# Temps qu'il reste au chemin rapide, jamais moins d'une seconde pour laisser une dernière tentative aboutir
+# Temps qu'il reste au chemin rapide, jamais moins d'une seconde pour laisser une dernière tentative aboutir ;
+# un budget sans limite le reste
 function Get-RemainingBudgetSeconds($Chrono, [int]$BudgetSeconds) {
+    if ($BudgetSeconds -eq $NoTimeLimitSeconds) { return $NoTimeLimitSeconds }
     return [int][Math]::Max(1, $BudgetSeconds - $Chrono.Elapsed.TotalSeconds)
 }
 
@@ -283,9 +369,22 @@ function Start-LeagueClientByLocalApi([string]$Path, [string]$Value, [scriptbloc
     # Noms distincts, et pas de GetNewClosure : ce bloc est invoqué depuis Wait-RiotClientOperation, qui a son
     # propre $OnTick — s'y référer ici le ferait se rappeler lui-même jusqu'à saturer la pile. GetNewClosure
     # résoudrait la capture mais attacherait le bloc à un module dynamique, aveugle aux fonctions du script.
-    $guardRiotPath = $Path
-    $guardUserTick = $OnTick
-    $guardedTick = { Assert-RiotClientRunning $guardRiotPath | Out-Null; if ($guardUserTick) { & $guardUserTick } else { Start-Sleep -Seconds 1 } }
+    $guardRiotPath   = $Path
+    $guardUserTick   = $OnTick
+    $guardShouldStop = $ShouldStop
+    # Même règle de nommage pour le motif d'attente : invoqué depuis la lib, il ne doit capturer que des noms à lui
+    $waitStatusSink = $OnStatus
+    $onWait = {
+        param($Reason)
+        $status = Get-WaitReasonStatus $Reason
+        if ($status) { Write-LaunchLogLine 'WAIT' ('424 : {0}' -f $status) | Out-Null; Write-LaunchStatus $waitStatusSink $status }
+    }
+    $script:RiotInterfaceSeen = $false
+    $guardedTick = {
+        Assert-RiotClientRunning $guardRiotPath | Out-Null
+        Watch-RiotClientInterface $guardRiotPath $guardUserTick $guardShouldStop
+        if ($guardUserTick) { & $guardUserTick } else { Start-Sleep -Seconds 1 }
+    }
 
     $chrono = [Diagnostics.Stopwatch]::StartNew()
 
@@ -299,7 +398,7 @@ function Start-LeagueClientByLocalApi([string]$Path, [string]$Value, [scriptbloc
     Write-LaunchStatus $OnStatus 'Demande de lancement au Riot Client…'
     $launched = Wait-RiotProductLaunch -ProductId $LeagueProductId -PatchlineId $LeaguePatchlineId `
         -TimeoutSeconds (Get-RemainingBudgetSeconds $chrono $LocalApiBudgetSeconds) -OnTick $guardedTick -ShouldStop $ShouldStop `
-        -SuccessProbe { Test-GameClientRunning }
+        -SuccessProbe { Test-GameClientRunning } -OnWait $onWait
     if (-not $launched.Success) { return New-LocalApiAttempt $false (New-LocalApiFailure $launched.Kind $launched.StatusCode 'launch') }
     if ($launched.Kind -eq 'probe') { Write-LaunchLogLine 'GAME' ('client de jeu déjà en marche pendant la demande de lancement (dernier code {0})' -f $launched.StatusCode) | Out-Null }
 
@@ -321,6 +420,17 @@ function Start-LeagueClientByLocalApi([string]$Path, [string]$Value, [scriptbloc
 # et son API continue de répondre. Jamais en démarrage manuel, où elle sert encore à cliquer sur Jouer.
 function Complete-LocalApiLaunch {
     if (Close-RiotClientWindow) { Write-LaunchLogLine 'RIOT' 'fenêtre du Riot Client fermée (repli sur l''icône)' | Out-Null }
+}
+
+# Ce que le splash dit quand Riot fait attendre le lancement (424) — textes validés par l'utilisateur le 2026-09-20
+$WaitReasonStatuses = @{
+    updating  = 'Mise à jour de League of Legends par Riot en cours…'
+    releasing = 'Riot libère la session de jeu précédente…'
+}
+
+function Get-WaitReasonStatus([string]$Reason) {
+    if ($WaitReasonStatuses.ContainsKey($Reason)) { return $WaitReasonStatuses[$Reason] }
+    return ''
 }
 
 function New-LocalApiAttempt([bool]$Success, $Failure) {
@@ -366,14 +476,26 @@ function Start-LeagueClientByCommandLine([string]$Path, [string]$YamlPath, [stri
 # Rend { Outcome; Failure } — Outcome vaut 'api' quand l'API locale a fait le travail, 'legacy' quand le chemin
 # historique a pris le relais, 'failed' quand même lui n'a pas pu démarrer le Riot Client (chemin périmé).
 # Failure n'est renseigné que si le chemin rapide a échoué : il dit pourquoi, pour le journal.
-function Start-LeagueClient([string]$Path, [string]$YamlPath, [string]$Value, [switch]$NoLocalApi, [scriptblock]$OnTick, [scriptblock]$OnStatus, [scriptblock]$ShouldStop) {
+# -ShouldStop : « Forcer en démarrage manuel » — le chemin rapide rend la main, le démarrage manuel prend le relais.
+# -ShouldAbort : la croix du splash — le chemin rapide rend la main et rien d'autre ne se passe (issue 'cancelled') :
+# rien n'est tué, Riot et le jeu restent en l'état, l'utilisateur réessaiera plus tard.
+function Start-LeagueClient([string]$Path, [string]$YamlPath, [string]$Value, [switch]$NoLocalApi, [scriptblock]$OnTick, [scriptblock]$OnStatus, [scriptblock]$ShouldStop, [scriptblock]$ShouldAbort) {
     $failure = $null
 
     if (-not $NoLocalApi) {
         Write-LaunchStatus $OnStatus 'Fermeture du client de jeu…'
         Stop-GameClient $OnTick
-        $attempt = Start-LeagueClientByLocalApi $Path $Value $OnTick $OnStatus $ShouldStop
+        # Un seul drapeau pour les boucles, quelle que soit la sortie choisie. Noms propres à cette fonction : le bloc
+        # est invoqué depuis la lib, il retrouve ces variables parce que Start-LeagueClient est encore sur la pile
+        $stopOnForce = $ShouldStop
+        $stopOnAbort = $ShouldAbort
+        $stopOnEither = { (Test-StopRequested $stopOnForce) -or (Test-StopRequested $stopOnAbort) }
+        $attempt = Start-LeagueClientByLocalApi $Path $Value $OnTick $OnStatus $stopOnEither
         if ($attempt.Success) { return New-LaunchOutcome 'api' $null }
+        if (Test-StopRequested $ShouldAbort) {
+            Write-LaunchLogLine 'ABORT' 'lancement interrompu par l''utilisateur (croix du splash) — rien n''est touché' | Out-Null
+            return New-LaunchOutcome 'cancelled' $attempt.Failure
+        }
 
         # Le client de jeu a pu apparaître juste après l'échéance : le chemin historique le tuerait pour le
         # relancer, et l'utilisateur verrait le jeu s'ouvrir, disparaître, puis s'ouvrir de nouveau. Fin du chemin
@@ -402,6 +524,7 @@ function Get-FallbackStatusMessage($Failure) {
 function New-LaunchOutcome([string]$Outcome, $Failure) {
     return [pscustomobject]@{ Outcome = $Outcome; Failure = $Failure }
 }
+
 
 # Une seule appli compagnon active : celle du raccourci (laissée en place si elle tourne déjà), les autres sont fermées
 function Stop-OtherCompanionApps($Config, [string]$KeepId) {
@@ -432,6 +555,18 @@ if ($MyInvocation.InvocationName -ne '.') {
     # Le journal est ouvert après tous les dot-sourcings : recharger une lib remettrait son chemin à vide
     Set-LaunchLogPath (Join-Path $PSScriptRoot $LaunchLogFileName)
 
+    $launchLock = Enter-LaunchLock
+    if (-not $launchLock) {
+        Write-LaunchLogLine 'START' ('refusé — lancement déjà en cours (locale={0} demandée)' -f $Locale) | Out-Null
+        $splash = New-SplashWindow -Subtitle (Get-LocaleLabel $Locale (Join-Path $PSScriptRoot 'locales.json'))
+        try {
+            Update-SplashStatus $splash 'Un lancement est déjà en cours — patientez qu''il se termine'
+            Wait-WithAnimation $LaunchRefusedSplashSeconds
+        }
+        finally { Close-SplashWindow $splash }
+        return
+    }
+
     $riotVersion  = Get-RiotClientVersion $config.riotClientPath
     # Deux voix peuvent écarter l'API : la ligne de commande (-NoLocalApi) et la case cochée dans setup.bat.
     # Il suffit d'une seule.
@@ -444,12 +579,20 @@ if ($MyInvocation.InvocationName -ne '.') {
         $(if ($riotVersion) { $riotVersion } else { 'version inconnue' })) | Out-Null
 
     $splash = New-SplashWindow -Subtitle (Get-LocaleLabel $Locale (Join-Path $PSScriptRoot 'locales.json'))
+    if (Test-LaunchBurst (Join-Path $PSScriptRoot $LaunchLogFileName)) {
+        Update-SplashStatus $splash $LaunchBurstWarningMessage
+        Wait-WithAnimation $LaunchBurstWarningSeconds
+    }
 
     # « Forcer en démarrage manuel » : le clic, pompé par le tick de l'attente en cours, ne fait que lever un drapeau ;
     # les boucles le lisent à leur tour suivant (ShouldStop) et rendent la main. Rien n'est mémorisé.
     $script:ForceStartRequested = $false
     $shouldStop = { $script:ForceStartRequested }
     Add-SplashAction $splash 'Forcer en démarrage manuel' { $script:ForceStartRequested = $true; Hide-SplashAction $splash | Out-Null } | Out-Null
+    # La croix : même mécanique, autre issue — le lanceur s'arrête sans démarrage manuel ni compagnon
+    $script:AbortRequested = $false
+    $shouldAbort = { $script:AbortRequested }
+    Add-SplashCloseButton $splash { $script:AbortRequested = $true; Hide-SplashAction $splash | Out-Null } | Out-Null
 
     try {
         if ($DryRun) {
@@ -471,12 +614,17 @@ if ($MyInvocation.InvocationName -ne '.') {
                 Wait-WithAnimation 1
             }
 
-            $launch = Start-LeagueClient -Path $config.riotClientPath -YamlPath $YamlPath -Value $Locale -NoLocalApi:(-not $tryLocalApi) -OnTick $onTick -OnStatus $onStatus -ShouldStop $shouldStop
+            $launch = Start-LeagueClient -Path $config.riotClientPath -YamlPath $YamlPath -Value $Locale -NoLocalApi:(-not $tryLocalApi) -OnTick $onTick -OnStatus $onStatus -ShouldStop $shouldStop -ShouldAbort $shouldAbort
             Hide-SplashAction $splash | Out-Null
             if ($launch.Outcome -eq 'legacy') { Update-SplashStatus $splash (Get-FallbackStatusMessage $launch.Failure) }
             if ($launch.Outcome -eq 'failed') { Update-SplashStatus $splash 'Riot Client introuvable — relancer setup.bat pour corriger config.json' }
 
             Write-LaunchLogLine 'END' ('issue={0} durée={1}' -f $launch.Outcome, (Format-LaunchLogDuration $totalChrono)) | Out-Null
+            if ($launch.Outcome -eq 'cancelled') {
+                Update-SplashStatus $splash 'Lancement interrompu'
+                Wait-WithAnimation $LaunchAbortedSplashSeconds
+                return
+            }
         }
         Wait-WithAnimation 0.5
 
@@ -500,5 +648,6 @@ if ($MyInvocation.InvocationName -ne '.') {
     }
     finally {
         Close-SplashWindow $splash
+        Exit-LaunchLock $launchLock
     }
 }

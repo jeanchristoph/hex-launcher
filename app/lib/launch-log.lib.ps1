@@ -63,6 +63,25 @@ function Write-LaunchLogLine([string]$Step, [string]$Detail) {
 }
 
 # Durées en secondes, une décimale : assez précis pour comparer deux lancements, assez court pour rester lisible
+# Lancements journalisés depuis un instant donné : les lignes START d'un lancement réel, jamais celles d'un
+# lancement refusé (« START refusé — … »). Lecture bornée aux dernières lignes — le journal peut peser 200 Ko.
+# Rend 0 sur tout incident : un journal illisible ne doit rien changer au lancement.
+$LaunchLogRecentTailLines = 400
+
+function Get-RecentLaunchCount([string]$Path, [datetime]$Since) {
+    try {
+        if (-not (Test-Path $Path)) { return 0 }
+        $count = 0
+        foreach ($line in @(Get-Content -Path $Path -Encoding UTF8 -Tail $LaunchLogRecentTailLines)) {
+            if ($line -notmatch '^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})  START   locale=') { continue }
+            if ([datetime]::ParseExact($Matches[1], 'yyyy-MM-dd HH:mm:ss', $null) -ge $Since) { $count++ }
+        }
+        return $count
+    } catch {
+        return 0
+    }
+}
+
 function Format-LaunchLogDuration($Chrono) {
     return '{0:N1}s' -f $Chrono.Elapsed.TotalSeconds
 }

@@ -12,6 +12,8 @@
 
     Un bouton d'action facultatif (Add-SplashAction) peut être posé en bas, caché : l'appelant décide quand il a
     un sens (Show-SplashAction) et ce que fait le clic. Le splash ne sait rien de ce qu'il déclenche.
+    Une croix facultative (Add-SplashCloseButton) peut être posée en haut à droite, visible d'emblée — le splash
+    n'a pas de barre de titre, c'est sa seule prise pour l'utilisateur qui veut s'arrêter là.
 #>
 
 . (Join-Path $PSScriptRoot 'theme.lib.ps1')
@@ -106,6 +108,32 @@ function Add-SplashAction($Splash, [string]$Text, [scriptblock]$OnClick) {
     $button.Add_Click($OnClick)
     $Splash.Controls.Add($button)
     return $button
+}
+
+# Croix en haut à droite : une étiquette, pas un bouton — pas de bordure, pas de fond, juste le signe, doré au survol.
+# Posée par-dessus les contrôles ancrés (BringToFront), elle ne bouge pas quand le bouton du bas apparaît
+$SplashCloseControlName = 'SplashClose'
+$SplashCloseSize        = 22
+$SplashCloseMargin      = 6
+
+function Add-SplashCloseButton($Splash, [scriptblock]$OnClick) {
+    if ($null -eq $Splash) { return $null }
+    $cross           = New-SplashLabel ([string][char]0x2715) (New-ThemeFont 10 'Bold') 'Muted' 'None' $SplashCloseSize
+    $cross.Name      = $SplashCloseControlName
+    $cross.Width     = $SplashCloseSize
+    $cross.Location  = New-Object System.Drawing.Point(($Splash.ClientSize.Width - $SplashCloseSize - $SplashCloseMargin), $SplashCloseMargin)
+    $cross.Cursor    = [System.Windows.Forms.Cursors]::Hand
+    $cross.Add_MouseEnter({ $this.ForeColor = Get-ThemeColor 'Gold' })
+    $cross.Add_MouseLeave({ $this.ForeColor = Get-ThemeColor 'Muted' })
+    $cross.Add_Click($OnClick)
+    $Splash.Controls.Add($cross)
+    $cross.BringToFront()
+    return $cross
+}
+
+function Get-SplashCloseButton($Splash) {
+    if ($null -eq $Splash) { return $null }
+    return $Splash.Controls[$SplashCloseControlName]
 }
 
 function Get-SplashAction($Splash) {

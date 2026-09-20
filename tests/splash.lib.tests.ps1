@@ -115,6 +115,35 @@ Describe 'Add-SplashAction' {
     }
 }
 
+Describe 'Add-SplashCloseButton' {
+    Mock Invoke-SplashTick {}
+
+    function New-HiddenForm { $f = New-Object System.Windows.Forms.Form; $f.Size = New-Object System.Drawing.Size(420, 170); return $f }
+
+    It 'pose une croix visible d''emblée, en haut à droite' {
+        $form  = New-HiddenForm
+        $cross = Add-SplashCloseButton $form { }
+        $cross.Text    | Should Be ([string][char]0x2715)
+        $cross.Top     | Should BeLessThan 10
+        $cross.Left + $cross.Width | Should BeGreaterThan ($form.ClientSize.Width - 10)
+        (Get-SplashCloseButton $form) | Should Be $cross
+    }
+
+    It 'déclenche l''action de l''appelant au clic' {
+        $form = New-HiddenForm
+        $script:clicked = $false
+        $cross = Add-SplashCloseButton $form { $script:clicked = $true }
+        # Une étiquette n'a pas de PerformClick : on déclenche l'événement Click par sa méthode protégée
+        $cross.GetType().GetMethod('OnClick', [Reflection.BindingFlags]'NonPublic,Instance').Invoke($cross, @([EventArgs]::Empty))
+        $script:clicked | Should Be $true
+    }
+
+    It 'ignore un splash absent' {
+        Add-SplashCloseButton $null { } | Should BeNullOrEmpty
+        Get-SplashCloseButton $null    | Should BeNullOrEmpty
+    }
+}
+
 Describe 'Show-SplashAction et Hide-SplashAction' {
     Mock Invoke-SplashTick {}
 

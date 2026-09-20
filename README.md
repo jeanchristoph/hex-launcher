@@ -266,8 +266,11 @@ So the launcher does, in order:
 4. Otherwise the manual start takes over: all Riot processes closed, `settings.locale` rewritten
    (`default_locale`, managed by Riot, is never touched), relaunch with `--launch-product`, and you press
    **Play** in the Riot Client yourself: the launcher never fails hard. `-NoLocalApi` forces that manual start.
-   When the wait drags on (more than 1 min 30), the splash offers **Force manual start**: one click switches to the
-   manual start for this launch only — nothing is remembered.
+   When the wait drags on (more than 2 min), the splash offers **Force manual start**: one click switches to the
+   manual start for this launch only — nothing is remembered. The ✕ at the top right of the splash stops the
+   launcher without doing anything else — nothing is closed, Riot and the game stay as they are, try again later.
+   From four game starts in less than five minutes, Vanguard shows error VAN 216 and closes the client, however
+   the game was closed. A Windows restart is then required — the splash warns from the third launch.
 5. Close the other companion apps of `config.json`, then start the one named by `-Companion`, if any.
 
 The launcher keeps no memory: the direct launch is attempted every time. If it keeps failing on your machine,

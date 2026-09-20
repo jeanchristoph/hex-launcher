@@ -289,7 +289,7 @@ kill en dernier recours, attente 5 s), lib : `Read-RiotClientResource`, `Find/Re
 `$ForceStartButtonDelaySeconds` 15 → 90, `$GameClientStartTimeoutSeconds` 30 → 90 (l'apparition du client est l'étape
 qui souffre le plus d'un disque lent). Commentaires des constantes et en-tête du lanceur réalignés, mention
 « plus de 15 s » des README ×3 → 1 min 30. Tests des seuils mis à jour. Demande de l'utilisateur (2026-09-20), après T22.
-[x] 2026-09-20 — trois seuils posés (300 / 90 / 90), en-tête du lanceur, README ×3, arbre de décision d'OUTPUT ;
+[x] 2026-09-20 — trois seuils posés (300 / 90 / 90, puis 360 / 120 / 180 sur demande de l'utilisateur), en-tête du lanceur, README ×3, arbre de décision d'OUTPUT ;
 tests des seuils + test « démarrage manuel = kill des process, aucun appel d'API » (règle utilisateur) ; 670 verts
 
 ### T24 — Section « Compatibilité Riot » dans l'assistant
@@ -302,6 +302,101 @@ l'utilisateur avant traduction. Fenêtre 620 → 680 px pour garder le journal. 
 testée). Option C retenue parmi trois (libellé enrichi, note seule, section). Demande de l'utilisateur (2026-09-20).
 [x] 2026-09-20 — section en place, deux clés i18n ×3, « lancement direct » → « lancement automatisé » dans le journal
 de l'assistant, README ×3 (case) ; 674 verts. À voir dans setup.bat par l'utilisateur.
+
+### T25 — Bug : réveil de Riot perdu pendant sa bascule en arrière-plan
+**Effort:** S
+**Files:** `app/launch-lol.ps1`, `tests/launch-lol.tests.ps1`
+**Description:** Journal du 2026-09-20 17:00 : jeu fermé à la main, Riot replié, changement de langue aussitôt →
+la relance sans argument tombe pendant que Riot démonte ses plugins (« Attempting to quit and switch to background
+mode ») ; la nouvelle instance dit « Client already running, exiting » à une instance qui n'écoute plus, l'interface
+ne revient jamais → 15,6 s d'attente, `PUT` 404, démarrage manuel (kill de Riot). Correctif :
+`Restore-RiotClientInterface` attend 5 s (`$RiotClientInterfaceRetrySeconds`), puis rejoue la relance une fois
+(journal `RIOT seconde relance…`) et attend le reste de l'échéance, portée de 15 à 30 s (choix utilisateur).
+`-ShouldStop` respecté entre les deux relances. Bug relevé par l'utilisateur.
+[x] 2026-09-20 — relance rejouée à 5 s, échéance 30 s ; 4 tests (une relance suffit / rejouée / reste d'échéance ≥ 1 s /
+jamais rejouée après « Forcer ») ; 677 verts. Essai réel : jeu fermé à la main, Riot replié, raccourci aussitôt.
+
+### T26 — Un seul lanceur à la fois
+**Effort:** S
+**Files:** `app/launch-lol.ps1`, `tests/launch-lol.tests.ps1`
+**Description:** Journal du 2026-09-20 17:14 : deux raccourcis cliqués à 3 s d'écart → deux lanceurs en parallèle, lignes
+d'API en double, puis deux démarrages manuels successifs (chacun tuant le Riot de l'autre). Mutex système nommé pris au
+démarrage ; déjà pris → splash « Un lancement est déjà en cours » 3 s, journal `START refusé — lancement déjà en cours`,
+sortie sans kill ni appel d'API. Libéré à la fin du lanceur, quoi qu'il arrive (`finally`).
+[x] 2026-09-20 — `Enter-LaunchLock`/`Exit-LaunchLock` (mutex `Local\HexLauncher.Launch`, abandonné repris), splash
+3 s « Un lancement est déjà en cours » ; 5 tests (dont verrou tenu par un autre fil, abandonné) ; essai réel : second
+raccourci refusé, premier fini en 14 s.
+
+### T27 — Fenêtre Riot refermée pendant l'attente
+**Effort:** S
+**Files:** `app/launch-lol.ps1`, `tests/launch-lol.tests.ps1`
+**Description:** Même journal : fenêtre Riot fermée à 17:14:34 pendant la boucle de lancement → Riot en arrière-plan,
+API déchargée, code 0 à chaque essai jusqu'au budget. La garde de boucle (`$guardedTick`) surveille aussi l'interface :
+Riot vivant mais sans interface → `Restore-RiotClientInterface` rejoué (journal `RIOT interface disparue pendant
+l'attente — réveil`), au plus une fois par disparition, jamais en rafale.
+[x] 2026-09-20 — `Watch-RiotClientInterface` (drapeau « vue » par lancement) dans `$guardedTick` ; 4 tests. Essai réel
+non concluant pour ce cas précis : fermer la fenêtre pendant un lancement replie Riot sans décharger l'API (session
+présente), le jeu part quand même en 14,8 s — le cas « aucune session » du 17:14 reste couvert par les tests seuls.
+
+### T28 — 424 : dire pourquoi on attend
+**Effort:** M
+**Files:** `app/lib/riot-client-api.lib.ps1`, `app/launch-lol.ps1`, `tests/riot-client-api.lib.tests.ps1`, `tests/launch-lol.tests.ps1`
+**Description:** Le 424 couvre deux attentes très différentes : session précédente à libérer (3 s à 1 min) et **patch du
+jeu en cours** (journal Riot 17:14 : « Product 'league_of_legends' not up to date », 58 s de mise à jour). Sur 424, lire le
+corps (`errorDescription`) et afficher sur le splash « Riot met le jeu à jour… » ou « Riot libère la session
+précédente… ». Corps jamais journalisé. Textes FR validés par l'utilisateur avant écriture.
+[x] 2026-09-20 — `Get-RiotClientWaitReason` (424 + « not up to date » → updating, sinon releasing), `WaitReason` sur
+chaque résultat, `-OnWait` sur la boucle (une fois par changement), `Get-WaitReasonStatus` + journal `WAIT 424 : …` ;
+`Send-WinHttpRequest` retiré (un seul transport) ; 12 tests ; 711 verts.
+
+### T29 — Avertissement de cadence sur le splash (VAN 216)
+**Effort:** S
+**Files:** `app/lib/launch-log.lib.ps1`, `app/launch-lol.ps1`, `tests/launch-log.lib.tests.ps1`, `tests/launch-lol.tests.ps1`
+**Description:** VAN 216 à 17:30 après 5 démarrages du client de jeu en 5 min, tous fermés proprement : la fermeture par
+l'API ne protège pas, c'est la cadence des connexions Vanguard. Le lanceur ne peut pas l'empêcher : il compte les
+`START` de `launch.log` sur les 5 dernières minutes (`Get-RecentLaunchCount`, lecture bornée aux 400 dernières lignes,
+lancements refusés exclus) et, à partir du 3ᵉ, affiche 3 s « Trop de lancements rapprochés : risque d'erreur Vanguard
+VAN 216 (redémarrage de Windows requis) » (texte validé mot à mot), journal `WARN`, puis continue. T21 de nouveau écartée.
+[x] 2026-09-20 — `Test-LaunchBurst` (seuil 3 / fenêtre 5 min / 3 s), 7 tests ; montré à l'utilisateur en DryRun ×3 ; 693 verts.
+
+### T30 — README : VAN 216
+**Effort:** S
+**Files:** README ×3
+**Description:** Après l'étape 4 du lanceur : « À partir de quatre démarrages du jeu en moins de cinq minutes, Vanguard
+affiche l'erreur VAN 216 et ferme le client, quelle que soit la manière dont il a été fermé. Un redémarrage de Windows est
+alors nécessaire » (texte validé), plus la mention du splash qui prévient au 3ᵉ. Traduit en, ja.
+[x] 2026-09-20 — README ×3.
+
+### T31 — Plus de limite d'attente sur le lancement direct ni sur l'apparition du client
+**Effort:** S
+**Files:** `app/lib/riot-client-api.lib.ps1`, `app/launch-lol.ps1`, tests, notes de release
+**Description:** Un patch du jeu sur une connexion lente peut durer des heures : le budget du lancement direct
+(6 min) et l'attente du client de jeu (3 min) sont supprimés — `$NoTimeLimitSeconds = 0`, `Test-WaitBudgetExhausted`,
+`Get-RemainingBudgetSeconds` transparent. Seuls un refus franc de l'API, le bouton « Forcer » ou la croix (T32) sortent.
+Décision de l'utilisateur (« autant le faire péter », 2026-09-20).
+[x] 2026-09-20 — deux budgets à ∞, 6 tests ; 700 verts.
+
+### T32 — Croix de fermeture sur le splash
+**Effort:** S
+**Files:** `app/lib/splash.lib.ps1`, `app/launch-lol.ps1`, `tests/splash.lib.tests.ps1`, `tests/launch-lol.tests.ps1`, README ×3
+**Description:** Croix en haut à droite du splash, visible dès le début. Un clic arrête le lanceur : la boucle en cours
+rend la main (drapeau lu à chaque tour, comme « Forcer ») mais sans démarrage manuel — rien n'est tué, Riot et le jeu
+restent en l'état, le compagnon n'est pas lancé. Journal `END issue=cancelled`, splash « Lancement interrompu » 1 s.
+Verrou libéré : un raccourci peut être recliqué aussitôt. README ×3, une ligne. Demande de l'utilisateur (2026-09-20).
+[x] 2026-09-20 — `Add-SplashCloseButton` (étiquette ✕, dorée au survol, par-dessus les contrôles ancrés),
+`-ShouldAbort` sur `Start-LeagueClient` (drapeau combiné à « Forcer » pour les boucles, issue `cancelled` sans démarrage
+manuel), journal `ABORT`, README ×3 ; 5 tests ; 716 verts. Montré en DryRun.
+
+### T33 — Réveil de Riot sans limite, relance périodique
+**Effort:** S
+**Files:** `app/launch-lol.ps1`, `tests/launch-lol.tests.ps1`
+**Description:** Le réveil (30 s) menait au démarrage manuel par un faux 404 quand Riot ne rouvrait pas sa fenêtre
+(17:00). Plus d'échéance : relance à 0 s, 5 s, puis toutes les 30 s (`$RiotClientRelaunchIntervalSeconds`, journal
+`RIOT relance n° N après X s`) tant que fenêtre et API ne sont pas là, jusqu'à « Forcer » ou la croix. Plus de
+première requête envoyée à une API absente. `$RiotClientInterfaceTimeoutSeconds` retiré.
+[x] 2026-09-20 — boucle de relance (5 s puis 30 s, `Format-RiotRelaunchReason`), faux seulement sur arrêt utilisateur ou
+exécutable introuvable ; tests réécrits ; notes de release : Known limits 1 retirée, sans limite + croix + motif du 424 ;
+716 verts.
 
 ## Risks
 - Endpoint non documenté par Riot : relevé sur `swagger/v3/openapi.json` à l'exécution, et le repli rend l'échec non bloquant.
@@ -338,4 +433,13 @@ None
 | T22 — Fermeture propre du client de jeu par l'API | M | [x] |
 | T23 — Budgets 5 min / « Forcer » à 1 min 30 | S | [x] |
 | T24 — Section « Compatibilité Riot » dans l'assistant | S | [x] |
+| T25 — Réveil de Riot rejoué (bascule en arrière-plan) | S | [x] |
+| T26 — Un seul lanceur à la fois | S | [x] |
+| T27 — Fenêtre Riot refermée pendant l'attente | S | [x] |
+| T28 — 424 : dire pourquoi on attend | M | [x] |
+| T29 — Avertissement de cadence VAN 216 sur le splash | S | [x] |
+| T30 — README : VAN 216 | S | [x] |
+| T31 — Plus de limite d'attente (lancement, client de jeu) | S | [x] |
+| T32 — Croix de fermeture sur le splash | S | [x] |
+| T33 — Réveil de Riot sans limite, relance périodique | S | [x] |
 | **Total** | **~L (5-8 h)** | |

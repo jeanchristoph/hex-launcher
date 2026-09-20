@@ -68,7 +68,7 @@ Raccourci .lnk → powershell -WindowStyle Hidden -File launch-lol.ps1
     │           de produit (son API suffira)                                     │
     └── oui ──► session en cours réutilisée, rien n'est redémarré                │
                                                                                  │
-    ⏱ Passé 1 min 30 depuis le clic sur le raccourci, le splash montre le bouton │
+    ⏱ Passé 2 min depuis le clic sur le raccourci, le splash montre le bouton    │
     « Forcer le démarrage » : un clic lève un drapeau que chaque boucle ci-dessous │
     lit en tête de tour (ShouldStop) → abandon immédiat, cause 'cancelled' ──────► │
     Rien n'est mémorisé : le lancement suivant retente le chemin rapide.           │
@@ -91,7 +91,7 @@ Raccourci .lnk → powershell -WindowStyle Hidden -File launch-lol.ps1
     └── refus définitif ──► avertissement ─────────────────────────────────────► │
     échéance atteinte sans succès ──► avertissement ─────────────────────────────┤
                                                                                  │
-6.5 Wait-GameClientStart — 90 s : un LeagueClient* apparaît-il ?                 │
+6.5 Wait-GameClientStart — 3 min : un LeagueClient* apparaît-il ?                │
     ├── oui ──► ✅ SUCCÈS PAR L'API                                    ──► ⑩    │
     ├── « Forcer le démarrage » cliqué ──► cause 'cancelled' ─────────────────►  │
     └── non ──► l'API a dit oui sans rien faire (cas de l'endpoint                │
@@ -231,8 +231,8 @@ tient aux temporisations du splash (2 s après la fermeture du client de jeu, 1 
 étapes des applis compagnon), pas à l'API.
 
 Ces durées viennent d'un poste rapide : elles décrivent ce qui a été mesuré, elles ne servent pas de seuil. Les
-échéances sont volontairement larges pour une machine lente — un budget unique de 5 min couvre la pose de la langue
-et l'acceptation du lancement (plutôt que deux compteurs qui se cumuleraient), et 90 s sont laissées au client de
+échéances sont volontairement larges pour une machine lente — un budget unique de 6 min couvre la pose de la langue
+et l'acceptation du lancement (plutôt que deux compteurs qui se cumuleraient), et 3 min sont laissées au client de
 jeu pour apparaître, l'étape la plus sensible à un disque lent ou à Vanguard.
 
 Si ce pire cas se répète, la case « Mode de secours » de l'assistant écarte le chemin rapide.

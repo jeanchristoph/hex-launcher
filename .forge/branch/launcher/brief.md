@@ -46,7 +46,9 @@ mot de passe, endpoint de lancement de produit). Le bouton Play reste un repli f
   2026-09-20).
 - L'utilisateur ne doit jamais avoir à ouvrir `config.json` : tout réglage qu'il peut avoir à corriger se corrige
   dans l'assistant (règle utilisateur, 2026-09-20).
-- Jamais de lancement réel du jeu ni de kill de process Riot en série par Claude : un essai réel = une demande
-  explicite de l'utilisateur, un seul à la fois. Vanguard a signalé une erreur après une quinzaine de cycles
-  lancement/kill enchaînés le 2026-09-20 (règle utilisateur). Les tests restent unitaires, tout est moqué.
+- Lancements réels par Claude : autorisés (levée par l'utilisateur le 2026-09-20), mais **jamais plus d'un cycle
+  toutes les 3-4 minutes** : VAN 216 tombe au 4ᵉ ou 5ᵉ démarrage du client de jeu en quelques minutes, que la
+  fermeture soit un kill ou un arrêt propre par l'API (mesuré trois fois le 2026-09-20 : ~15 cycles avec kill le
+  matin, 4 en 3 min l'après-midi, 5 en 5 min avec fermeture API à 17:30). C'est la cadence des connexions Vanguard
+  qui compte. Les tests Pester restent unitaires, tout est moqué.
 - Aucune écriture de journal, aucun chemin périmé, aucun recul d'horloge ne doit faire échouer un lancement.

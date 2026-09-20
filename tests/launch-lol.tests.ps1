@@ -72,6 +72,70 @@ Describe 'Set-LeagueLocale' {
     }
 }
 
+Describe 'Enter-LaunchLock' {
+    $name = 'Local\HexLauncher.Launch.Test-' + [guid]::NewGuid().ToString('N')
+
+    It 'prend le verrou quand aucun lanceur ne tourne, et le rend' {
+        $lock = Enter-LaunchLock $name
+        $lock | Should Not BeNullOrEmpty
+        Exit-LaunchLock $lock
+        $again = Enter-LaunchLock $name
+        $again | Should Not BeNullOrEmpty
+        Exit-LaunchLock $again
+    }
+
+    It 'refuse le verrou tenu par un autre lanceur — un autre fil, comme un autre process' {
+        $holder = [powershell]::Create()
+        $holder.AddScript({ param($Name) $m = New-Object Threading.Mutex($false, $Name); [void]$m.WaitOne(0); Start-Sleep -Seconds 2; $m.ReleaseMutex(); $m.Dispose() }).AddArgument($name) | Out-Null
+        $handle = $holder.BeginInvoke()
+        Start-Sleep -Milliseconds 300
+        try {
+            Enter-LaunchLock $name | Should BeNullOrEmpty
+        }
+        finally { $holder.EndInvoke($handle); $holder.Dispose() }
+    }
+
+    It 'reprend un verrou abandonné par un lanceur tué' {
+        $holder = [powershell]::Create()
+        $holder.AddScript({ param($Name) $m = New-Object Threading.Mutex($false, $Name); [void]$m.WaitOne(0) }).AddArgument($name) | Out-Null
+        $holder.Invoke() | Out-Null
+        $holder.Dispose()
+        $lock = Enter-LaunchLock $name
+        $lock | Should Not BeNullOrEmpty
+        Exit-LaunchLock $lock
+    }
+
+    It 'rend la main sans erreur quand il n''y a rien à libérer' {
+        { Exit-LaunchLock $null } | Should Not Throw
+    }
+
+    It 'laisse au second lanceur le temps de lire le message avant de s''effacer' {
+        $LaunchRefusedSplashSeconds | Should BeGreaterThan 1
+    }
+}
+
+Describe 'Test-LaunchBurst' {
+    Mock Write-LaunchLogLine { }
+
+    It 'prévient à partir du troisième lancement en cinq minutes, et le journalise' {
+        Mock Get-RecentLaunchCount { return 3 }
+        Test-LaunchBurst 'C:\journal\launch.log' | Should Be $true
+        Assert-MockCalled Get-RecentLaunchCount -Scope It -Exactly 1 -ParameterFilter { $Path -eq 'C:\journal\launch.log' -and $Since -gt (Get-Date).AddMinutes(-6) -and $Since -lt (Get-Date).AddMinutes(-4) }
+        Assert-MockCalled Write-LaunchLogLine -Scope It -Exactly 1 -ParameterFilter { $Step -eq 'WARN' -and $Detail -like '3 lancements en 5 min*' }
+    }
+
+    It 'reste silencieux en dessous du seuil' {
+        Mock Get-RecentLaunchCount { return 2 }
+        Test-LaunchBurst 'C:\journal\launch.log' | Should Be $false
+        Assert-MockCalled Write-LaunchLogLine -Scope It -Exactly 0
+    }
+
+    It 'nomme l''erreur Vanguard et le redémarrage dans le message' {
+        $LaunchBurstWarningMessage | Should Match 'VAN 216'
+        $LaunchBurstWarningMessage | Should Match 'redémarrage'
+    }
+}
+
 Describe 'Stop-RiotProcesses' {
     Mock Wait-WithAnimation { }
 
@@ -252,6 +316,13 @@ Describe 'Wait-GameClientStart' {
         Wait-GameClientStart 1 { } | Should Be $false
     }
 
+    It 'sans limite, n''abandonne que sur demande d''arrêt' {
+        $script:ticks = 0
+        Mock Test-GameClientRunning { return $false }
+        Wait-GameClientStart $NoTimeLimitSeconds { $script:ticks++ } { $script:ticks -ge 5 } | Should Be $false
+        $script:ticks | Should Be 5
+    }
+
     It 'laisse au client de jeu le temps d''apparaître' {
         $script:polls = 0
         Mock Test-GameClientRunning { $script:polls++; return ($script:polls -ge 3) }
@@ -267,20 +338,20 @@ Describe 'Wait-GameClientStart' {
 }
 
 Describe 'Budgets du chemin rapide' {
-    It 'laisse cinq minutes au chemin rapide avant le repli en démarrage manuel' {
-        $LocalApiBudgetSeconds | Should Be 300
+    It 'n''impose aucune limite de temps au chemin rapide — un patch sur une connexion lente peut durer des heures' {
+        $LocalApiBudgetSeconds | Should Be $NoTimeLimitSeconds
     }
 
-    It 'propose « Forcer en démarrage manuel » à partir d''une minute trente' {
-        $ForceStartButtonDelaySeconds | Should Be 90
+    It 'propose « Forcer en démarrage manuel » à partir de deux minutes' {
+        $ForceStartButtonDelaySeconds | Should Be 120
     }
 
-    It 'propose le bouton avant la fin du budget, sinon il ne servirait à rien' {
-        $ForceStartButtonDelaySeconds | Should BeLessThan $LocalApiBudgetSeconds
+    It 'propose le bouton « Forcer » : sans limite de temps, c''est la seule sortie d''une attente qui dure' {
+        $ForceStartButtonDelaySeconds | Should BeGreaterThan 0
     }
 
-    It 'laisse une minute trente au client de jeu pour apparaître après un lancement accepté' {
-        $GameClientStartTimeoutSeconds | Should Be 90
+    It 'attend le client de jeu sans limite après un lancement accepté — « Forcer » reste la sortie' {
+        $GameClientStartTimeoutSeconds | Should Be $NoTimeLimitSeconds
     }
 }
 
@@ -293,6 +364,11 @@ Describe 'Get-RemainingBudgetSeconds' {
     It 'laisse toujours une dernière seconde, même le budget épuisé' {
         $chrono = [pscustomobject]@{ Elapsed = [timespan]::FromSeconds(90) }
         Get-RemainingBudgetSeconds $chrono 60 | Should Be 1
+    }
+
+    It 'transmet un budget sans limite tel quel, quel que soit le temps écoulé' {
+        $chrono = [pscustomobject]@{ Elapsed = [timespan]::FromHours(3) }
+        Get-RemainingBudgetSeconds $chrono $NoTimeLimitSeconds | Should Be $NoTimeLimitSeconds
     }
 }
 
@@ -378,15 +454,15 @@ Describe 'Start-LeagueClientByLocalApi' {
         Assert-MockCalled Wait-RiotProductLocale -Scope It -Exactly 0
     }
 
-    It 'partage un seul budget entre la langue et le lancement' {
+    It 'transmet le budget sans limite à la langue comme au lancement' {
         Mock Test-RiotClientRunning { return $true }
         Mock Start-RiotClient { return $true }
         Mock Wait-RiotProductLocale { return [pscustomobject]@{ Success = $true; Kind = ''; StatusCode = 201 } }
         Mock Wait-RiotProductLaunch { return [pscustomobject]@{ Success = $true; Kind = ''; StatusCode = 200 } }
         Mock Wait-GameClientStart { return $true }
         Start-LeagueClientByLocalApi $riotClient 'ja_JP' { } $null | Out-Null
-        Assert-MockCalled Wait-RiotProductLocale -Scope It -Exactly 1 -ParameterFilter { $TimeoutSeconds -le $LocalApiBudgetSeconds -and $TimeoutSeconds -ge 1 }
-        Assert-MockCalled Wait-RiotProductLaunch -Scope It -Exactly 1 -ParameterFilter { $TimeoutSeconds -le $LocalApiBudgetSeconds -and $TimeoutSeconds -ge 1 }
+        Assert-MockCalled Wait-RiotProductLocale -Scope It -Exactly 1 -ParameterFilter { $TimeoutSeconds -eq $NoTimeLimitSeconds }
+        Assert-MockCalled Wait-RiotProductLaunch -Scope It -Exactly 1 -ParameterFilter { $TimeoutSeconds -eq $NoTimeLimitSeconds }
     }
 
     It 'surveille la session du Riot Client à chaque tour, car il se ferme parfois en cours de route' {
@@ -579,8 +655,27 @@ Describe 'Restore-RiotClientInterface' {
         Mock Stop-Process { }
         Restore-RiotClientInterface $riotClient { } | Should Be $true
         Assert-MockCalled Start-RiotClient -Scope It -Exactly 1 -ParameterFilter { $Path -eq $riotClient }
-        Assert-MockCalled Wait-RiotClientInterface -Scope It -Exactly 1
+        Assert-MockCalled Wait-RiotClientInterface -Scope It -Exactly 1 -ParameterFilter { $TimeoutSeconds -eq $RiotClientInterfaceRetrySeconds }
         Assert-MockCalled Stop-Process -Scope It -Exactly 0
+    }
+
+    It 'relance toutes les 30 s après la seconde, sans jamais renoncer de lui-même' {
+        Mock Test-RiotClientInterfaceRunning { return $false }
+        Mock Start-RiotClient { return $true }
+        $script:waits = 0
+        Mock Wait-RiotClientInterface { $script:waits++; return $false }
+        Restore-RiotClientInterface $riotClient { } { $script:waits -ge 4 } | Should Be $false
+        Assert-MockCalled Start-RiotClient -Scope It -Exactly 4
+        Assert-MockCalled Wait-RiotClientInterface -Scope It -Exactly 1 -ParameterFilter { $TimeoutSeconds -eq $RiotClientInterfaceRetrySeconds }
+        Assert-MockCalled Wait-RiotClientInterface -Scope It -Exactly 3 -ParameterFilter { $TimeoutSeconds -eq $RiotClientRelaunchIntervalSeconds }
+    }
+
+    It 'ne rejoue pas la relance quand l''utilisateur a forcé le démarrage manuel entre-temps' {
+        Mock Test-RiotClientInterfaceRunning { return $false }
+        Mock Start-RiotClient { return $true }
+        Mock Wait-RiotClientInterface { return $false }
+        Restore-RiotClientInterface $riotClient { } { $true } | Should Be $false
+        Assert-MockCalled Start-RiotClient -Scope It -Exactly 1
     }
 
     It 'rend faux quand l''exécutable est introuvable, sans attendre' {
@@ -591,11 +686,73 @@ Describe 'Restore-RiotClientInterface' {
         Assert-MockCalled Wait-RiotClientInterface -Scope It -Exactly 0
     }
 
-    It 'rend faux quand l''interface ne revient pas dans le délai — l''appelant tentera l''API quand même' {
+    It 'ne rend faux que sur demande d''arrêt, et le journalise' {
         Mock Test-RiotClientInterfaceRunning { return $false }
         Mock Start-RiotClient { return $true }
-        Mock Wait-RiotClientInterface { return $false }
-        Restore-RiotClientInterface $riotClient { } | Should Be $false
+        Mock Write-LaunchLogLine { }
+        $script:waits = 0
+        Mock Wait-RiotClientInterface { $script:waits++; return $false }
+        Restore-RiotClientInterface $riotClient { } { $script:waits -ge 2 } | Should Be $false
+        Assert-MockCalled Write-LaunchLogLine -Scope It -Exactly 1 -ParameterFilter { $Detail -like 'réveil interrompu*' }
+        Assert-MockCalled Write-LaunchLogLine -Scope It -Exactly 1 -ParameterFilter { $Detail -like 'relance n° 2 *' }
+    }
+
+    # En dernier : ses mocks filtrés survivent jusqu'à la fin du Describe (Pester 3) et masqueraient les suivants
+    It 'rejoue la relance quand l''interface n''est pas revenue après le premier délai — la demande a pu se perdre pendant la bascule' {
+        Mock Test-RiotClientInterfaceRunning { return $false }
+        Mock Start-RiotClient { return $true }
+        Mock Wait-RiotClientInterface { return $false } -ParameterFilter { $TimeoutSeconds -eq $RiotClientInterfaceRetrySeconds }
+        Mock Wait-RiotClientInterface { return $true }  -ParameterFilter { $TimeoutSeconds -ne $RiotClientInterfaceRetrySeconds }
+        Mock Write-LaunchLogLine { }
+        Restore-RiotClientInterface $riotClient { } | Should Be $true
+        Assert-MockCalled Start-RiotClient -Scope It -Exactly 2
+        Assert-MockCalled Wait-RiotClientInterface -Scope It -Exactly 2
+        Assert-MockCalled Write-LaunchLogLine -Scope It -Exactly 1 -ParameterFilter { $Detail -like 'relance n° 2 *' }
+    }
+}
+
+Describe 'Watch-RiotClientInterface' {
+    $riotClient = 'C:\Riot\RiotClientServices.exe'
+    Mock Write-LaunchLogLine { }
+
+    It 'retient que l''interface a été vue, sans rien réveiller' {
+        $script:RiotInterfaceSeen = $false
+        Mock Test-RiotClientInterfaceRunning { return $true }
+        Mock Restore-RiotClientInterface { return $true }
+        Watch-RiotClientInterface $riotClient { } { $false }
+        $script:RiotInterfaceSeen | Should Be $true
+        Assert-MockCalled Restore-RiotClientInterface -Scope It -Exactly 0
+    }
+
+    It 'ne réveille pas un Riot Client dont l''interface n''a jamais été vue — il est en train de démarrer' {
+        $script:RiotInterfaceSeen = $false
+        Mock Test-RiotClientInterfaceRunning { return $false }
+        Mock Restore-RiotClientInterface { return $true }
+        Watch-RiotClientInterface $riotClient { } { $false }
+        Assert-MockCalled Restore-RiotClientInterface -Scope It -Exactly 0
+    }
+
+    It 'réveille le Riot Client dont la fenêtre a été refermée pendant l''attente, une seule fois' {
+        $script:RiotInterfaceSeen = $true
+        Mock Test-RiotClientInterfaceRunning { return $false }
+        Mock Restore-RiotClientInterface { return $false }
+        Watch-RiotClientInterface $riotClient { } { $false }
+        Watch-RiotClientInterface $riotClient { } { $false }
+        Assert-MockCalled Restore-RiotClientInterface -Scope It -Exactly 1 -ParameterFilter { $Path -eq $riotClient }
+        Assert-MockCalled Write-LaunchLogLine -Scope It -Exactly 1 -ParameterFilter { $Detail -like 'interface disparue*' }
+    }
+
+    It 'réveille de nouveau si l''interface revient puis disparaît encore' {
+        $script:RiotInterfaceSeen = $true
+        $script:present = $false
+        Mock Test-RiotClientInterfaceRunning { return $script:present }
+        Mock Restore-RiotClientInterface { return $true }
+        Watch-RiotClientInterface $riotClient { } { $false }   # disparue → réveil
+        $script:present = $true
+        Watch-RiotClientInterface $riotClient { } { $false }   # revenue
+        $script:present = $false
+        Watch-RiotClientInterface $riotClient { } { $false }   # disparue → second réveil
+        Assert-MockCalled Restore-RiotClientInterface -Scope It -Exactly 2
     }
 }
 
@@ -652,6 +809,21 @@ Describe 'Start-LeagueClientByLocalApi, Riot Client replié sans interface' {
     }
 }
 
+Describe 'Get-WaitReasonStatus' {
+    It 'dit au joueur que Riot met le jeu à jour' {
+        Get-WaitReasonStatus 'updating' | Should Be 'Mise à jour de League of Legends par Riot en cours…'
+    }
+
+    It 'dit au joueur que Riot libère la session précédente' {
+        Get-WaitReasonStatus 'releasing' | Should Be 'Riot libère la session de jeu précédente…'
+    }
+
+    It 'ne dit rien pour un motif inconnu' {
+        Get-WaitReasonStatus 'autre' | Should Be ''
+        Get-WaitReasonStatus '' | Should Be ''
+    }
+}
+
 Describe 'Start-LeagueClientByLocalApi, suivi des étapes' {
     $riotClient = 'C:\Riot\RiotClientServices.exe'
     Mock Test-RiotClientInterfaceRunning { return $true }
@@ -667,6 +839,19 @@ Describe 'Start-LeagueClientByLocalApi, suivi des étapes' {
         ($script:etapes -join ' | ') | Should Match 'Application de la langue fr_FR'
         ($script:etapes -join ' | ') | Should Match 'Demande de lancement'
         ($script:etapes -join ' | ') | Should Match 'Le jeu se prépare'
+    }
+
+    It 'affiche pourquoi Riot fait attendre le lancement, et le journalise' {
+        Mock Test-RiotClientRunning { return $true }
+        Mock Start-RiotClient { return $true }
+        Mock Write-LaunchLogLine { }
+        Mock Wait-RiotProductLocale { return [pscustomobject]@{ Success = $true; Kind = ''; StatusCode = 201 } }
+        Mock Wait-RiotProductLaunch { & $OnWait 'updating'; return [pscustomobject]@{ Success = $true; Kind = ''; StatusCode = 200 } }
+        Mock Wait-GameClientStart { return $true }
+        $script:etapes = @()
+        Start-LeagueClientByLocalApi $riotClient 'fr_FR' { } { param($Message) $script:etapes += $Message } | Out-Null
+        ($script:etapes -join ' | ') | Should Match 'Mise à jour de League of Legends par Riot en cours'
+        Assert-MockCalled Write-LaunchLogLine -Scope It -Exactly 1 -ParameterFilter { $Step -eq 'WAIT' -and $Detail -like '424 : Mise à jour*' }
     }
 
     It 'annonce le démarrage du Riot Client quand il est éteint' {
@@ -793,6 +978,25 @@ Describe 'Start-LeagueClient' {
         Assert-MockCalled Start-LeagueClientByLocalApi -Scope It -Exactly 0
         Assert-MockCalled Stop-GameClient -Scope It -Exactly 0
         Assert-MockCalled Start-LeagueClientByCommandLine -Scope It -Exactly 1
+    }
+
+    It 's''arrête sans démarrage manuel ni kill quand l''utilisateur clique la croix' {
+        Mock Stop-GameClient { }
+        Mock Start-LeagueClientByLocalApi { return [pscustomobject]@{ Success = $false; Failure = [pscustomobject]@{ Kind = 'cancelled'; StatusCode = 424; Stage = 'launch' } } }
+        Mock Test-GameClientRunning { return $false }
+        Mock Start-LeagueClientByCommandLine { return $true }
+        Mock Write-LaunchLogLine { }
+        $launch = Start-LeagueClient -Path 'C:\Riot\RiotClientServices.exe' -YamlPath 'C:\yaml' -Value 'ja_JP' -OnTick { } -ShouldStop { $false } -ShouldAbort { $true }
+        $launch.Outcome | Should Be 'cancelled'
+        Assert-MockCalled Start-LeagueClientByCommandLine -Scope It -Exactly 0
+        Assert-MockCalled Write-LaunchLogLine -Scope It -Exactly 1 -ParameterFilter { $Step -eq 'ABORT' }
+    }
+
+    It 'transmet à la boucle un arrêt qui vaut pour « Forcer » comme pour la croix' {
+        Mock Stop-GameClient { }
+        Mock Start-LeagueClientByLocalApi { param($Path, $Value, $OnTick, $OnStatus, $ShouldStop) $script:stopSeen = & $ShouldStop; return [pscustomobject]@{ Success = $true; Failure = $null } }
+        Start-LeagueClient -Path 'C:\Riot\RiotClientServices.exe' -YamlPath 'C:\yaml' -Value 'ja_JP' -OnTick { } -ShouldStop { $false } -ShouldAbort { $true } | Out-Null
+        $script:stopSeen | Should Be $true
     }
 
     It 'n''interrompt jamais l''installation, même quand rien ne répond' {
