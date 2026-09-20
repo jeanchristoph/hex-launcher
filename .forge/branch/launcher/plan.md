@@ -135,6 +135,32 @@ process `Riot Client` et la classe `Chrome_WidgetWin_1`. Jamais sur le chemin cl
 n'est disponible pour déboguer.
 [x] 2026-09-20 — réglage lu par le lanceur, case mémorisée comme le jeu d'icônes, i18n ×3, 518 verts
 
+### T14 — Bug : Riot déjà lancé, pourtant fermé et redémarré en mode classique
+**Effort:** M
+**Files:** `app/lib/riot-window.lib.ps1`, `app/lib/riot-client-api.lib.ps1`, `app/lib/launch-state.lib.ps1`, `app/launch-lol.ps1`, tests
+**Description:** Constaté par l'utilisateur sur la 0.2.0, release retirée le 2026-09-20. Le journal montre la
+séquence exacte : un premier lancement réussit par l'API et **ferme la fenêtre du Riot Client** (T12) ; au
+lancement suivant, Riot tourne encore mais **sans interface**, et dans cet état `PUT /riotclient/product-locales/…`
+répond **404 en 0,0 s**. Le lanceur y voit une route disparue → bascule classique → tout Riot fermé. Puis la
+mémoire, avec son seuil `route = 1` (T9), écarte l'API d'office pour tous les lancements suivants.
+
+Deux décisions se combinent mal : T12 produit un état de Riot où certaines routes n'existent plus, et T9 rend ce
+404 définitif dès la première occurrence.
+
+**Mesurer d'abord**, Riot Client tournant fenêtre fermée : quelles routes répondent encore ? (`GET region-locale`,
+`PUT product-locales`, `POST product-launcher`, `GET swagger`). Puis, si l'interface est relancée (ou Riot
+redémarré), la route revient-elle ? Hypothèse à vérifier : la route de la langue appartient à un plugin de
+l'interface, détruit avec elle.
+
+**Pistes selon la mesure** : (a) traiter le 404 sur un Riot sans fenêtre comme un état transitoire — redémarrer
+Riot proprement puis retenter l'API, au lieu de basculer classique ; (b) ne compter en mémoire un `route` qu'après
+confirmation sur un Riot fraîchement démarré, jamais sur un Riot dégradé ; (c) en dernier recours, ne plus fermer
+la fenêtre (renoncer aux 600 Mo de T12) — à n'envisager que si rien d'autre ne tient.
+
+**Test à écrire** : « Riot déjà lancé, fenêtre fermée → le lanceur ne le ferme pas et ne bascule pas en
+classique ». Et un test réel enchaînant deux lancements à 60 s d'intervalle, le second devant rester sur l'API.
+[ ]
+
 ## Risks
 - Endpoint non documenté par Riot : relevé sur `swagger/v3/openapi.json` à l'exécution, et le repli rend l'échec non bloquant.
 - `ServerCertificateValidationCallback` est global à .NET : posé puis restauré dans un `finally`.
@@ -160,4 +186,5 @@ None
 | T11 — Splash détaillé | S | [x] |
 | T12 — Riot dans la zone de notification | M | [x] |
 | T13 — Case dans l'assistant | M | [x] |
+| T14 — Riot déjà lancé fermé à tort (bug 0.2.0) | M | [ ] |
 | **Total** | **~L (5-8 h)** | |
