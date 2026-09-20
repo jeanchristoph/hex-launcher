@@ -33,7 +33,7 @@ lol/  (dépôt hex-launcher)
     ├── lib/icon.lib.ps1         # Lecture/écriture .ico (entrées PNG ou DIB), chemins résolus à la PowerShell
     ├── lib/icon-badge.lib.ps1   # Pastille compagnon (disque couleur + lettre, haut-droite) composée sur chaque taille
     ├── lib/palette.lib.ps1      # Palette réduite (8 teintes) + atténuation ($PaletteMuting) partagées : drapeaux (générateur) et pastilles compagnon (runtime) ; voile mêlé en lumière linéaire = GDI+ HighQuality
-    ├── lib/icon-set.lib.ps1     # Jeux d'icônes : Get-IconSets (sous-dossiers de ico\ avec hex-launcher.ico ou icon-source.json), défaut flat, Resolve-IconSet avec repli, Get-IconSetSource (jeu externe league-client, badges)
+    ├── lib/icon-set.lib.ps1     # Jeux d'icônes : Get-IconSets (sous-dossiers de ico\ avec hex-launcher.ico ou icon-source.json, ordre fixe $IconSetDisplayOrder), repli flat, préféré original-badges (présélection), Resolve-IconSet avec repli, Get-IconSetSource ; libellés traduits iconSet.<camelCase> côté setup (jeu externe league-client, badges)
     ├── lib/flag.lib.ps1         # Drapeaux GDI+ ($FlagDrawings, une définition pour les icônes et les pastilles pays) ; New-FlagBitmap neutre, résolveur de couleur optionnel injecté par le générateur
     ├── lib/riot-install.lib.ps1 # RiotClientInstalls.json (fichier officiel Riot, lecture seule) : Find-RiotClientPath, Find-LeagueClientPath (associated_client → LeagueClient.exe)
     ├── lib/i18n.lib.ps1         # Traductions : Resolve-UiLanguage, Initialize-Translation, Get-Text, Get-LocalizedValue

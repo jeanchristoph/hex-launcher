@@ -247,6 +247,10 @@ Si l'icône ne tient pas : décision utilisateur (garder sans engrenage, ou ne p
 [x] 2026-09-20 — `New-ReleaseSetupShortcut` (RelativePath = chemin du .lnk → le shell stocke « setup.bat » et pose
 HasRelativePath) ; test de résolution après déplacement (`ShellLinkObject.Resolve`) ; essai réel sur l'archive extraite
 ailleurs : cible résolue, engrenage affiché depuis un répertoire courant étranger ; README ×3 ; 572 verts
+[!] RETIRÉE le 2026-09-20 (branche icons) : la mesure « engrenage affiché » était fausse — la sonde tournait avec le
+dossier du projet comme répertoire courant, où `app\ico\…` existe. Depuis `C:\Windows` (cas de l'Explorateur), l'icône
+relative rend un carré vide : le format .lnk n'a pas de repli relatif pour l'icône, seulement pour la cible. Décision de
+l'utilisateur : pas de raccourci dans l'archive. `New-ReleaseSetupShortcut`, ses tests et la mention README retirés.
 
 ## Risks
 - Endpoint non documenté par Riot : relevé sur `swagger/v3/openapi.json` à l'exécution, et le repli rend l'échec non bloquant.
@@ -278,5 +282,5 @@ None
 | T14 — Riot déjà lancé fermé à tort (bug 0.2.0) | M | [x] réserve : 2ᵉ scénario réel à rejouer |
 | T17 — Chemins Riot modifiables dans l'assistant | M | [x] |
 | T18 — Raccourci « Hex Launcher » sur le Bureau | S | [x] |
-| T19 — Raccourci relatif « Hex Launcher » dans l'archive | S | [x] |
+| T19 — Raccourci relatif « Hex Launcher » dans l'archive | S | [!] retirée le 2026-09-20 — l'icône d'un .lnk ne peut pas être relative |
 | **Total** | **~L (5-8 h)** | |

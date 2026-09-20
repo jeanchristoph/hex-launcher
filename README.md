@@ -2,7 +2,7 @@
 
 **English** · [Français](README.fr.md) · [日本語](README.ja.md)
 
-> **Not affiliated with Riot Games.** Hex Launcher was created under Riot Games' ["Legal Jibber Jabber"](https://www.riotgames.com/en/legal) policy. Riot Games does not endorse or sponsor this project. League of Legends and Riot Games are trademarks or registered trademarks of Riot Games, Inc. This project ships no Riot artwork: its icons are original.
+> **Not affiliated with Riot Games.** Hex Launcher was created under Riot Games' ["Legal Jibber Jabber"](https://www.riotgames.com/en/legal) policy. Riot Games does not endorse or sponsor this project. League of Legends and Riot Games are trademarks or registered trademarks of Riot Games, Inc.
 
 **Windows only, for now** (Windows 10/11, PowerShell 5.1 included — macOS is not supported).
 
@@ -11,6 +11,10 @@ League of Legends launcher helper for Windows: start the game in the language of
 and manage your **companion apps** (Porofessor, Blitz, OP.GG, Mobalytics) — tick the ones you want,
 they get installed for you, and you get one shortcut per language × companion app
 (`League of Legends JP - Blitz`, `League of Legends JP - Porofessor`…).
+
+> **No data collected, no telemetry, no account.** The tool only talks to the Riot Client on your PC, only goes online for
+> a companion app you ticked, refuses to run as administrator and installs nothing without your click on *Apply*.
+> `setup.bat` is one line; all the code is plain text. Details: [Trust](#trust--what-setupbat-does-and-does-not-do).
 
 ## Folder contents
 
@@ -37,12 +41,32 @@ they get installed for you, and you get one shortcut per language × companion a
 | `tools/` | Development only, not shipped: `make-release.ps1`, `make-flag-icons.ps1` (rebuilds the `flat` icon set from the vector logo), `logo/make-logo-svg.py` + `logo/hex-launcher-logo-drawing.png` → `logo/hex-launcher-logo.svg` (the original HL logo, source of truth) |
 | `app/ico/` | Icon sets, one folder each: `flat/` (default: flat flag behind the HL logo) and `classic/` (the former embossed icons); each holds the base icon + one flag variant per language (`hex-launcher-xx.ico`), and a generated `companion/` subfolder with the flag + badge icons composed on this machine. `original/` and `original-badges/` hold only an `icon-source.json` marker: the official game icon, referenced from the installed `LeagueClient.exe` — bare, or with country and companion badges composed on this machine |
 
+## Trust — what `setup.bat` does, and does not do
+
+Double-clicking an unknown `.bat` is scary, and rightly so. Here is how to check for yourself:
+
+- **It is readable.** `setup.bat` is one line — open it in Notepad: it opens `app\setup.ps1`, without a console.
+  All the code lives in `app\`, in plain PowerShell, identical to this public repository.
+- **No data collected, no telemetry, no account, no server.** Hex Launcher only talks to the Riot Client on *your*
+  PC (`127.0.0.1`, its local API) and only reaches the Internet to download a companion app *you ticked*, from its
+  publisher's site or winget. The `app\launch.log` journal stays in the folder.
+- **Never as administrator**: run "as administrator", it refuses. The Windows registry is read only (to detect
+  already-installed apps), never written. It writes only inside its own folder (`config.json`, composed icons), on
+  the Desktop (the shortcuts) and, for the duration of an install you asked for, the companion app's installer in
+  the Windows temporary folder.
+- **Nothing without your click.** A companion app is installed or removed only after *Apply*, with the exact list
+  of actions shown beforehand. The welcome page changes nothing.
+- **The game is not modified.** Only the language changes, through the Riot Client's own local API (what its own
+  setting does); no League of Legends file is touched.
+- **Verifiable.** Every release publishes the SHA-256 of its zip; compare it with
+  `Get-FileHash hex-launcher-x.y.z.zip` in PowerShell. The source code is this repository.
+
 ## Setting up on a new machine
 
 0. **[Download the latest release](https://github.com/jeanchristoph/hex-launcher/releases/latest)** (`hex-launcher-x.y.z.zip`) and unzip it — or clone the repository.
 1. Copy this folder anywhere (e.g. `Documents\hex-launcher`) — **without** `config.json` if it comes
    from another machine, so detection can run.
-2. Double-click the **Hex Launcher** shortcut shipped at the root — if nothing happens (shortcut moved, `.lnk` blocked), double-click **`setup.bat`**, which is what it runs. Never "Run as administrator": the tool refuses, on purpose. One window, three steps:
+2. Double-click **`setup.bat`** (never "Run as administrator": the tool refuses, on purpose). One window, three steps:
    - **[1/3] Detection** — finds the Riot Client (via `RiotClientInstalls.json`, Riot's official file) and every
      companion app of the catalogue already installed, then writes `config.json` (never overwritten if it already
      exists: manual settings are preserved). Both Riot paths are shown in editable fields with a *Browse…* button:
@@ -190,7 +214,10 @@ Icon: each shortcut gets the flag variant of its language from the chosen icon s
 e.g. `hex-launcher-jp.ico` for `ja_JP`); missing flag → the set's base icon, then the default set. The set is picked on
 the *Shortcuts* page of `setup.bat` (with a preview of its base icon) and remembered in `config.json` (`iconSet`);
 in script mode: `create-shortcuts.ps1 -IconSet classic`. Any folder dropped in `app/ico/` that contains a
-`hex-launcher.ico` becomes a selectable set, named after the folder — `flat` is the default.
+`hex-launcher.ico` becomes a selectable set. Shipped sets are listed in a fixed order under a translated label
+("Official LoL + badges", "Official LoL, plain", "Classic (embossed)", "Flat flag + HL logo"); an added set comes after,
+under its folder name. On a fresh install `original-badges` is preselected; `flat` remains the fallback set (window
+icon, missing flag, LoL not found).
 A shortcut with a companion app also carries a coloured badge in the top-right corner — P Porofessor, B Blitz,
 O OP.GG, M Mobalytics — composed at install time into `app/ico/<set>/companion/` (the letter is dropped below 32 px, the colour stays).
 Badge colours are those of the catalogue; a set can style them with a `badge-style.json` in its folder:

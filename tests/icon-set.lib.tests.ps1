@@ -21,16 +21,21 @@ function New-TestIcoRoot([string[]]$SetsWithBase, [string[]]$FoldersWithoutBase 
 }
 
 Describe 'Get-IconSets' {
-    It 'liste un jeu par sous-dossier contenant hex-launcher.ico, nommé par le dossier, trié par nom' {
+    It 'liste un jeu par sous-dossier contenant hex-launcher.ico, nommé par le dossier, dans l''ordre d''affichage' {
         $root = New-TestIcoRoot @('flat', 'classic')
         $sets = @(Get-IconSets $root)
         ($sets | ForEach-Object { $_.Name }) -join ',' | Should Be 'classic,flat'
         $sets[1].Path | Should Be (Join-Path $root 'flat')
     }
 
+    It 'place les jeux livrés dans l''ordre fixe, un jeu inconnu après eux par ordre alphabétique' {
+        $root = New-TestIcoRoot @('flat', 'zeta', 'classic', 'alpha') @() @('original', 'original-badges')
+        (@(Get-IconSets $root) | ForEach-Object { $_.Name }) -join ',' | Should Be 'original-badges,original,classic,flat,alpha,zeta'
+    }
+
     It 'liste aussi un jeu externe, reconnu par icon-source.json sans aucun .ico' {
         $root = New-TestIcoRoot @('flat') @() @('original')
-        (@(Get-IconSets $root) | ForEach-Object { $_.Name }) -join ',' | Should Be 'flat,original'
+        (@(Get-IconSets $root) | ForEach-Object { $_.Name }) -join ',' | Should Be 'original,flat'
     }
 
     It 'ignore un dossier sans hex-launcher.ico ni icon-source.json (ico\companion par exemple)' {
@@ -55,6 +60,20 @@ Describe 'Get-DefaultIconSet' {
 
     It 'rend null sans aucun jeu' {
         Get-DefaultIconSet @() | Should BeNullOrEmpty
+    }
+}
+
+Describe 'Get-PreferredIconSet' {
+    It 'présélectionne original-badges pour une installation neuve' {
+        (Get-PreferredIconSet @(Get-IconSets (New-TestIcoRoot @('classic', 'flat') @() @('original', 'original-badges')))).Name | Should Be 'original-badges'
+    }
+
+    It 'replie sur le jeu de repli quand original-badges manque' {
+        (Get-PreferredIconSet @(Get-IconSets (New-TestIcoRoot @('classic', 'flat')))).Name | Should Be 'flat'
+    }
+
+    It 'rend null sans aucun jeu' {
+        Get-PreferredIconSet @() | Should BeNullOrEmpty
     }
 }
 
@@ -160,7 +179,7 @@ Describe 'jeux livrés dans app\ico' {
         . (Join-Path $here '..\app\lib\launch-config.lib.ps1')
         $root  = Join-Path $here '..\app\ico'
         $sets  = @(Get-IconSets $root)
-        ($sets | ForEach-Object { $_.Name }) -join ',' | Should Be 'classic,flat,original,original-badges'
+        ($sets | ForEach-Object { $_.Name }) -join ',' | Should Be 'original-badges,original,classic,flat'
         (Get-DefaultIconSet $sets).Name | Should Be 'flat'
         $codes = @(Read-JsonCatalog (Join-Path $here '..\app\locales.json') | ForEach-Object { $_.code })
         foreach ($set in @($sets | Where-Object { -not (Test-IconSetExternal $_) })) {

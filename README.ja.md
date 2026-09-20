@@ -2,7 +2,7 @@
 
 [English](README.md) · [Français](README.fr.md) · **日本語**
 
-> **Riot Games とは無関係のプロジェクトです。** Hex Launcher は Riot Games の[「Legal Jibber Jabber」](https://www.riotgames.com/en/legal)ポリシーのもとで作成されました。Riot Games はこのプロジェクトを支持・後援していません。League of Legends および Riot Games は Riot Games, Inc. の商標または登録商標です。このプロジェクトには Riot の画像素材は含まれず、アイコンはすべてオリジナルです。
+> **Riot Games とは無関係のプロジェクトです。** Hex Launcher は Riot Games の[「Legal Jibber Jabber」](https://www.riotgames.com/en/legal)ポリシーのもとで作成されました。Riot Games はこのプロジェクトを支持・後援していません。League of Legends および Riot Games は Riot Games, Inc. の商標または登録商標です。
 
 **現時点では Windows 専用です**（Windows 10/11、PowerShell 5.1 同梱 — macOS は非対応）。
 
@@ -11,6 +11,10 @@ Windows 向け League of Legends 起動アシスタント：デスクトップ�
 さらに**補助アプリ**（Porofessor、Blitz、OP.GG、Mobalytics）を管理します — 使いたいものにチェックを入れると
 ツールがインストールし、言語 × 補助アプリごとにショートカットが作られます
 （`League of Legends JP - Blitz`、`League of Legends JP - Porofessor` など）。
+
+> **データ収集なし、テレメトリなし、アカウントなし。** このツールが通信するのはあなたの PC 上の Riot Client だけで、
+> インターネットに接続するのはあなたがチェックした補助アプリのためだけです。管理者としての実行は拒否し、「適用」を
+> クリックしない限り何もインストールしません。`setup.bat` は 1 行、コードはすべて平文です。詳細：[安心して使うために](#安心して使うために--setupbat-がすることしないこと)。
 
 ## フォルダーの内容
 
@@ -37,12 +41,32 @@ Windows 向け League of Legends 起動アシスタント：デスクトップ�
 | `app/lib/i18n.lib.ps1` / `app/i18n/` | アシスタントとコンソールの翻訳：言語ごとの辞書 `fr.json` / `en.json` / `ja.json`（すべて同じキー） |
 | `app/ico/` | アイコンセット（フォルダーごとに 1 セット）：`flat/`（既定：HL ロゴの背後にフラットな国旗）と `classic/`（以前の立体アイコン）。各セットに基本アイコン＋言語ごとの国旗バージョン（`hex-launcher-xx.ico`）と、この PC で合成された国旗＋バッジのアイコンが入る生成フォルダー `companion/` があります。`original/` と `original-badges/` にはマーカー `icon-source.json` しかありません：インストール済みの `LeagueClient.exe` から参照するゲームの公式アイコンで、そのまま、または国と補助アプリのバッジをこの PC で合成して使います |
 
+## 安心して使うために — `setup.bat` がすること、しないこと
+
+見知らぬ `.bat` をダブルクリックするのは怖いものです。ご自身で確認できる材料です：
+
+- **読めます。** `setup.bat` は 1 行だけ — メモ帳で開いてください：コンソールなしで `app\setup.ps1` を開くだけです。
+  コードはすべて `app\` にあり、平文の PowerShell で、この公開リポジトリと同一です。
+- **データ収集なし、テレメトリなし、アカウントなし、サーバーなし。** Hex Launcher が通信するのは*あなたの* PC 上の
+  Riot Client（`127.0.0.1`、ローカル API）だけで、インターネットに接続するのは*あなたがチェックした*補助アプリを
+  配布元サイトまたは winget からダウンロードするときだけです。ログ `app\launch.log` はフォルダーから出ません。
+- **管理者としては絶対に実行しません**：「管理者として実行」すると拒否します。Windows レジストリは読み取りのみ
+  （インストール済みアプリの検出）、書き込みは一切しません。書き込むのは自分のフォルダー内（`config.json`、合成した
+  アイコン）、デスクトップ（ショートカット）、そしてあなたが依頼したインストールの間だけ Windows の一時フォルダーに
+  置かれる補助アプリのインストーラーです。
+- **クリックなしには何もしません。** 補助アプリのインストール・アンインストールは「適用」を押した後だけで、実行される
+  操作の一覧が事前に表示されます。ようこそページは何も変更しません。
+- **ゲームは変更されません。** 変わるのは言語だけで、Riot Client 自身のローカル API（本体の設定と同じ仕組み）を
+  使います。League of Legends のファイルには触れません。
+- **検証できます。** 各リリースは zip の SHA-256 を公開しています。PowerShell の
+  `Get-FileHash hex-launcher-x.y.z.zip` と比較してください。ソースコードはこのリポジトリです。
+
 ## 新しい PC でのセットアップ
 
 0. **[最新版をダウンロード](https://github.com/jeanchristoph/hex-launcher/releases/latest)**（`hex-launcher-x.y.z.zip`）して展開するか、リポジトリをクローンします。
 1. このフォルダーを好きな場所にコピーします（例：`Documents\hex-launcher`）。別の PC から持ってきた場合は、
    検出が正しく動くように **`config.json` を含めない**でください。
-2. ルートに同梱のショートカット **Hex Launcher** をダブルクリックします。反応しない場合（ショートカットを移動した、`.lnk` がブロックされた）は **`setup.bat`** をダブルクリックしてください — ショートカットが起動するのはこのファイルです。「管理者として実行」は不可：ツールは意図的に拒否します。3 つのステップ：
+2. **`setup.bat`** をダブルクリックします（「管理者として実行」は不可：ツールは意図的に拒否します）。3 つのステップ：
    - **[1/3] 検出** — Riot Client を検出（Riot 公式のファイル `RiotClientInstalls.json` を使用）し、カタログの補助アプリのうち
      既にインストール済みのものをすべて検出し、`config.json` を書き出します（既に存在する場合は上書きしません：手動設定は保持されます）。
      Riot の 2 つのパスは「参照…」ボタン付きの編集可能な欄に表示されます：間違ったパスはその場で修正でき、「次へ」で保存され、
@@ -183,7 +207,10 @@ Riot が提供するすべての言語が `locales.json` にあり、インス�
 例：`ja_JP` は `hex-launcher-jp.ico`）が設定されます。国旗がなければセットの基本アイコン、次に既定セットが使われます。
 セットは `setup.bat` の「ショートカット」ページで選び（基本アイコンのプレビュー付き）、`config.json`（`iconSet`）に記憶されます。
 スクリプトモード：`create-shortcuts.ps1 -IconSet classic`。`hex-launcher.ico` を含むフォルダーを `app/ico/` に置けば、
-フォルダー名のセットとして選べるようになります（`flat` が既定）。
+セットとして選べるようになります。同梱のセットは固定の順序で、翻訳されたラベル（「LoL 公式＋バッジ」「LoL 公式（バッジなし）」
+「クラシック（立体）」「フラット国旗＋HL ロゴ」）で表示され、追加したセットはその後にフォルダー名で表示されます。
+新規インストールでは `original-badges` が選択済みです。`flat` は引き続きフォールバック用のセットです（ウィンドウアイコン、
+国旗がない場合、LoL が見つからない場合）。
 補助アプリ付きのショートカットには右上に色付きバッジが加わります — P Porofessor、B Blitz、O OP.GG、M Mobalytics —
 インストール時に `app/ico/<セット>/companion/` に合成されます（32 px 未満では文字が省かれ、色だけが残ります）。
 バッジの色はカタログのままです。セットのフォルダーに `badge-style.json`（`{ "nightVeil": true, "reducedPalette": false }`）を置くと、

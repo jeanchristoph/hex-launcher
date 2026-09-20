@@ -2,7 +2,7 @@
 
 [English](README.md) · **Français** · [日本語](README.ja.md)
 
-> **Projet non affilié à Riot Games.** Hex Launcher a été créé dans le cadre de la politique [« Legal Jibber Jabber »](https://www.riotgames.com/en/legal) de Riot Games. Riot Games ne soutient ni ne sponsorise ce projet. League of Legends et Riot Games sont des marques ou marques déposées de Riot Games, Inc. Ce projet n'embarque aucun visuel Riot : ses icônes sont originales.
+> **Projet non affilié à Riot Games.** Hex Launcher a été créé dans le cadre de la politique [« Legal Jibber Jabber »](https://www.riotgames.com/en/legal) de Riot Games. Riot Games ne soutient ni ne sponsorise ce projet. League of Legends et Riot Games sont des marques ou marques déposées de Riot Games, Inc.
 
 **Windows uniquement, pour l'instant** (Windows 10/11, PowerShell 5.1 inclus — macOS non pris en charge).
 
@@ -11,6 +11,10 @@ Assistant de lancement League of Legends pour Windows : démarre le jeu dans la 
 **applications compagnon** (Porofessor, Blitz, OP.GG, Mobalytics) — on coche celles qu'on veut, l'outil les
 installe, et on obtient un raccourci par langue × appli compagnon
 (`League of Legends JP - Blitz`, `League of Legends JP - Porofessor`…).
+
+> **Aucune donnée collectée, aucune télémétrie, aucun compte.** L'outil ne parle qu'au Riot Client de votre PC, ne va sur
+> Internet que pour une appli compagnon que vous avez cochée, refuse le mode administrateur et n'installe rien sans votre
+> clic sur *Appliquer*. `setup.bat` tient en une ligne, tout le code est en clair. Détails : [Confiance](#confiance--ce-que-fait-setupbat-ce-quil-ne-fait-pas).
 
 ## Contenu du dossier
 
@@ -37,12 +41,32 @@ installe, et on obtient un raccourci par langue × appli compagnon
 | `tools/` | Développement uniquement, hors release : `make-release.ps1`, `make-flag-icons.ps1` (régénère toutes les icônes de `app/ico/` depuis le logo vectoriel), `logo/make-logo-svg.py` + `logo/hex-launcher-logo-drawing.png` → `logo/hex-launcher-logo.svg` (logo HL original, source de vérité) |
 | `app/ico/` | Jeux d'icônes, un dossier chacun : `flat/` (défaut : drapeau plat derrière le logo HL) et `classic/` (les anciennes icônes en relief) ; chacun contient l'icône de base + une variante drapeau par langue (`hex-launcher-xx.ico`) et un sous-dossier généré `companion/` avec les icônes drapeau + pastille composées sur ce poste. `original/` et `original-badges/` ne contiennent qu'un marqueur `icon-source.json` : l'icône officielle du jeu, référencée depuis `LeagueClient.exe` installé — nue, ou avec pastilles pays et compagnon composées sur ce poste |
 
+## Confiance — ce que fait `setup.bat`, ce qu'il ne fait pas
+
+Cliquer sur un `.bat` inconnu fait peur, à juste titre. Voici de quoi vérifier par vous-même :
+
+- **Il se lit.** `setup.bat` tient en une ligne — ouvrez-le dans le Bloc-notes : il ouvre `app\setup.ps1`, sans console.
+  Tout le code est dans `app\`, en clair (PowerShell), identique à ce dépôt public.
+- **Aucune donnée collectée, aucune télémétrie, aucun compte, aucun serveur.** Hex Launcher ne parle qu'au Riot Client
+  de *votre* PC (`127.0.0.1`, son API locale) et ne contacte Internet que pour télécharger une appli compagnon *que
+  vous avez cochée*, depuis le site de son éditeur ou winget. Le journal `app\launch.log` reste dans le dossier.
+- **Jamais administrateur** : lancé « en tant qu'administrateur », il refuse. Registre Windows lu seulement (pour
+  détecter les applis déjà installées), jamais écrit. Il n'écrit que dans son propre dossier (`config.json`, icônes
+  composées), sur le Bureau (les raccourcis) et, le temps d'une installation que vous avez demandée, l'installeur de
+  l'appli compagnon dans le dossier temporaire de Windows.
+- **Rien sans votre clic.** Une appli compagnon n'est installée ou désinstallée qu'après *Appliquer*, la liste exacte
+  des actions étant affichée avant. La page d'accueil ne modifie rien.
+- **Le jeu n'est pas modifié.** Seule la langue change, par l'API officielle locale du Riot Client (ce que fait son
+  propre réglage) ; aucun fichier de League of Legends n'est touché.
+- **Vérifiable.** Chaque release publie l'empreinte SHA-256 de son zip ; comparez avec
+  `Get-FileHash hex-launcher-x.y.z.zip` dans PowerShell. Le code source est ce dépôt.
+
 ## Mise en route sur une nouvelle machine
 
 0. **[Télécharger la dernière version](https://github.com/jeanchristoph/hex-launcher/releases/latest)** (`hex-launcher-x.y.z.zip`) et la décompresser — ou cloner le dépôt.
 1. Copier ce dossier où on veut (ex. `Documents\hex-launcher`) — **sans** `config.json` s'il vient
    d'une autre machine, pour que la détection se fasse.
-2. Double-cliquer sur le raccourci **Hex Launcher** livré à la racine — s'il ne réagit pas (raccourci déplacé, `.lnk` bloqué), double-cliquer **`setup.bat`**, c'est lui qu'il lance. Jamais « Exécuter en tant qu'administrateur » : l'outil refuse, volontairement. Une fenêtre, trois étapes :
+2. Double-cliquer sur **`setup.bat`** (jamais « Exécuter en tant qu'administrateur » : l'outil refuse, volontairement). Une fenêtre, trois étapes :
    - **[1/3] Détection** — trouve le Riot Client (via `RiotClientInstalls.json`, le fichier officiel de Riot) et toutes
      les applis compagnon du catalogue déjà installées, puis écrit `config.json` (jamais écrasé s'il existe déjà :
      les réglages manuels sont conservés). Les deux chemins Riot sont affichés dans des champs modifiables avec un
@@ -191,7 +215,10 @@ Icône : chaque raccourci reçoit la variante drapeau de sa langue dans le jeu d
 par exemple `hex-launcher-jp.ico` pour `ja_JP`) ; sans drapeau → l'icône de base du jeu, puis le jeu par défaut. Le jeu se
 choisit sur la page *Raccourcis* de `setup.bat` (avec un aperçu de son icône de base) et reste mémorisé dans `config.json`
 (`iconSet`) ; en mode script : `create-shortcuts.ps1 -IconSet classic`. Tout dossier déposé dans `app/ico/` qui contient
-un `hex-launcher.ico` devient un jeu sélectionnable, nommé comme le dossier — `flat` est le jeu par défaut.
+un `hex-launcher.ico` devient un jeu sélectionnable. Les jeux livrés s'affichent dans un ordre fixe et sous un libellé
+traduit (« LoL officielle + pastilles », « LoL officielle, nue », « Classique (relief) », « Drapeau plat + logo HL ») ;
+un jeu ajouté s'affiche après, sous le nom de son dossier. Installation neuve : `original-badges` est présélectionné ;
+`flat` reste le jeu de repli (icône de fenêtre, drapeau manquant, LoL introuvable).
 Un raccourci avec appli compagnon porte en plus une pastille de couleur en haut à droite — P Porofessor, B Blitz,
 O OP.GG, M Mobalytics — composée à l'installation dans `app/ico/<jeu>/companion/` (la lettre disparaît sous 32 px, la couleur reste).
 Les couleurs de pastille sont celles du catalogue ; un jeu peut les styler par un `badge-style.json` dans son dossier :

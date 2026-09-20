@@ -4,16 +4,16 @@
 
 .DESCRIPTION
     L'archive contient exactement ce qu'un joueur doit télécharger : setup.bat, LISEZMOI.txt, LICENSE,
-    les README, un raccourci « Hex Launcher » vers setup.bat et le dossier app\ — sans config.json (propre à
-    chaque machine), sans tests\, .forge\, .git*, tools\ ni dist\. La version est lue dans app\version.txt.
+    les README et le dossier app\ — sans config.json (propre à chaque machine), sans tests\, .forge\,
+    .git*, tools\ ni dist\. La version est lue dans app\version.txt.
 
-    Le raccourci est relatif : sa cible absolue (le staging) n'existe pas chez le joueur, l'Explorateur retombe
-    alors sur le chemin relatif stocké dans le .lnk, résolu depuis l'emplacement du raccourci — l'archive se
-    décompresse n'importe où (mesuré le 2026-09-20 : cible résolue et icône engrenage affichée après déplacement).
-    Déplacé hors du dossier, il ne pointe plus sur rien : le raccourci du Bureau est celui que pose l'assistant.
+    Pas de raccourci .lnk dans l'archive : la cible d'un .lnk peut être relative (RelativePath), son icône jamais —
+    l'Explorateur la résout depuis son propre répertoire courant, pas depuis le raccourci (mesuré le 2026-09-20).
+    Le raccourci « Hex Launcher » du Bureau est posé par l'assistant, en chemins absolus.
 
     Sans -Publish : le zip est écrit dans dist\ (gitignoré). Avec -Publish : `gh release create v<version>`
-    avec le zip en pièce jointe (nécessite gh authentifié et un tag non existant).
+    avec le zip en pièce jointe (nécessite gh authentifié et un tag non existant). Les notes de release se
+    terminent par l'empreinte SHA-256 du zip, pour que chacun puisse vérifier son téléchargement (Get-FileHash).
 
 .EXAMPLE
     powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-release.ps1
@@ -25,8 +25,6 @@ param(
 )
 
 $ReleaseRootFiles = @('setup.bat', 'LISEZMOI.txt', 'LICENSE', 'README.md', 'README.fr.md', 'README.ja.md')
-$ReleaseShortcutName = 'Hex Launcher'
-$ReleaseSetupIcon    = 'app\ico\hex-launcher-setup.ico'
 $ReleaseExcluded     = @('config.json', 'launch.log')
 $ReleaseExcludedDirs = @('ico\*\companion')   # icônes drapeau + pastille composées sur chaque poste par create-shortcuts.ps1, dans chaque jeu
 
@@ -55,23 +53,7 @@ function Get-ReleaseAppFiles([string]$Root) {
     return @(Get-ChildItem -Path $app -Recurse -File | Where-Object { $ReleaseExcluded -notcontains $_.Name -and -not (Test-ReleaseExcludedDir $app $_.FullName) })
 }
 
-# Raccourci portable vers setup.bat à la racine du staging. RelativePath reçoit le chemin du .lnk lui-même
-# (IShellLink::SetRelativePath) : le shell en déduit « setup.bat » et pose le drapeau HasRelativePath.
-# L'icône relative est résolue par le shell depuis le dossier du raccourci, pas depuis le répertoire courant.
-function New-ReleaseSetupShortcut([string]$Staging) {
-    $path     = Join-Path $Staging "$ReleaseShortcutName.lnk"
-    $shell    = New-Object -ComObject WScript.Shell
-    $shortcut = $shell.CreateShortcut($path)
-    $shortcut.TargetPath   = Join-Path $Staging 'setup.bat'
-    $shortcut.RelativePath = $path
-    $shortcut.IconLocation = "$ReleaseSetupIcon,0"
-    $shortcut.WindowStyle  = 7   # Réduite : setup.bat n'a rien à montrer, la fenêtre de l'assistant suffit
-    $shortcut.Description  = 'Hex Launcher — setup'
-    $shortcut.Save()
-    return $path
-}
-
-# Prépare un dossier hex-launcher-<version>\ avec la racine épurée, le raccourci et app\
+# Prépare un dossier hex-launcher-<version>\ avec la racine épurée et app\
 function New-ReleaseStaging([string]$Root, [string]$Version, [string]$StagingParent) {
     $staging = Join-Path $StagingParent "hex-launcher-$Version"
     if (Test-Path $staging) { Remove-Item $staging -Recurse -Force }
@@ -84,7 +66,6 @@ function New-ReleaseStaging([string]$Root, [string]$Version, [string]$StagingPar
         New-Item -ItemType Directory -Path (Split-Path $target -Parent) -Force | Out-Null
         Copy-Item $file.FullName $target
     }
-    New-ReleaseSetupShortcut $staging | Out-Null
     return $staging
 }
 
@@ -96,9 +77,23 @@ function New-ReleaseArchive([string]$Staging, [string]$Version, [string]$DistDir
     return $zip
 }
 
+# Empreinte SHA-256 du zip, en minuscules — celle que rend Get-FileHash chez l'utilisateur
+function Get-ReleaseChecksum([string]$Zip) {
+    return (Get-FileHash -Path $Zip -Algorithm SHA256).Hash.ToLowerInvariant()
+}
+
+# Notes de release : le texte fourni, puis l'empreinte du zip et comment la vérifier
+function Format-ReleaseNotes([string]$Notes, [string]$Zip) {
+    $lines = @()
+    if (-not [string]::IsNullOrWhiteSpace($Notes)) { $lines += $Notes.TrimEnd(); $lines += '' }
+    $lines += "SHA-256 of ``$(Split-Path $Zip -Leaf)``: ``$(Get-ReleaseChecksum $Zip)``"
+    $lines += 'Verify in PowerShell: `Get-FileHash <the zip> -Algorithm SHA256`'
+    return ($lines -join "`n")
+}
+
 function Publish-Release([string]$Version, [string]$Zip, [string]$ReleaseNotes) {
     $tag = "v$Version"
-    & gh release create $tag $Zip --title "Hex Launcher $tag" --notes $ReleaseNotes
+    & gh release create $tag $Zip --title "Hex Launcher $tag" --notes (Format-ReleaseNotes $ReleaseNotes $Zip)
     if ($LASTEXITCODE -ne 0) { throw "gh release create a échoué (code $LASTEXITCODE)" }
     return $tag
 }
@@ -112,6 +107,7 @@ if ($MyInvocation.InvocationName -ne '.') {
     try {
         $zip = New-ReleaseArchive $staging $version (Join-Path $root 'dist')
         "Archive : $zip ($([math]::Round((Get-Item $zip).Length / 1KB)) Ko)"
+        "SHA-256 : $(Get-ReleaseChecksum $zip)"
         if ($Publish) { "Release publiée : $(Publish-Release $version $zip $Notes)" }
     }
     finally { Remove-Item $staging -Recurse -Force -ErrorAction SilentlyContinue }

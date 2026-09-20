@@ -1,4 +1,4 @@
-{
+﻿{
   "common.none": "なし",
   "common.apply": "適用",
   "common.cancel": "キャンセル",
@@ -37,6 +37,10 @@
   "setup.shortcuts.iconSetChosen": "アイコンセット：{0}",
   "setup.shortcuts.iconSetNote.bare": "公式アイコン、バッジなし：ショートカットは名前でしか区別できません。",
   "setup.shortcuts.iconSetNote.badges": "公式アイコン＋国旗とコンパニオンのバッジ、この PC 上で合成します。",
+  "iconSet.originalBadges": "LoL 公式＋バッジ",
+  "iconSet.original": "LoL 公式（バッジなし）",
+  "iconSet.classic": "クラシック（立体）",
+  "iconSet.flat": "フラット国旗＋HL ロゴ",
   "setup.shortcuts.legacyLaunch": "手動起動 — Riot でプレイを押す",
   "setup.shortcuts.legacyLaunchChosen": "起動：手動（Riot でプレイを押す）",
   "setup.shortcuts.directLaunchChosen": "起動：ゲームを直接起動",

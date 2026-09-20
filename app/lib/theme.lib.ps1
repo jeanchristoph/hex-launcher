@@ -41,7 +41,8 @@ function Get-ThemeIconPath {
     return Get-IconSetFilePath (Get-IconSetFolderOrDefault (Get-DefaultIconSet @(Get-IconSets $icoRoot)) $icoRoot) $IconSetBaseIcon
 }
 
-function New-ThemedForm([string]$Title, [int]$Width, [int]$Height) {
+# $IconPath : icône de la barre de titre et de la barre des tâches ; par défaut celle du projet, absente → aucune
+function New-ThemedForm([string]$Title, [int]$Width, [int]$Height, [string]$IconPath = (Get-ThemeIconPath)) {
     $form                 = New-Object System.Windows.Forms.Form
     $form.Text            = $Title
     $form.Size            = New-Object System.Drawing.Size($Width, $Height)
@@ -52,8 +53,7 @@ function New-ThemedForm([string]$Title, [int]$Width, [int]$Height) {
     $form.BackColor       = Get-ThemeColor 'Background'
     $form.ForeColor       = Get-ThemeColor 'Cream'
     $form.Font            = New-ThemeFont 10
-    $icon = Get-ThemeIconPath
-    if (Test-Path $icon) { $form.Icon = New-Object System.Drawing.Icon($icon) }
+    if ($IconPath -and (Test-Path $IconPath)) { $form.Icon = New-Object System.Drawing.Icon($IconPath) }
     return $form
 }
 

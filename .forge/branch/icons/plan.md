@@ -68,7 +68,7 @@ un jeu sans aucun `.ico`, reconnu par un marqueur `icon-source.json` ; la mécan
 - **`original-badges`** : l'icône officielle surmontée de la **pastille pays** puis de la **pastille compagnon**,
   empilées verticalement, pays en haut. Impose d'extraire l'icône du binaire en mémoire
   (`[Drawing.Icon]::ExtractAssociatedIcon`) et de composer dessus ; le `.ico` produit va dans
-  `ico/<jeu>/companion/`, déjà gitignoré et hors release. Rien n'est distribué : fichier local au poste.
+  `ico/<jeu>/companion/`, déjà gitignoré et hors release : fichier local au poste, rien n'est distribué.
 
 **Nouveau composant — la pastille pays**, venue de T10 : un **drapeau miniature**, et non des lettres. Le drapeau
 est dessiné puis **redimensionné, et un disque y est découpé** (masque circulaire GDI+, interpolation
@@ -178,6 +178,34 @@ Les blancs cassés (Italie, Pologne, Thaïlande) sont conservés tels quels : co
 régénérées : **une seule change**, la France, dont le bleu officiel bascule de `Blue` vers `Navy` après réduction
 — rendu validé. Les onze autres corrections ne se verront que sur les futures pastilles, en couleurs brutes.
 
+### T12 — Jeux d'icônes : libellés lisibles et ordre explicite
+**Effort:** S
+**Files:** `app/lib/icon-set.lib.ps1`, `app/setup.ps1`, `app/i18n/{fr,en,ja}.json`, `tests/icon-set.lib.tests.ps1`, `tests/setup.tests.ps1`, README ×3
+**Description:** Demande de l'utilisateur (2026-09-20) : `original-badges` en premier, sous un nom compréhensible.
+Le dossier reste la clé (`config.json` mémorise `iconSet` par dossier) ; le libellé vient du dictionnaire
+(`iconSet.<dossier en camelCase>`, repli sur le nom du dossier pour un jeu inconnu). Ordre fixe
+`$IconSetDisplayOrder` : `original-badges`, `original`, `classic`, `flat`, un jeu inconnu après par ordre alphabétique.
+Deux rôles séparés dans la lib : jeu de REPLI (`flat`, seul à avoir tous ses `.ico`) et jeu PRÉFÉRÉ
+(`original-badges`, présélection d'une installation neuve). Page Raccourcis : liste de 4 lignes sans défilement,
+intro sur 3 lignes, case et journal descendus (fenêtre 620 px).
+[x] 2026-09-20 — `Get-IconSetDisplayRank`/`Get-PreferredIconSet`, `Get-IconSetLabel` (clé camelCase, exigée par le test
+de catalogue), libellés courts pour tenir dans 174 px (les longs étaient tronqués — le détail reste dans la note
+sous la liste) ; rendu vérifié fr/ja par capture ; README ×3 ; 635 verts
+
+### T13 — Transparence : ce que fait `setup.bat`, ce qu'il ne fait pas, empreinte de l'archive
+**Effort:** S
+**Files:** README ×3, `LISEZMOI.txt`, `tools/make-release.ps1`, `tests/make-release.tests.ps1`
+**Description:** Question de l'utilisateur (2026-09-20) : « cliquer sur setup.bat dont on ne sait rien fait peur ».
+Section « Confiance » avant la mise en route (README ×3) et bloc dans LISEZMOI (FR + EN), factuelle et vérifiable :
+setup.bat lisible en une ligne, code en clair dans app\ ; aucune donnée collectée, aucune télémétrie, aucun compte,
+aucun serveur — seul le Riot Client local (127.0.0.1) et l'éditeur d'une appli compagnon cochée ; jamais administrateur,
+registre lu seulement ; n'écrit que dans son dossier, le Bureau et le dossier temporaire (installeur demandé) ; rien sans
+Appliquer ; jeu non modifié ; SHA-256 du zip publié. Encadré en tête des README renvoyant à la section (demande : « le
+mettre en avant »). `make-release.ps1` : `Get-ReleaseChecksum`, `Format-ReleaseNotes` (empreinte + commande
+Get-FileHash en fin de notes), empreinte affichée à la construction.
+[x] 2026-09-20 — sections et encadrés ×3, LISEZMOI, notes de release avec SHA-256 ; 3 tests ; faits recoupés dans le
+code (registre lecture seule, installeur dans %TEMP%, API locale seule)
+
 ## Risks
 - `.ico` à entrées DIB (non PNG) : le repli `System.Drawing.Icon` ne rend pas l'entrée 256 px → la lib lève un throw explicite plutôt qu'une icône incomplète ; nos `.ico` actuels sont tous PNG.
 - Cache d'icônes Explorer : une pastille modifiée peut ne pas s'afficher avant relance d'Explorer — documenté, pas d'action système.
@@ -196,5 +224,7 @@ régénérées : **une seule change**, la France, dont le bleu officiel bascule 
 | T8 — Jeux d'icônes sélectionnables | M | [x] |
 | T9 — Icône originale de LoL, deux jeux | L | [x] |
 | T10 — Drapeaux en fond + SVG importable | L | [!] abandonnée pour le moment (2026-09-20) |
+| T12 — Libellés et ordre des jeux d'icônes | S | [x] |
+| T13 — Transparence : section Confiance, SHA-256 de la release | S | [x] |
 | T11 — Couleurs officielles des drapeaux | S | [x] |
 | **Total** | **~XL (8-11 h)** | |
