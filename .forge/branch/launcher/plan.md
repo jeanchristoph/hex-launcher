@@ -1,4 +1,4 @@
-# Plan — launcher
+﻿# Plan — launcher
 **Objective:** Lancer League of Legends sans clic sur Play, en pilotant le Riot Client par son API locale, repli sur le rejeu de `--launch-product`.
 **Date:** 2026-09-19
 
@@ -135,9 +135,41 @@ process `Riot Client` et la classe `Chrome_WidgetWin_1`. Jamais sur le chemin cl
 n'est disponible pour déboguer.
 [x] 2026-09-20 — réglage lu par le lanceur, case mémorisée comme le jeu d'icônes, i18n ×3, 518 verts
 
+### T15 — Retirer la mémoire de lancement
+**Effort:** S
+**Files:** `app/lib/launch-state.lib.ps1` (supprimé), `app/launch-lol.ps1`, `tests/launch-state.lib.tests.ps1` (supprimé), `tests/launch-lol.tests.ps1`, `.gitignore`, `tools/make-release.ps1`, README ×3, `.forge/project.md`, `output/` (arbre de décision)
+**Description:** Décision du 2026-09-20 : la mémoire a rendu le bug de T14 *collant* (un 404 ponctuel → chemin
+classique pour toujours, sans rien à l'écran) et n'économise du temps que sur des pannes jamais observées
+(`silent`, `timeout`). Le lanceur redevient sans état : l'API est tentée à chaque lancement sauf `-NoLocalApi`
+ou case « Lancement classique » (T13) ; `launch-state.json` n'est plus ni lu ni écrit. La cause d'échec
+(`Failure.Kind`, code, étape) reste rendue et journalisée, pour le support seulement. Placée avant T14, plus
+simple à raisonner sur un lanceur sans état.
+[x] 2026-09-20 — lib et tests supprimés, `New-LocalApiFailure` et `Get-RiotClientVersion` dans le lanceur, journal `START chemin=…` ; README ×3, project.md, arbre ; 497 verts, `-DryRun` réel passé
+
+### T16 — Bouton « Forcer le démarrage » sur le splash — pour le lancement en cours seulement
+**Effort:** M
+**Files:** `app/lib/splash.lib.ps1`, `app/lib/riot-client-api.lib.ps1`, `app/launch-lol.ps1`, `tests/splash.lib.tests.ps1`, `tests/riot-client-api.lib.tests.ps1`, `tests/launch-lol.tests.ps1`, README ×3, `output/`
+**Description:** Après 15 s d'attente sur le chemin rapide (un lancement normal tient en 8 à 13 s, le bouton ne
+doit tenter personne quand tout va bien), le splash montre « Forcer le démarrage » (un bouton porte un verbe ;
+« Mode de secours » décrit un état, il reste le nom de la case). Statut après le clic : « Démarrage forcé :
+fermeture de Riot puis redémarrage… ». Un clic abandonne les boucles
+d'attente (`-ShouldStop` vérifié à chaque tour de `Wait-RiotClientOperation` et `Wait-GameClientStart`,
+`Kind = 'cancelled'`) et bascule tout de suite en mode de secours. Rien n'est mémorisé : le lancement suivant
+retente le lancement direct ; la case de setup.bat reste le seul réglage durable. Le splash reste ignorant du
+lanceur (`Add-SplashAction -Text -OnClick`, montré par lui après le délai, caché au clic et dès que le chemin
+rapide rend la main). Journal : `cause=cancelled`.
+Décisions de l'utilisateur (2026-09-20) : un bouton dans chaque sens sur un splash n'est pas exploitable par un
+humain ; un clic qui coche la case rendrait le mode collant sans retour visible. `-NoLocalApi` reste un
+interrupteur de ligne de commande pour le dépannage, jamais posé par les raccourcis.
+[x] 2026-09-20 — `Add-SplashAction`/`Show`/`Hide` (état demandé dans le Tag du bouton), `-ShouldStop` dans les trois
+boucles, `Kind = 'cancelled'`, statut « Démarrage forcé » ; clic vérifié en réel par harnais (bouton à 3 s, clic
+→ secours en 1 s) — l'attente > 15 s ne se provoque pas à la demande, les lancements réels sont passés en 3,8 à
+8,7 s sans bouton ; au passage : titre et sous-titre du splash jamais affichés depuis 0.1.0 (collision `$title` /
+`[string]$Title`) corrigés, barre marquee inerte remplacée par un filet doré ; 517 verts
+
 ### T14 — Bug : Riot déjà lancé, pourtant fermé et redémarré en mode classique
 **Effort:** M
-**Files:** `app/lib/riot-window.lib.ps1`, `app/lib/riot-client-api.lib.ps1`, `app/lib/launch-state.lib.ps1`, `app/launch-lol.ps1`, tests
+**Files:** `app/lib/riot-window.lib.ps1`, `app/lib/riot-client-api.lib.ps1`, `app/launch-lol.ps1`, tests
 **Description:** Constaté par l'utilisateur sur la 0.2.0, release retirée le 2026-09-20. Le journal montre la
 séquence exacte : un premier lancement réussit par l'API et **ferme la fenêtre du Riot Client** (T12) ; au
 lancement suivant, Riot tourne encore mais **sans interface**, et dans cet état `PUT /riotclient/product-locales/…`
@@ -159,7 +191,62 @@ la fenêtre (renoncer aux 600 Mo de T12) — à n'envisager que si rien d'autre 
 
 **Test à écrire** : « Riot déjà lancé, fenêtre fermée → le lanceur ne le ferme pas et ne bascule pas en
 classique ». Et un test réel enchaînant deux lancements à 60 s d'intervalle, le second devant rester sur l'API.
-[ ]
+[x] 2026-09-20 — Mesuré : Riot replié + jeu terminé → toutes les routes 404, port changé (API déchargée) ; aucune
+route native de pilotage de l'interface ; relancer `RiotClientServices.exe` sans argument réveille la même
+instance, interface et API revenues en 2 à 3 s. Codé : `Restore-RiotClientInterface` (Riot déjà en marche sans
+process « Riot Client » → relance sans argument, jamais de kill, attente interface + `GET region-locale`),
+`Test-RiotClientReady`, 409 parmi les codes d'attente ; sonde `tools/probe-riot-client-api.ps1` ; 533 verts.
+Réel : scénario du bug (Riot replié, jeu fermé, relancement) vérifié — réveil 2,3 s, jeu par l'API en 10 s.
+**RÉSERVE** : le second scénario (jeu ouvert, Riot replié, relancement immédiat) n'a pas été rejoué —
+Vanguard a émis VAN 216 après la rafale de lancements/kills de la matinée, y compris sur un lancement normal ;
+session arrêtée pour redémarrer Windows. À vérifier une seule fois, par l'utilisateur, quand Vanguard sera sain.
+
+### T17 — Chemins Riot modifiables dans l'assistant
+**Effort:** M
+**Files:** `app/setup.ps1`, `app/lib/theme.lib.ps1`, `app/lib/launch-config.lib.ps1`, `app/i18n/{fr,en,ja}.json`, `tests/setup.tests.ps1`, `tests/launch-config.lib.tests.ps1`, README ×3
+**Description:** Page 1 : « Riot Client » et « Fichier de langue de LoL » deviennent des champs de saisie avec un
+bouton « Parcourir… » (`OpenFileDialog` filtré `.exe` / `.yaml`, ouvert sur le dossier du chemin courant, sinon
+`C:\Riot Games`). Le statut « Trouvé / Introuvable » se recalcule à chaque modification. Sur « Suivant », les
+chemins sont enregistrés dans `config.json` seulement s'ils ont changé (`Save-LaunchRiotPaths`) ; un chemin encore
+introuvable n'empêche pas d'avancer mais reste signalé en rouge, et le résumé final le rappelle. Les chemins saisis
+survivent au changement de langue (portés par `Get-SetupPageSelection`). Intro réécrite en trois langues :
+« corrigez-les ici » au lieu de « dans config.json » ; `detect-config.ps1` inchangé (il ne fait que détecter).
+Demande de l'utilisateur (2026-09-20) : ne jamais avoir à ouvrir config.json.
+[x] 2026-09-20 — champs modifiables + « Parcourir… » (`OpenFileDialog` filtré, ouvert sur le dossier du chemin
+courant sinon `C:\Riot Games`), statut recalculé à chaque frappe, chemin collé entre guillemets accepté ;
+`Save-LaunchRiotPaths` n'écrit que si un chemin change ; saisie conservée au changement de langue ; rappel rouge sur
+la page Terminé ; i18n ×3, README ×3 ; rendu vérifié par capture (fr/en/ja, chemin du yaml sur 3 lignes) ; 559 verts
+
+### T18 — Raccourci « Hex Launcher » sur le Bureau
+**Effort:** S
+**Files:** `app/create-shortcuts.ps1`, `app/setup.ps1`, `app/i18n/{fr,en,ja}.json`, `tests/create-shortcuts.tests.ps1`, `tests/setup.tests.ps1`, README ×3
+**Description:** À l'étape *Raccourcis* de l'assistant (c'est elle qui écrit sur le Bureau), un raccourci
+`Hex Launcher.lnk` est posé à côté des raccourcis de langue — même destination, même repli dans le
+dossier du lanceur. Cible `setup.bat`, dossier de travail = racine, fenêtre réduite, infobulle « Ouvre l'assistant
+de configuration ». Toujours recréé (suit un déplacement du dossier), jamais retiré par `Remove-ObsoleteShortcuts`.
+Résumé final : une ligne. Nom fixe quelle que soit la langue. Icône `app\ico\<jeu>\hex-launcher-setup.ico`
+(engrenage), repli sur `hex-launcher.ico` du jeu tant que le fichier n'existe pas — le .ico se produit sur la
+branche `icons` (règle du 2026-09-20). Demande de l'utilisateur (2026-09-20).
+[x] 2026-09-20 — `New-SetupShortcut` (vers setup.bat, racine en dossier de travail), `Resolve-IconSetFile` factorisé
+pour le drapeau et l'engrenage (`$IconSetSetupIcon`, repli sur la base), `New-ShortcutWithFallback` partagé ; posé
+par l'étape Raccourcis, cité dans le résumé, échec non bloquant ; i18n ×3, README ×3 ; 569 verts. Engrenage fourni
+par l'utilisateur (`tools/logo/hex_launcher_gear_multisize.ico`, 8 tailles) → `app/ico/hex-launcher-setup.ico`,
+commun à tous les jeux, livré par la release ; repli sur l'icône de base du jeu s'il manque.
+
+### T19 — Raccourci relatif « Hex Launcher » dans l'archive de release
+**Effort:** S
+**Files:** `tools/make-release.ps1`, `tests/make-release.tests.ps1`, README ×3
+**Description:** `make-release.ps1` fabrique `Hex Launcher.lnk` à la racine du staging : cible absolue du staging
+(inexistante chez le joueur) + `RelativePath` `setup.bat`, que l'Explorateur résout depuis l'emplacement du `.lnk`
+quand l'absolu manque — l'archive se décompresse n'importe où. Fenêtre réduite. Icône : `app\ico\hex-launcher-setup.ico`
+en relatif, à vérifier (IconLocation n'a pas de résolution relative documentée). Test : présence du `.lnk`, drapeau
+HasRelativePath et chaîne relative lus dans le fichier. Essai réel : staging déplacé dans un autre dossier, lien
+résolu par `ShellLinkObject.Resolve` (sans interface) vers le `setup.bat` déplacé ; icône relevée par `SHGetFileInfo`.
+Si l'icône ne tient pas : décision utilisateur (garder sans engrenage, ou ne pas embarquer). Demande de l'utilisateur
+(2026-09-20). Réserve : déplacé hors du dossier, le `.lnk` relatif ne pointe plus sur rien — T18 reste le raccourci du Bureau.
+[x] 2026-09-20 — `New-ReleaseSetupShortcut` (RelativePath = chemin du .lnk → le shell stocke « setup.bat » et pose
+HasRelativePath) ; test de résolution après déplacement (`ShellLinkObject.Resolve`) ; essai réel sur l'archive extraite
+ailleurs : cible résolue, engrenage affiché depuis un répertoire courant étranger ; README ×3 ; 572 verts
 
 ## Risks
 - Endpoint non documenté par Riot : relevé sur `swagger/v3/openapi.json` à l'exécution, et le repli rend l'échec non bloquant.
@@ -186,5 +273,10 @@ None
 | T11 — Splash détaillé | S | [x] |
 | T12 — Riot dans la zone de notification | M | [x] |
 | T13 — Case dans l'assistant | M | [x] |
-| T14 — Riot déjà lancé fermé à tort (bug 0.2.0) | M | [ ] |
+| T15 — Retirer la mémoire de lancement | S | [x] |
+| T16 — Bouton « Forcer le démarrage » sur le splash | M | [x] |
+| T14 — Riot déjà lancé fermé à tort (bug 0.2.0) | M | [x] réserve : 2ᵉ scénario réel à rejouer |
+| T17 — Chemins Riot modifiables dans l'assistant | M | [x] |
+| T18 — Raccourci « Hex Launcher » sur le Bureau | S | [x] |
+| T19 — Raccourci relatif « Hex Launcher » dans l'archive | S | [x] |
 | **Total** | **~L (5-8 h)** | |

@@ -6,7 +6,7 @@
 .DESCRIPTION
     Lancé par setup.bat (sans console). Les scripts existants restent le moteur : ils sont dot-sourcés
     (leur bloc Main est ignoré) et l'assistant n'orchestre que leurs fonctions :
-        detect-config.ps1        → config.json (généré s'il manque, jamais écrasé)
+        detect-config.ps1        → config.json (généré s'il manque, jamais écrasé ; chemins Riot corrigeables sur la page 1)
         manage-companion-app.ps1 → choix, installation et désinstallation des applis compagnon
         create-shortcuts.ps1     → un raccourci par langue × appli compagnon dans la destination
 
@@ -59,6 +59,7 @@ $script:InstallState = @{
     IconSets         = @()
     ExistingShortcuts = @()
     ShortcutPaths    = @()
+    SetupShortcutPath = ''
     PendingSelection = $null   # cases cochées à restaurer au redessin de la page (changement de langue)
     Form             = $null
     Layout           = $null
@@ -66,7 +67,10 @@ $script:InstallState = @{
 }
 
 # Contrôles propres à une page : remis à zéro à chaque affichage, pour ne jamais lire un contrôle détruit
-$SetupPageControlNames = @('Log', 'AppList', 'UninstallBox', 'LocaleList', 'CompanionList')
+$SetupPageControlNames = @('Log', 'AppList', 'UninstallBox', 'LocaleList', 'CompanionList', 'RiotPathBoxes', 'RiotPathStatuses')
+
+# Dossier d'installation habituel de Riot : point de départ de « Parcourir… » quand le chemin courant ne mène nulle part
+$SetupRiotGamesFolder = 'C:\Riot Games'
 
 # ---------------------------------------------------------------- Machine à états (pure, sans WinForms)
 
@@ -214,15 +218,40 @@ function Test-SetupPathPresent([string]$Path) {
     return [bool](Test-Path $Path)
 }
 
+# Statut d'un chemin : trouvé (Accent) ou introuvable avec la raison (Danger) ; recalculé à chaque frappe sur la page
+function Get-DetectionPathStatus([string]$Path, [string]$MissingReason) {
+    $isFound = Test-SetupPathPresent (ConvertTo-LaunchPathValue $Path)
+    return @{
+        IsFound = $isFound
+        Text    = $(if ($isFound) { Get-Text 'setup.detect.found' } else { Get-Text 'setup.detect.missing' $MissingReason })
+        Color   = $(if ($isFound) { 'Accent' } else { 'Danger' })
+    }
+}
+
 # Un élément détecté : libellé, valeur affichée dans un encadré, statut sous l'encadré (Accent = trouvé, Danger = manquant).
 # IsFound et MissingReason portent l'état ; Status n'est que son texte affiché.
-function New-DetectionItem([string]$Label, [string]$Path, [string]$MissingReason) {
-    $isFound = Test-SetupPathPresent $Path
-    $status  = if ($isFound) { Get-Text 'setup.detect.found' } else { Get-Text 'setup.detect.missing' $MissingReason }
+# Key (clé de Get-LaunchRiotPaths) et FileFilter ne sont posés que sur un chemin corrigeable dans la page.
+function New-DetectionItem([string]$Label, [string]$Path, [string]$MissingReason, [string]$Key = '', [string]$FileFilter = '') {
+    $status = Get-DetectionPathStatus $Path $MissingReason
     return [pscustomobject]@{
-        Label = $Label; Value = $Path; IsFound = $isFound; MissingReason = $MissingReason
-        Status = $status; Color = $(if ($isFound) { 'Accent' } else { 'Danger' })
+        Label = $Label; Value = $Path; IsFound = $status.IsFound; MissingReason = $MissingReason
+        Status = $status.Text; Color = $status.Color; Key = $Key; FileFilter = $FileFilter
     }
+}
+
+function Test-DetectionItemEditable($Item) {
+    return -not [string]::IsNullOrEmpty($Item.Key)
+}
+
+# Dossier d'ouverture de « Parcourir… » : celui du chemin courant s'il existe, sinon C:\Riot Games, sinon le choix de Windows ('')
+function Get-SetupBrowseStartFolder([string]$CurrentPath) {
+    $folder = ''
+    if (-not [string]::IsNullOrWhiteSpace($CurrentPath)) {
+        try { $folder = [string](Split-Path $CurrentPath -Parent) } catch { $folder = '' }
+    }
+    if ($folder -and (Test-Path $folder)) { return $folder }
+    if (Test-Path $SetupRiotGamesFolder) { return $SetupRiotGamesFolder }
+    return ''
 }
 
 function Get-CompanionNamesText([object[]]$CompanionApps) {
@@ -231,15 +260,30 @@ function Get-CompanionNamesText([object[]]$CompanionApps) {
     return ($names -join ', ')
 }
 
+# Raison d'un manque : nom du fichier attendu et son dossier habituel (ceux que detect-config.ps1 cherche),
+# pour que l'utilisateur sache quoi chercher dans « Parcourir… »
+function Get-DetectionMissingReason([string]$Key, [string]$UsualPath) {
+    return Get-Text $Key (Split-Path $UsualPath -Leaf), (Split-Path $UsualPath -Parent)
+}
+
 function Get-DetectionItems($Config) {
     return @(
-        (New-DetectionItem (Get-Text 'setup.detect.riotClient') $Config.riotClientPath (Get-Text 'setup.detect.fixRiotClient'))
-        (New-DetectionItem (Get-Text 'setup.detect.productSettings') $Config.productSettingsPath (Get-Text 'setup.detect.isLolInstalled'))
+        (New-DetectionItem (Get-Text 'setup.detect.riotClient') $Config.riotClientPath (Get-DetectionMissingReason 'setup.detect.fixRiotClient' $RiotClientDefault) 'RiotClientPath' (Get-Text 'setup.detect.filterExe'))
+        (New-DetectionItem (Get-Text 'setup.detect.productSettings') $Config.productSettingsPath (Get-DetectionMissingReason 'setup.detect.isLolInstalled' $ProductSettings) 'ProductSettingsPath' (Get-Text 'setup.detect.filterYaml'))
         [pscustomobject]@{
             Label = (Get-Text 'setup.detect.installedApps'); Value = (Get-CompanionNamesText @($Config.companionApps))
-            IsFound = $true; MissingReason = ''; Status = ''; Color = 'Cream'
+            IsFound = $true; MissingReason = ''; Status = ''; Color = 'Cream'; Key = ''; FileFilter = ''
         }
     )
+}
+
+function Find-DetectionItem([object[]]$Items, [string]$Key) {
+    return @($Items | Where-Object { $_.Key -eq $Key }) | Select-Object -First 1
+}
+
+# Rappel du résumé final : un chemin Riot toujours introuvable après l'assistant, avec son libellé et sa valeur
+function Get-MissingRiotPathLines($Config) {
+    return @(Get-DetectionItems $Config | Where-Object { -not $_.IsFound } | ForEach-Object { Get-Text 'setup.done.pathMissing' $_.Label, $_.Value })
 }
 
 # Vue en lignes (Text + Color) des éléments détectés, pour les résumés et les tests
@@ -283,12 +327,14 @@ function Get-ShortcutCountText([string[]]$Paths) {
     return Get-Text $key $paths.Count, ($folders -join ', ')
 }
 
-function Get-CompletionSummaryLines($Config, [string]$ConfigPath, [string[]]$ShortcutPaths) {
-    return @(
+function Get-CompletionSummaryLines($Config, [string]$ConfigPath, [string[]]$ShortcutPaths, [string]$SetupShortcutPath = '') {
+    $lines = @(
         (Get-Text 'setup.done.config' $ConfigPath)
         (Get-Text 'setup.done.companions' (Get-CompanionNamesText @($Config.companionApps)))
         (Get-ShortcutCountText $ShortcutPaths)
     )
+    if ($SetupShortcutPath) { $lines += Get-Text 'setup.done.setupShortcut' $SetupShortcutPath }
+    return $lines
 }
 
 # ---------------------------------------------------------------- Journal et sûreté d'exécution
@@ -381,7 +427,7 @@ function New-SetupFooter($Layout) {
 
 function New-SetupWindow {
     $state    = $script:InstallState
-    $form     = New-ThemedForm (Get-SetupWindowTitle) 800 560
+    $form     = New-ThemedForm (Get-SetupWindowTitle) 800 620
     $layout   = Get-SetupLayout $form.ClientSize.Width $form.ClientSize.Height
     $controls = $state.Controls
     $controls.PageTitle = New-ThemedTitle '' $layout.ContentLeft 24 $layout.ContentWidth
@@ -474,7 +520,23 @@ function Get-SetupPageSelection {
     if ($null -ne $controls.IconSetList) { $selection.IconSetList = @(Get-SetupSelectedIconSetName $controls.IconSetList) }
     if ($null -ne $controls.UninstallBox) { $selection.UninstallOthers = [bool]$controls.UninstallBox.Checked }
     if ($null -ne $controls.LegacyLaunchBox) { $selection.LegacyLaunchBox = @([string]$controls.LegacyLaunchBox.Checked) }
+    if ($null -ne $controls.RiotPathBoxes) { $selection.RiotPaths = Get-SetupRiotPathInputs }
     return $selection
+}
+
+# Chemins Riot tels que saisis sur la page, sous les clés de Get-LaunchRiotPaths
+function Get-SetupRiotPathInputs {
+    $boxes  = $script:InstallState.Controls.RiotPathBoxes
+    $inputs = @{}
+    foreach ($key in @($boxes.Keys)) { $inputs[$key] = [string]$boxes[$key].Text }
+    return $inputs
+}
+
+# Chemin à afficher : la saisie en attente (redessin) prime sur la valeur de config.json
+function Get-SetupPendingRiotPath([string]$Key, [string]$Default) {
+    $pending = $script:InstallState.PendingSelection
+    if ($null -ne $pending -and $pending.ContainsKey('RiotPaths') -and $pending.RiotPaths.ContainsKey($Key)) { return [string]$pending.RiotPaths[$Key] }
+    return $Default
 }
 
 # Présélection d'une liste : la saisie en attente (redessin) prime sur le calcul par défaut
@@ -503,32 +565,105 @@ function Initialize-SetupDetection {
     $state.DetectionItems = @(Get-DetectionItems $state.Config)
 }
 
-# Libellé, encadré (2 lignes, retour à la ligne) et statut ; retourne les contrôles et la hauteur occupée
+# Géométrie d'une ligne de la page : libellé, encadré de 3 lignes pour un chemin (celui du yaml sous ProgramData
+# en occupe trois à cette largeur) ou d'une ligne pour une valeur en lecture seule, statut sur 3 lignes (la raison
+# d'un manque cite le fichier attendu et son dossier habituel — celui du yaml est long)
+$SetupDetectionRow = @{ FieldTop = 22; FieldHeight = 56; ReadOnlyFieldHeight = 30; StatusTop = 80; StatusHeight = 56; Gap = 6 }
+
+# Libellé, encadré en lecture seule et statut éventuel ; retourne les contrôles et la hauteur occupée
 function New-DetectionItemControls($Item, [int]$Top, [int]$Width) {
+    $row      = $SetupDetectionRow
     $controls = @(
         (New-ThemedLabel $Item.Label 0 $Top $Width 22 'Gold' 10 'Bold')
-        (New-ThemedField $Item.Value 0 ($Top + 24) $Width 46)
+        (New-ThemedField $Item.Value 0 ($Top + $row.FieldTop) $Width $row.ReadOnlyFieldHeight)
     )
-    $height = 74
-    if ($Item.Status) { $controls += New-ThemedLabel $Item.Status 0 ($Top + 72) $Width 22 $Item.Color; $height += 24 }
-    return @{ Controls = $controls; Height = $height + 8 }
+    $height = $row.FieldTop + $row.ReadOnlyFieldHeight
+    if ($Item.Status) { $controls += New-ThemedLabel $Item.Status 0 ($Top + $row.StatusTop) $Width $row.StatusHeight $Item.Color; $height = $row.StatusTop + $row.StatusHeight }
+    return @{ Controls = $controls; Inputs = @(); Height = $height + $row.Gap }
+}
+
+# Libellé, champ modifiable + « Parcourir… », statut recalculé à chaque frappe ; les contrôles sont retenus par clé
+function New-RiotPathItemControls($Item, [int]$Top, [int]$Width) {
+    $row      = $SetupDetectionRow
+    $controls = $script:InstallState.Controls
+    $buttonWidth = $script:InstallState.Layout.ButtonWidth
+    $box    = New-ThemedInputField (Get-SetupPendingRiotPath $Item.Key $Item.Value) 0 ($Top + $row.FieldTop) ($Width - $buttonWidth - 10) $row.FieldHeight
+    $browse = New-ThemedButton (Get-Text 'setup.detect.browse') ($Width - $buttonWidth) ($Top + $row.FieldTop) $buttonWidth $row.FieldHeight
+    $status = New-ThemedLabel '' 0 ($Top + $row.StatusTop) $Width $row.StatusHeight $Item.Color
+    $box.Tag = $Item.Key
+    $browse.Tag = $Item.Key
+    $controls.RiotPathBoxes[$Item.Key]    = $box
+    $controls.RiotPathStatuses[$Item.Key] = $status
+    Update-SetupRiotPathStatus $Item.Key
+    $box.Add_TextChanged({ param($sender, $e) Invoke-SetupSafely { Update-SetupRiotPathStatus $sender.Tag } })
+    $browse.Add_Click({ param($sender, $e) Invoke-SetupSafely { Invoke-SetupBrowseRiotPath $sender.Tag } })
+    return @{
+        Controls = @((New-ThemedLabel $Item.Label 0 $Top $Width 22 'Gold' 10 'Bold'), $box, $browse, $status)
+        Inputs   = @($box, $browse)
+        Height   = $row.StatusTop + $row.StatusHeight + $row.Gap
+    }
+}
+
+# Le statut suit la saisie : « Trouvé » dès que le chemin mène à un fichier, la raison du manque sinon
+function Update-SetupRiotPathStatus([string]$Key) {
+    $state  = $script:InstallState
+    $item   = Find-DetectionItem $state.DetectionItems $Key
+    $label  = $state.Controls.RiotPathStatuses[$Key]
+    if ($null -eq $item -or $null -eq $label) { return }
+    $status = Get-DetectionPathStatus $state.Controls.RiotPathBoxes[$Key].Text $item.MissingReason
+    $label.Text      = $status.Text
+    $label.ForeColor = Get-ThemeColor $status.Color
+}
+
+# Boîte de sélection de fichier ; rend le chemin choisi, $null si l'utilisateur annule
+function Show-SetupFileDialog([string]$CurrentPath, [string]$Filter, [string]$Title) {
+    $dialog                  = New-Object System.Windows.Forms.OpenFileDialog
+    $dialog.Title            = $Title
+    $dialog.Filter           = $Filter
+    $dialog.CheckFileExists  = $true
+    $dialog.InitialDirectory = Get-SetupBrowseStartFolder $CurrentPath
+    $owner  = $script:InstallState.Form
+    $result = if ($null -ne $owner) { $dialog.ShowDialog($owner) } else { $dialog.ShowDialog() }
+    if ($result -ne [System.Windows.Forms.DialogResult]::OK) { return $null }
+    return $dialog.FileName
+}
+
+function Invoke-SetupBrowseRiotPath([string]$Key) {
+    $state  = $script:InstallState
+    $item   = Find-DetectionItem $state.DetectionItems $Key
+    $box    = $state.Controls.RiotPathBoxes[$Key]
+    $chosen = Show-SetupFileDialog (ConvertTo-LaunchPathValue $box.Text) $item.FileFilter $item.Label
+    if ($chosen) { $box.Text = $chosen }
 }
 
 function Show-SetupDetectPage {
     Initialize-SetupDetection
-    $state = $script:InstallState
-    $width = $state.Layout.ContentWidth
+    $state    = $script:InstallState
+    $width    = $state.Layout.ContentWidth
+    $state.Controls.RiotPathBoxes    = @{}
+    $state.Controls.RiotPathStatuses = @{}
     $controls = @(
         (New-ThemedLabel (Get-Text 'setup.detect.intro') 0 0 $width 48 'Muted')
-        (New-ThemedLabel (Get-ConfigStatusText $state.ConfigCreated $SetupConfigPath) 0 52 $width 22 'Accent')
+        (New-ThemedLabel (Get-ConfigStatusText $state.ConfigCreated $SetupConfigPath) 0 50 $width 22 'Accent')
     )
-    $top = 86
+    $top    = 78
+    $inputs = @()
     foreach ($item in $state.DetectionItems) {
-        $built = New-DetectionItemControls $item $top $width
+        $built = if (Test-DetectionItemEditable $item) { New-RiotPathItemControls $item $top $width } else { New-DetectionItemControls $item $top $width }
         $controls += $built.Controls
-        $top += $built.Height
+        $inputs   += @($built.Inputs)
+        $top      += $built.Height
     }
+    $state.Controls.Inputs = $inputs
     Add-SetupContent $controls
+}
+
+# Chemins enregistrés seulement s'ils ont changé ; un chemin introuvable n'empêche pas d'avancer, le résumé final le rappelle
+function Invoke-SetupDetectStep {
+    $state = $script:InstallState
+    if ($null -eq $state.Controls.RiotPathBoxes) { return $true }
+    Save-LaunchRiotPaths $state.Config $SetupConfigPath (Get-SetupRiotPathInputs) | Out-Null
+    return $true
 }
 
 # ---------------------------------------------------------------- Page 2 : applis compagnon
@@ -733,7 +868,20 @@ function Invoke-SetupShortcutsStep {
     $combinations = Get-ShortcutCombinations $selection.Codes (Resolve-ShortcutCompanions $state.Config $selection.CompanionIds)
     $state.ShortcutPaths = @(New-SetupShortcuts $combinations)
     foreach ($line in @(Remove-ObsoleteShortcuts $state.ExistingShortcuts $combinations)) { Write-SetupLog $line }
+    $state.SetupShortcutPath = New-SetupConfigurationShortcut
     return $true
+}
+
+# Le raccourci vers setup.bat : toujours recréé (il suit un déplacement du dossier) ; un échec ne bloque pas l'étape
+function New-SetupConfigurationShortcut {
+    try {
+        $path = Invoke-SetupLogged { New-SetupShortcutWithFallback }
+        Write-SetupLog (Get-Text 'shortcuts.created' $path)
+        return [string]$path
+    } catch {
+        Write-SetupLog (Get-Text 'common.warning' $_.Exception.Message)
+        return ''
+    }
 }
 
 # ---------------------------------------------------------------- Page 4 : terminé
@@ -744,8 +892,12 @@ function Show-SetupDonePage {
     $state.ExitCode = 0
     $controls = @(New-ThemedLabel (Get-Text 'setup.done.title') 0 0 $width 26 'Accent' 11 'Bold')
     $top = 44
-    foreach ($line in Get-CompletionSummaryLines $state.Config $SetupConfigPath $state.ShortcutPaths) {
+    foreach ($line in Get-CompletionSummaryLines $state.Config $SetupConfigPath $state.ShortcutPaths $state.SetupShortcutPath) {
         $controls += New-ThemedLabel $line 0 $top $width 46 'Cream'
+        $top += 52
+    }
+    foreach ($line in Get-MissingRiotPathLines $state.Config) {
+        $controls += New-ThemedLabel $line 0 $top $width 46 'Danger'
         $top += 52
     }
     $controls += New-ThemedLabel (Get-Text 'setup.done.hint') 0 ($top + 8) $width 60 'Muted'
@@ -797,6 +949,7 @@ function Sync-SetupLanguageBox([string]$Language) {
 # Action d'une page au clic sur Suivant/Appliquer ; rend vrai si l'on peut avancer
 function Invoke-SetupStepAction([string]$StepId) {
     switch ($StepId) {
+        'detect'    { return Invoke-SetupDetectStep }
         'apps'      { return Invoke-SetupAppsStep }
         'shortcuts' { return Invoke-SetupShortcutsStep }
     }

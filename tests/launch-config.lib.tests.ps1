@@ -127,7 +127,7 @@ Describe 'Get-LaunchUseLocalApi' {
         Get-LaunchUseLocalApi (Read-LaunchConfig (New-TempConfig)) | Should Be $true
     }
 
-    It 'respecte le lancement classique choisi dans setup' {
+    It 'respecte le démarrage manuel choisi dans setup' {
         $config = Read-LaunchConfig (New-TempConfig)
         Set-LaunchUseLocalApi $config $false
         Get-LaunchUseLocalApi $config | Should Be $false
@@ -148,5 +148,61 @@ Describe 'Save-LaunchUseLocalApi' {
         $path = New-TempConfig
         $config = Read-LaunchConfig $path
         Save-LaunchUseLocalApi $config $path $true | Should Be $false
+    }
+}
+
+Describe 'ConvertTo-LaunchPathValue' {
+    It 'retire les guillemets d''un chemin collé depuis l''Explorateur et les espaces autour' {
+        ConvertTo-LaunchPathValue '  "C:\Riot Games\Riot Client\RiotClientServices.exe"  ' | Should Be 'C:\Riot Games\Riot Client\RiotClientServices.exe'
+    }
+
+    It 'laisse un chemin propre intact et rend une chaîne vide pour une valeur absente' {
+        ConvertTo-LaunchPathValue 'C:\r.exe' | Should Be 'C:\r.exe'
+        ConvertTo-LaunchPathValue $null | Should Be ''
+        ConvertTo-LaunchPathValue '   ' | Should Be ''
+    }
+}
+
+Describe 'Get-LaunchRiotPaths' {
+    It 'relève les deux chemins Riot de config.json' {
+        $paths = Get-LaunchRiotPaths (Read-LaunchConfig (New-TempConfig))
+        $paths.RiotClientPath | Should Be 'C:\Riot\RiotClientServices.exe'
+        $paths.ProductSettingsPath | Should Be 'C:\yaml'
+    }
+}
+
+Describe 'Save-LaunchRiotPaths' {
+    AfterEach { Remove-TestTempFiles }
+
+    It 'écrit config.json quand un chemin change, et le relit tel quel' {
+        $path   = New-TempConfig '[{ "id": "blitz", "name": "Blitz", "path": "C:\\b.exe", "arguments": "" }]'
+        $config = Read-LaunchConfig $path
+        Save-LaunchRiotPaths $config $path @{ RiotClientPath = 'D:\Riot\RiotClientServices.exe'; ProductSettingsPath = 'C:\yaml' } | Should Be $true
+        $reloaded = Read-LaunchConfig $path
+        $reloaded.riotClientPath | Should Be 'D:\Riot\RiotClientServices.exe'
+        $reloaded.productSettingsPath | Should Be 'C:\yaml'
+        (@($reloaded.companionApps) | ForEach-Object { $_.id }) -join ',' | Should Be 'blitz'
+    }
+
+    It 'n''écrit rien quand les chemins sont déjà ceux du fichier, guillemets et espaces ignorés' {
+        $path   = New-TempConfig
+        $config = Read-LaunchConfig $path
+        $before = (Get-Item $path).LastWriteTimeUtc
+        Save-LaunchRiotPaths $config $path @{ RiotClientPath = ' "C:\Riot\RiotClientServices.exe" '; ProductSettingsPath = 'C:\yaml' } | Should Be $false
+        (Get-Item $path).LastWriteTimeUtc | Should Be $before
+    }
+
+    It 'enregistre le chemin nettoyé, jamais les guillemets collés' {
+        $path   = New-TempConfig
+        $config = Read-LaunchConfig $path
+        Save-LaunchRiotPaths $config $path @{ RiotClientPath = '"D:\r.exe"'; ProductSettingsPath = 'C:\yaml' } | Should Be $true
+        (Read-LaunchConfig $path).riotClientPath | Should Be 'D:\r.exe'
+    }
+
+    It 'accepte un chemin vidé par l''utilisateur : il sera signalé introuvable, pas remplacé en douce' {
+        $path   = New-TempConfig
+        $config = Read-LaunchConfig $path
+        Save-LaunchRiotPaths $config $path @{ RiotClientPath = ''; ProductSettingsPath = 'C:\yaml' } | Should Be $true
+        (Read-LaunchConfig $path).riotClientPath | Should Be ''
     }
 }
