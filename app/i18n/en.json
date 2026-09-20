@@ -1,10 +1,9 @@
-{
+﻿{
   "common.none": "none",
   "common.apply": "Apply",
   "common.cancel": "Cancel",
   "common.warning": "Warning: {0}",
   "common.notElevated": "Do not run as administrator: installers are per-user and uninstallers are read from the user registry",
-
   "setup.windowTitle": "hex-launcher — setup",
   "setup.language": "Language",
   "setup.page.detect": "Welcome",
@@ -33,6 +32,9 @@
   "setup.shortcuts.companions": "Companion apps",
   "setup.shortcuts.iconSet": "Icon set",
   "setup.shortcuts.iconSetChosen": "Icon set: {0}",
+  "setup.shortcuts.legacyLaunch": "Classic launch — tick this if the game does not start",
+  "setup.shortcuts.legacyLaunchChosen": "Startup: classic launch (Riot Client not driven)",
+  "setup.shortcuts.directLaunchChosen": "Startup: direct game launch",
   "setup.shortcuts.noLanguage": "No language checked: check at least one language to create a shortcut.",
   "setup.done.title": "Setup complete.",
   "setup.done.config": "Configuration: {0}",
@@ -43,7 +45,6 @@
   "setup.done.hint": "Double-click a shortcut to start the game in the chosen language. Run setup.bat again to add or remove languages or companion apps.",
   "setup.error.failed": "Setup failed:\r\n\r\n{0}",
   "setup.error.elevatedHint": "Run setup.bat again normally.",
-
   "companion.title": "Companion apps",
   "companion.pickerTitle": "League of Legends — companion apps",
   "companion.hint": "Apps started after the game (one shortcut per checked app). Checked apps that are missing will be installed.",
@@ -76,7 +77,6 @@
   "companion.chosen": "Selected companion apps: {0}",
   "companion.dryRun": "[DryRun] Nothing was executed, config.json unchanged.",
   "companion.uninstallFailed": "Uninstallation not completed ({0}): nothing was installed, config.json unchanged.",
-
   "shortcuts.localesMissing": "locales.json not found: {0}",
   "shortcuts.badgesUnavailable": "Companion badges unavailable ({0}) — flag icons only",
   "shortcuts.iconNotComposed": "Companion icon '{0}' not composed ({1}) — flag icon only",
@@ -97,7 +97,6 @@
   "shortcuts.unknownLocales": "Unknown language(s) in locales.json: {0}",
   "shortcuts.unknownCompanions": "Companion app(s) missing from config.json: {0} — run setup.bat again",
   "shortcuts.noLanguage": "No language checked: no shortcut created.",
-
   "detect.kept": "Existing config.json kept: {0}",
   "detect.keptHint": "  (delete the file or run again with -Force to detect again)",
   "detect.generated": "config.json generated: {0}",

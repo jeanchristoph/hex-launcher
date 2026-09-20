@@ -1,4 +1,4 @@
-# hex-launcher
+﻿# hex-launcher
 
 [English](README.md) · **Français** · [日本語](README.ja.md)
 
@@ -217,10 +217,19 @@ Le réglage « Langue » du Riot Client ne change que le lanceur, pas le jeu. La
 dans `settings.locale` du fichier `product_settings.yaml`, que le Riot Client réécrit à chaque fermeture.
 Le lanceur fait donc, dans l'ordre :
 
-1. Fermer le Riot Client et le client LoL s'ils tournent (sinon la modification serait écrasée).
-2. Réécrire `settings.locale` avec la langue demandée (`default_locale`, géré par Riot, n'est pas touché).
-3. Lancer le Riot Client avec `--locale=xx_XX` en plus, par sécurité.
-4. Fermer les autres applis compagnon de `config.json`, puis lancer celle nommée par `-Companion`, s'il y en a une.
+1. Fermer le client de jeu s'il tourne. Le Riot Client, lui, est laissé allumé — et démarré s'il ne l'est pas.
+2. Poser la langue par l'API locale du Riot Client, qui écrit alors `settings.locale` lui-même
+   (écrire ce fichier dans son dos ne tient pas : il le réécrit depuis sa mémoire en quelques secondes).
+3. Lui demander le jeu par la même API — l'équivalent du clic sur **Play** — puis vérifier que le client de
+   jeu apparaît vraiment avant de considérer que c'est gagné.
+4. À défaut : le chemin historique reprend la main — tout Riot fermé, `settings.locale` réécrit
+   (`default_locale`, géré par Riot, n'est jamais touché), relance avec `--launch-product`. En dernier ressort,
+   le bouton Play reste actif : le lanceur n'échoue jamais. `-NoLocalApi` force ce chemin historique.
+5. Fermer les autres applis compagnon de `config.json`, puis lancer celle nommée par `-Companion`, s'il y en a une.
+
+Le lanceur retient ce qui marche sur votre poste, dans `app\launch-state.json` : après deux échecs consécutifs
+du lancement direct, il passe d'emblée au lancement classique — et le retente automatiquement dès que le Riot
+Client change de version. Rien à régler.
 
 ## Développer
 

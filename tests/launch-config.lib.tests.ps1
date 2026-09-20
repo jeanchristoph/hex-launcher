@@ -121,3 +121,32 @@ Describe 'Test-LaunchCompanionAppsEqual' {
         Test-LaunchCompanionAppsEqual @() @() | Should Be $true
     }
 }
+
+Describe 'Get-LaunchUseLocalApi' {
+    It 'privilégie le lancement direct quand le poste n''a rien choisi' {
+        Get-LaunchUseLocalApi (Read-LaunchConfig (New-TempConfig)) | Should Be $true
+    }
+
+    It 'respecte le lancement classique choisi dans setup' {
+        $config = Read-LaunchConfig (New-TempConfig)
+        Set-LaunchUseLocalApi $config $false
+        Get-LaunchUseLocalApi $config | Should Be $false
+    }
+}
+
+Describe 'Save-LaunchUseLocalApi' {
+    AfterEach { Remove-TestTempFiles }
+
+    It 'écrit config.json quand le choix change, et le relit tel quel' {
+        $path = New-TempConfig
+        $config = Read-LaunchConfig $path
+        Save-LaunchUseLocalApi $config $path $false | Should Be $true
+        Get-LaunchUseLocalApi (Read-LaunchConfig $path) | Should Be $false
+    }
+
+    It 'n''écrit rien quand le choix est déjà celui du fichier' {
+        $path = New-TempConfig
+        $config = Read-LaunchConfig $path
+        Save-LaunchUseLocalApi $config $path $true | Should Be $false
+    }
+}

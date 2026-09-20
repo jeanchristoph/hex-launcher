@@ -473,6 +473,7 @@ function Get-SetupPageSelection {
     }
     if ($null -ne $controls.IconSetList) { $selection.IconSetList = @(Get-SetupSelectedIconSetName $controls.IconSetList) }
     if ($null -ne $controls.UninstallBox) { $selection.UninstallOthers = [bool]$controls.UninstallBox.Checked }
+    if ($null -ne $controls.LegacyLaunchBox) { $selection.LegacyLaunchBox = @([string]$controls.LegacyLaunchBox.Checked) }
     return $selection
 }
 
@@ -619,6 +620,7 @@ function New-SetupShortcutsControls {
     $controls.CompanionList = New-SetupCheckedList (Get-ShortcutCompanionListItems $companionApps) (Get-SetupPreselection 'CompanionList' (Get-PreselectedShortcutCompanionIds $companionApps $state.ExistingShortcuts)) $rightColumn 72 $columnWidth $companionHeight
     $controls.IconSetList   = New-SetupIconSetList $state.IconSets (Get-SetupPreselectedIconSetName $state) $rightColumn ($iconSetsTop + 24) ($columnWidth - $previewSize - 12) $previewSize
     $controls.IconSetPreview = New-ThemedPicture ($rightColumn + $columnWidth - $previewSize) ($iconSetsTop + 24) $previewSize
+    $controls.LegacyLaunchBox = New-SetupLegacyLaunchBox $state $rightColumn ($iconSetsTop + 24 + $previewSize + 6) $columnWidth
     $controls.Log           = New-ThemedLog 0 312 $layout.ContentWidth ($layout.ContentHeight - 312)
     $controls.Inputs        = @($controls.LocaleList, $controls.CompanionList, $controls.IconSetList)
     $controls.IconSetList.Add_SelectedIndexChanged({ Invoke-SetupSafely { Update-SetupIconSetPreview } })
@@ -632,8 +634,23 @@ function New-SetupShortcutsControls {
         $controls.CompanionList
         $controls.IconSetList
         $controls.IconSetPreview
+        $controls.LegacyLaunchBox
         $controls.Log
     )
+}
+
+# Case décochée par défaut : le lancement direct est le comportement normal, la case est le recours quand il
+# ne fonctionne pas. Libellée par le symptôme, pour être actionnable sans connaître la mécanique.
+function New-SetupLegacyLaunchBox($State, [int]$Left, [int]$Top, [int]$Width) {
+    $box = New-ThemedCheckBox (Get-Text 'setup.shortcuts.legacyLaunch') $Left $Top $Width
+    # @() obligatoire : un retour à un seul élément se déroule en chaîne, et $pending[0] rendrait un caractère
+    $pending = @(Get-SetupPreselection 'LegacyLaunchBox' @())
+    if ($pending.Count -gt 0) {
+        $box.Checked = [bool]($pending[0] -eq 'True')
+    } else {
+        $box.Checked = -not (Get-LaunchUseLocalApi $State.Config)
+    }
+    return $box
 }
 
 # Liste des jeux, le jeu présélectionné sélectionné ; les clés (noms de dossier) dans Tag comme les listes à cocher
@@ -682,6 +699,7 @@ function Get-SetupShortcutSelection {
         Codes        = @(Get-SetupCheckedKeys $controls.LocaleList)
         CompanionIds = @(Get-SetupCheckedKeys $controls.CompanionList)
         IconSet      = Get-SetupSelectedIconSetName $controls.IconSetList
+        UseLocalApi  = -not [bool]$controls.LegacyLaunchBox.Checked
     }
 }
 
@@ -704,6 +722,10 @@ function Invoke-SetupShortcutsStep {
     }
     $iconSet = Select-IconSetForConfig $state.Config $SetupConfigPath $selection.IconSet
     if ($iconSet) { Write-SetupLog (Get-Text 'setup.shortcuts.iconSetChosen' $iconSet.Name) }
+    if ($null -ne $selection.UseLocalApi) {
+        Save-LaunchUseLocalApi $state.Config $SetupConfigPath ([bool]$selection.UseLocalApi) | Out-Null
+        Write-SetupLog (Get-Text $(if ($selection.UseLocalApi) { 'setup.shortcuts.directLaunchChosen' } else { 'setup.shortcuts.legacyLaunchChosen' }))
+    }
     $combinations = Get-ShortcutCombinations $selection.Codes (Resolve-ShortcutCompanions $state.Config $selection.CompanionIds)
     $state.ShortcutPaths = @(New-SetupShortcuts $combinations)
     foreach ($line in @(Remove-ObsoleteShortcuts $state.ExistingShortcuts $combinations)) { Write-SetupLog $line }

@@ -1,4 +1,4 @@
-# hex-launcher
+﻿# hex-launcher
 
 **English** · [Français](README.fr.md) · [日本語](README.ja.md)
 
@@ -216,10 +216,19 @@ The Riot Client's "Language" setting only changes the launcher, not the game. Th
 from `settings.locale` in `product_settings.yaml`, which the Riot Client rewrites every time it closes.
 So the launcher does, in order:
 
-1. Close the Riot Client and the LoL client if they are running (otherwise the change would be overwritten).
-2. Rewrite `settings.locale` with the requested language (`default_locale`, managed by Riot, is left alone).
-3. Start the Riot Client with `--locale=xx_XX` as well, for good measure.
-4. Close the other companion apps of `config.json`, then start the one named by `-Companion`, if any.
+1. Close the game client if it is running. The Riot Client is left alone — and started if it is not running.
+2. Set the language through the Riot Client's local API, so that it writes `settings.locale` itself
+   (writing that file behind its back does not hold: it rewrites it from memory within seconds).
+3. Ask it for the game through the same API — what the **Play** button does — then check that the game
+   client really shows up before calling it a success.
+4. Otherwise the legacy path takes over: all Riot processes closed, `settings.locale` rewritten
+   (`default_locale`, managed by Riot, is never touched), relaunch with `--launch-product`. As a last resort
+   the Play button is still there: the launcher never fails hard. `-NoLocalApi` forces that legacy path.
+5. Close the other companion apps of `config.json`, then start the one named by `-Companion`, if any.
+
+The launcher remembers what works on your machine, in `app\launch-state.json`: after two consecutive failures
+of the direct launch it goes straight to the classic one — and tries again automatically as soon as the Riot
+Client changes version. Nothing to configure.
 
 ## Developing
 

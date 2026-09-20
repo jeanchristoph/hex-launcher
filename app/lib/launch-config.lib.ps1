@@ -8,7 +8,8 @@
 
     config.json :
         riotClientPath, productSettingsPath, companionApps = [ { id, name, path, arguments }, … ],
-        iconSet = nom du jeu d'icônes choisi dans setup.bat (dossier de app\ico ; absent → jeu par défaut)
+        iconSet = nom du jeu d'icônes choisi dans setup.bat (dossier de app\ico ; absent → jeu par défaut),
+        useLocalApi = chemin de lancement choisi dans setup.bat (absent → vrai : API locale du Riot Client)
 
     Un config.json antérieur (bloc unique companionApp { enabled, name, path, arguments }) est migré à la lecture :
     l'entrée activée devient la seule ligne de companionApps, avec un id dérivé de son nom.
@@ -64,6 +65,25 @@ function Read-LaunchConfig([string]$Path) {
 }
 
 # Nom du jeu d'icônes retenu ('' si jamais choisi)
+# Chemin de lancement voulu par l'utilisateur (case de setup.bat) : vrai = API locale du Riot Client d'abord,
+# faux = lancement classique directement. Absent d'un config.json antérieur → vrai, le comportement par défaut.
+function Get-LaunchUseLocalApi($Config) {
+    if ($null -ne $Config.useLocalApi) { return [bool]$Config.useLocalApi }
+    return $true
+}
+
+function Set-LaunchUseLocalApi($Config, [bool]$UseLocalApi) {
+    $Config | Add-Member -NotePropertyName useLocalApi -NotePropertyValue $UseLocalApi -Force
+}
+
+# N'écrit config.json que si le choix a changé ; rend vrai dans ce cas
+function Save-LaunchUseLocalApi($Config, [string]$ConfigPath, [bool]$UseLocalApi) {
+    if ((Get-LaunchUseLocalApi $Config) -eq $UseLocalApi) { return $false }
+    Set-LaunchUseLocalApi $Config $UseLocalApi
+    Write-LaunchConfig $Config $ConfigPath
+    return $true
+}
+
 function Get-LaunchIconSetName($Config) {
     if ($null -ne $Config.iconSet) { return [string]$Config.iconSet }
     return ''

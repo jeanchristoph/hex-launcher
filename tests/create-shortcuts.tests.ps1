@@ -142,9 +142,9 @@ Describe 'Resolve-ShortcutIconPath' {
         Mock New-Item {}
         Mock Add-CompanionBadge { param($SourceIco, $Badge, $DestinationIco, $Style) $DestinationIco }
 
-        It 'compose drapeau + pastille dans ico\<jeu>\companion, avec le style du jeu (voile nuit pour flat)' {
+        It 'compose drapeau + pastille dans ico\<jeu>\companion, avec le style du jeu (flat livré sans voile)' {
             Resolve-ShortcutIconPath (New-ShortcutCombination 'ja_JP' $blitz) | Should Be (Get-CompanionIconPath 'ja_JP' $blitz $badge)
-            Assert-MockCalled Add-CompanionBadge -Scope It -Exactly 1 -ParameterFilter { $SourceIco -eq (Get-FlagIconPath 'ja_JP') -and $Badge.glyph -eq 'B' -and $Style.NightVeil -eq $true }
+            Assert-MockCalled Add-CompanionBadge -Scope It -Exactly 1 -ParameterFilter { $SourceIco -eq (Get-FlagIconPath 'ja_JP') -and $Badge.glyph -eq 'B' -and $Style.NightVeil -eq $false }
         }
 
         It 'compose aux couleurs brutes du catalogue pour le jeu classic' {
