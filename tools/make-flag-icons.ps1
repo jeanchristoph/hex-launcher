@@ -197,12 +197,12 @@ $FlagDrawings = @{
         $G.Clear((Get-FlagColor '#FFFFFF'))
         Draw-Disc $G '#BC002D' $R.Cx $R.Cy ($R.Height * $CenterEmblem)
     }
-    'fr_FR' = { param($G, $R) Draw-VerticalStripes $G $R @('#0055A4', '#FFFFFF', '#EF4135') }
+    'fr_FR' = { param($G, $R) Draw-VerticalStripes $G $R @('#000091', '#FFFFFF', '#E1000F') }
     'en_US' = { param($G, $R)
-        $stripes = @(); for ($i = 0; $i -lt 9; $i++) { $stripes += if ($i % 2 -eq 0) { '#B22234' } else { '#FFFFFF' } }
+        $stripes = @(); for ($i = 0; $i -lt 9; $i++) { $stripes += if ($i % 2 -eq 0) { '#B31942' } else { '#FFFFFF' } }
         Draw-HorizontalStripes $G $R $stripes
         $cantonW = $R.Width * 0.55; $cantonH = $R.Height * 4 / 9
-        $G.FillRectangle((Get-Brush '#3C3B6E'), 0, 0, [float]($R.Left + $cantonW), [float]($R.Top + $cantonH))
+        $G.FillRectangle((Get-Brush '#0A3161'), 0, 0, [float]($R.Left + $cantonW), [float]($R.Top + $cantonH))
         for ($row = 0; $row -lt 3; $row++) { for ($col = 0; $col -lt 3; $col++) {
             Draw-Disc $G '#FFFFFF' ($R.Left + $cantonW * (0.2 + 0.3 * $col)) ($R.Top + $cantonH * (0.2 + 0.3 * $row)) ($R.Size * 0.02)
         } }
@@ -212,7 +212,7 @@ $FlagDrawings = @{
         Draw-UnionJack $G ($R.Cx - $R.Size) ($R.Cy - $R.Size) ($R.Size * 2) ($R.Size * 2)
     }
     'en_AU' = { param($G, $R)
-        $G.Clear((Get-FlagColor '#012169'))
+        $G.Clear((Get-FlagColor '#001B69'))
         $cantonW = $R.Width * 0.55; $cantonH = $R.Height * 0.4
         Draw-UnionJack $G 0 0 ($R.Left + $cantonW) ($R.Top + $cantonH)
         $star = $R.Width * 0.09
@@ -222,9 +222,9 @@ $FlagDrawings = @{
         }
     }
     'en_SG' = { param($G, $R)
-        Draw-HorizontalStripes $G $R @('#EF3340', '#FFFFFF')
+        Draw-HorizontalStripes $G $R @('#EE2536', '#FFFFFF')
         $cy = $R.Top + $R.Height * 0.25; $d = $R.Height * 0.32
-        Draw-Crescent $G '#FFFFFF' '#EF3340' ($R.Left + $R.Width * 0.3) $cy $d ($d * 0.28)
+        Draw-Crescent $G '#FFFFFF' '#EE2536' ($R.Left + $R.Width * 0.3) $cy $d ($d * 0.28)
         foreach ($p in @(@(0.62, -0.42), @(0.52, -0.12), @(0.72, -0.12), @(0.56, 0.22), @(0.68, 0.22))) {
             Draw-Star $G '#FFFFFF' ($R.Left + $R.Width * $p[0]) ($cy + $d * $p[1]) ($d * 0.11)
         }
@@ -246,12 +246,12 @@ $FlagDrawings = @{
     }
     'id_ID' = { param($G, $R) Draw-HorizontalStripes $G $R @('#FF0000', '#FFFFFF') }
     'zh_MY' = { param($G, $R)
-        $stripes = @(); for ($i = 0; $i -lt 7; $i++) { $stripes += if ($i % 2 -eq 0) { '#CC0001' } else { '#FFFFFF' } }
+        $stripes = @(); for ($i = 0; $i -lt 7; $i++) { $stripes += if ($i % 2 -eq 0) { '#CC0000' } else { '#FFFFFF' } }
         Draw-HorizontalStripes $G $R $stripes
         $cantonRight = $R.Left + $R.Width * 0.55; $cantonBottom = $R.Top + $R.Height * 4 / 7
-        $G.FillRectangle((Get-Brush '#010066'), 0, 0, [float]$cantonRight, [float]$cantonBottom)
+        $G.FillRectangle((Get-Brush '#000066'), 0, 0, [float]$cantonRight, [float]$cantonBottom)
         $cx = ($R.Left + $cantonRight) / 2; $cy = ($R.Top + $cantonBottom) / 2; $d = $R.Width * 0.3
-        Draw-Crescent $G '#FFCC00' '#010066' ($cx - $d * 0.15) $cy $d ($d * 0.25)
+        Draw-Crescent $G '#FFCC00' '#000066' ($cx - $d * 0.15) $cy $d ($d * 0.25)
         Draw-Star $G '#FFCC00' ($cx + $d * 0.42) $cy ($d * 0.3) 14
     }
     'ko_KR' = { param($G, $R)
@@ -273,17 +273,17 @@ $FlagDrawings = @{
             Draw-Trigram $G '#000000' ($R.Cx + $t.X * $d) ($R.Cy + $t.Y * $d) $angle ($d / 2) ($d / 12) ($d / 24) $t.Broken
         }
     }
-    'de_DE' = { param($G, $R) Draw-HorizontalStripes $G $R @('#000000', '#DD0000', '#FFCE00') }
-    'es_ES' = { param($G, $R) Draw-HorizontalStripes $G $R @('#AA151B', '#F1BF00', '#AA151B') @(1, 2, 1) }
+    'de_DE' = { param($G, $R) Draw-HorizontalStripes $G $R @('#000000', '#D00000', '#FFCE00') }
+    'es_ES' = { param($G, $R) Draw-HorizontalStripes $G $R @('#AD1519', '#FABD00', '#AD1519') @(1, 2, 1) }
     'es_MX' = { param($G, $R) Draw-VerticalStripes $G $R @('#006847', '#FFFFFF', '#CE1126') }
-    'it_IT' = { param($G, $R) Draw-VerticalStripes $G $R @('#009246', '#FFFFFF', '#CE2B37') }
-    'pl_PL' = { param($G, $R) Draw-HorizontalStripes $G $R @('#FFFFFF', '#DC143C') }
+    'it_IT' = { param($G, $R) Draw-VerticalStripes $G $R @('#008C45', '#F4F5F0', '#CD212A') }
+    'pl_PL' = { param($G, $R) Draw-HorizontalStripes $G $R @('#E9E8E7', '#D4213D') }
     'pt_BR' = { param($G, $R)
-        $G.Clear((Get-FlagColor '#009C3B'))
+        $G.Clear((Get-FlagColor '#009440'))
         $rw = $R.Width * 0.85; $rh = $R.Height * 0.55
         $rhombus = New-PointArray @(@($R.Cx, ($R.Cy - $rh / 2)), @(($R.Cx + $rw / 2), $R.Cy), @($R.Cx, ($R.Cy + $rh / 2)), @(($R.Cx - $rw / 2), $R.Cy))
-        $G.FillPolygon((Get-Brush '#FFDF00'), $rhombus)
-        Draw-Disc $G '#002776' $R.Cx $R.Cy ($rh * 0.62)
+        $G.FillPolygon((Get-Brush '#FFCB00'), $rhombus)
+        Draw-Disc $G '#302681' $R.Cx $R.Cy ($rh * 0.62)
     }
     'ru_RU' = { param($G, $R) Draw-HorizontalStripes $G $R @('#FFFFFF', '#0039A6', '#D52B1E') }
     'tr_TR' = { param($G, $R)
@@ -319,14 +319,14 @@ $FlagDrawings = @{
     }
     'hu_HU' = { param($G, $R) Draw-HorizontalStripes $G $R @('#CE2939', '#FFFFFF', '#477050') }
     'ro_RO' = { param($G, $R) Draw-VerticalStripes $G $R @('#002B7F', '#FCD116', '#CE1126') }
-    'th_TH' = { param($G, $R) Draw-HorizontalStripes $G $R @('#A51931', '#FFFFFF', '#2D2A4A', '#FFFFFF', '#A51931') @(1, 1, 2, 1, 1) }
+    'th_TH' = { param($G, $R) Draw-HorizontalStripes $G $R @('#A51931', '#F4F5F8', '#2D2A4A', '#F4F5F8', '#A51931') @(1, 1, 2, 1, 1) }
     'vi_VN' = { param($G, $R)
         $G.Clear((Get-FlagColor '#DA251D'))
         Draw-Star $G '#FFFF00' $R.Cx $R.Cy ($R.Height * $CenterEmblem / 2)
     }
     'ar_AE' = { param($G, $R)
-        Draw-HorizontalStripes $G $R @('#00732F', '#FFFFFF', '#000000')
-        $G.FillRectangle((Get-Brush '#FF0000'), 0, 0, [float]($R.Left + $R.Width * 0.25), $R.Size)
+        Draw-HorizontalStripes $G $R @('#00843D', '#FFFFFF', '#000000')
+        $G.FillRectangle((Get-Brush '#C8102E'), 0, 0, [float]($R.Left + $R.Width * 0.25), $R.Size)
     }
 }
 

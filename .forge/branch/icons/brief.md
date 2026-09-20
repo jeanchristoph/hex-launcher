@@ -9,6 +9,7 @@ lisible de 256 à 16 px (couleur seule en dessous de 32 px). Livraison en versio
 
 ## Scope & rules
 
-- Aucun actif de Riot n'entre dans le dépôt ni dans la release : l'icône officielle du jeu est **référencée** depuis
-  le binaire installé (`IconLocation`), jamais copiée, jamais extraite vers un fichier du projet, et aucune pastille
-  n'est composée dessus.
+- L'icône officielle du jeu n'entre ni dans le dépôt ni dans la release : elle est **référencée** depuis le binaire
+  installé (`IconLocation`), jamais copiée dans le projet.
+- Le jeu `original-badges` compose ses pastilles par-dessus, dans `ico/<jeu>/companion/` (gitignoré, hors release) :
+  fichier local au poste. Le jeu `original` reste disponible pour l'icône intacte.

@@ -56,14 +56,57 @@
 [x] T8.2 — 2026-09-17 : -IconSet, Set-ActiveIconSet, repli en chaîne, pastilles dans ico/<jeu>/companion (choix utilisateur), iconSet mémorisé par Select-IconSetForConfig, .gitignore et release
 [x] T8.3 — 2026-09-17 : liste des jeux + aperçu hex-launcher.ico (PictureBox 64 px) sur la page Raccourcis, icône de fenêtre depuis le jeu par défaut ; 322 tests verts ; README ×3, project.md
 
-### T9 — Troisième jeu : l'icône originale de League of Legends
-**Effort:** M
-**Files:** `app/ico/original/icon-source.json` (nouveau), `app/lib/icon-set.lib.ps1`, `app/lib/launch-config.lib.ps1`, `app/detect-config.ps1`, `app/create-shortcuts.ps1`, `app/setup.ps1`, `app/i18n/{fr,en,ja}.json`, `tests/icon-set.lib.tests.ps1`, `tests/create-shortcuts.tests.ps1`, `tests/setup.tests.ps1`, README ×3
-**Description:** Un jeu d'icônes sans aucun `.ico`, reconnu par un marqueur `icon-source.json`
-(`{ "source": "league-client" }`) — les jeux portent déjà `badge-style.json`, la mécanique de découverte existe.
-`Resolve-ShortcutIconPath` rend `"<LeagueClient.exe>,0"` : Windows extrait l'icône du binaire installé, aucun actif
-de Riot n'entre dans le dépôt ni dans la release. **Aucune pastille compagnon composée** sur ce jeu : les raccourcis ne s'y distinguent que par leur nom, ce que
-l'assistant doit dire. Repli sur le jeu par défaut si le binaire est introuvable, l'installation aboutit toujours.
+### T9 — Icône originale de League of Legends, en deux jeux
+**Effort:** L
+**Files:** `app/ico/original/icon-source.json` et `app/ico/original-badges/icon-source.json` (nouveaux), `app/lib/flag.lib.ps1` (nouveau, dessins venus de `tools/`), `app/lib/icon-set.lib.ps1`, `app/lib/icon-badge.lib.ps1`, `app/lib/launch-config.lib.ps1`, `app/detect-config.ps1`, `app/create-shortcuts.ps1`, `app/setup.ps1`, `app/i18n/{fr,en,ja}.json`, `tools/make-flag-icons.ps1`, `tests/flag.lib.tests.ps1` (nouveau), `tests/icon-set.lib.tests.ps1`, `tests/icon-badge.lib.tests.ps1`, `tests/create-shortcuts.tests.ps1`, `tests/setup.tests.ps1`, README ×3
+**Description:** Deux entrées dans la liste des jeux, toutes deux référençant l'icône du binaire de LoL installé —
+un jeu sans aucun `.ico`, reconnu par un marqueur `icon-source.json` ; la mécanique de découverte existe déjà
+(les jeux portent `badge-style.json`).
+
+- **`original`** : l'icône officielle nue, `IconLocation = "<LeagueClient.exe>,0"`, aucune pastille. Les raccourcis
+  ne se distinguent alors que par leur nom, ce que l'assistant doit dire.
+- **`original-badges`** : l'icône officielle surmontée de la **pastille pays** puis de la **pastille compagnon**,
+  empilées verticalement, pays en haut. Impose d'extraire l'icône du binaire en mémoire
+  (`[Drawing.Icon]::ExtractAssociatedIcon`) et de composer dessus ; le `.ico` produit va dans
+  `ico/<jeu>/companion/`, déjà gitignoré et hors release. Rien n'est distribué : fichier local au poste.
+
+**Nouveau composant — la pastille pays**, venue de T10 : un **drapeau miniature**, et non des lettres. Le drapeau
+est dessiné puis **redimensionné, et un disque y est découpé** (masque circulaire GDI+, interpolation
+`HighQualityBicubic`), avec le même anneau que la pastille compagnon. Métriques en fractions du côté, comme
+`$BadgeShape` de `icon-badge.lib.ps1`.
+
+Géométrie arrêtée : le drapeau est redimensionné **dans un carré**, et le cercle de découpe est **inscrit dans ce
+carré** — diamètre égal au côté. Toutes les couleurs du drapeau restent donc visibles, seuls les quatre coins sont
+perdus : un Japon garde son disque rouge sur blanc, une France ses trois bandes. Pas de recadrage centré, qui
+aurait vidé ces deux-là de leur sens.
+
+**Couleurs officielles brutes : ni voile, ni palette réduite.** Les icônes subissent deux traitements qui n'ont
+pas lieu d'être sur une pastille de quelques pixels : l'atténuation (saturation 0,72 et voile nuit 60/255,
+`$PaletteMuting`), qui sert à détacher le logo HL de son fond — il n'y a aucun logo à détacher ici — et la
+réduction à 8 teintes (`ConvertTo-PaletteHex`), qui unifie l'aspect des 29 icônes entre elles. La palette reste
+en place pour les icônes ; elle ne s'applique pas aux pastilles.
+
+Conséquence sur la migration : `app/lib/flag.lib.ps1` dessine avec **les couleurs déclarées, telles quelles**, et
+ne connaît ni l'atténuation ni la réduction. C'est le générateur qui les applique ensuite pour ses fonds d'icônes.
+La lib reste neutre, chaque appelant décide de son rendu.
+
+Corollaire : l'exactitude des couleurs déclarées devient visible pour la première fois, puisque les pastilles les
+afficheront sans transformation. Mesuré le 2026-09-20 : sur 50 couleurs déclarées, 5 seulement sont déplacées de
+plus de 60 unités RGB par la palette (`#FF0000` → `#C6202A`, `#FFFF00` → `#F2C230`, `#000095` → `#1E2A5A`…).
+
+Pour la dessiner, `$FlagDrawings` et ses fonctions de dessin **migrent de `tools/make-flag-icons.ps1` vers une lib
+de `app/`** (`app/lib/flag.lib.ps1`), que le générateur dot-source à son tour : une seule définition des drapeaux,
+et les pastilles suivent d'elles-mêmes toute retouche. Aucune dépendance ajoutée — les drapeaux sont dessinés en
+GDI+ (`System.Drawing`), natif à Windows ; seul le logo HL passe par `resvg`, qui reste dans `tools/` et hors
+release. C'est `tools/` qui n'est pas livré aux joueurs, pas qui échappe à git : il est bien versionné.
+
+Alternative écartée le 2026-09-20 : livrer 27 vignettes de drapeau par jeu — fichiers redondants à régénérer et
+recommiter à chaque retouche.
+
+**Règle de lisibilité, tranchée :** sous 32 px, une seule pastille subsiste — **le pays**. C'est lui qui définit le
+raccourci ; le compagnon est contextuel.
+
+Repli sur le jeu par défaut si le binaire est introuvable : l'installation aboutit toujours.
 
 Relevé du 2026-09-20 (branche `launcher`), à ne pas remesurer :
 - le dossier du jeu est déclaré par Riot dans `associated_client` de `%ProgramData%\Riot Games\RiotClientInstalls.json`
@@ -73,29 +116,44 @@ Relevé du 2026-09-20 (branche `launcher`), à ne pas remesurer :
 - piège rencontré : dans un `-replace`, la chaîne de remplacement ne traite pas `\` comme un échappement.
 [ ]
 
-### T10 — Drapeaux en image de fond, et logo SVG importable
+### T10 — Drapeaux en image de fond, et logo SVG importable — EN ATTENTE
 **Effort:** L
 **Files:** `tools/make-flag-icons.ps1`, `app/ico/<jeu>/`, éventuellement `app/setup.ps1` et une lib de génération, tests, README ×3
-**Description:** Séparer le drapeau — aujourd'hui dessiné en GDI+ par `$FlagDrawings` dans le générateur — en image
-de fond distincte, et permettre à l'utilisateur de fournir son propre SVG comme logo pour la génération des icônes.
+**Description:** Mise en attente à la demande de l'utilisateur le 2026-09-20 ; la pastille pays qu'elle portait est
+passée en T9, qui en a besoin. Reste ici la seule génération : séparer le drapeau — aujourd'hui dessiné en GDI+ par
+`$FlagDrawings` — en image de fond distincte, et permettre à l'utilisateur de fournir son propre SVG comme logo.
 
-Question de cadrage à trancher avant d'écrire une ligne : le générateur vit dans `tools/`, exclu de la release, et
-dépend de `resvg` installé par scoop. Un utilisateur final n'a ni l'un ni l'autre. Trois voies — embarquer `resvg`
-dans la release (MPL-2.0, ~3 Mo, redistribuable), accepter un PNG plutôt qu'un SVG (GDI+ le lit nativement, aucune
+Question de cadrage à trancher au dégel : le générateur vit dans `tools/`, exclu de la release, et dépend de
+`resvg` installé par scoop. Un utilisateur final n'a ni l'un ni l'autre. Trois voies — embarquer `resvg` dans la
+release (MPL-2.0, ~3 Mo, redistribuable), accepter un PNG plutôt qu'un SVG (GDI+ le lit nativement, aucune
 dépendance), ou réserver la génération à `tools/`.
-
-Piste à évaluer ici : le drapeau en **seconde pastille**, empilement **vertical** — pays en premier (en haut),
-compagnon en second (en dessous). L'ordre suit la lecture, du plus discriminant (la langue, qui définit le
-raccourci) au plus contextuel (l'appli compagnon). La pastille compagnon est aujourd'hui en haut-droite
-(`$BadgeShape` de `icon-badge.lib.ps1` : disque Ø 34 % du côté, centre à 58 % du diamètre depuis le coin) : elle
-descend, et les métriques restent en fractions du côté.
-
-À trancher dans la tâche : la lisibilité aux petites tailles. Une pastille seule perd déjà sa lettre sous 32 px et
-devient un point de couleur ; deux pastilles empilées à 16 px donneraient deux points de ~5 px indistinguables. Il
-faudra décider ce qui subsiste sous un seuil — le pays seul, le compagnon seul, ou aucune pastille.
-
-Cette piste rendrait sa langue au jeu « original » de T9, au prix d'un fichier composé sur le disque de l'utilisateur, jamais distribué.
 [ ]
+
+### T11 — Couleurs officielles des drapeaux
+**Effort:** S
+**Files:** `tools/make-flag-icons.ps1`, `app/ico/flat/hex-launcher-fr.ico`
+**Description:** Vérification des 24 drapeaux du catalogue contre les sources officielles, puis correction de
+douze d'entre eux. Politique retenue : **spécification officielle là où elle existe, valeur des SVG de Wikimedia
+Commons ailleurs** — une seule règle, jamais un mélange, sinon les drapeaux jurent entre eux.
+
+Peu de pays définissent leurs couleurs en droit : Corée (Munsell + CIE, la plus précise), Roumanie, Hongrie,
+Thaïlande, Espagne, Pologne, France, plus une spécification partielle aux Émirats et en Indonésie. Le Japon et les
+États-Unis n'ont que du textile et du Pantone ; leurs hex sont des conventions.
+
+Corrigés : France (`#000091` `#E1000F`, charte de l'État 2020), Brésil (`#009440` `#FFCB00` `#302681`, SVG
+gouvernementaux), Émirats (`#00843D` `#C8102E`), États-Unis (`#B31942` `#0A3161`), Espagne (`#AD1519` `#FABD00`),
+Italie (`#008C45` `#CD212A` `#F4F5F0`), Pologne (`#D4213D` `#E9E8E7`), Thaïlande (blanc `#F4F5F8`), Singapour
+(`#EE2536`), Allemagne (`#D00000`), Australie (`#001B69`), Malaisie (`#CC0000` `#000066`).
+
+Déjà justes, laissés tels quels : Japon, Royaume-Uni, Corée, Philippines, Argentine, Mexique, Russie, Turquie,
+Taïwan, Indonésie, Tchéquie, Grèce, Hongrie, Roumanie, Vietnam. Deux pièges évités — l'Indonésie `#FF0000` est la
+valeur de la loi UU 24/2009 et non une simplification ; des couleurs tchèques circulent en se réclamant d'un
+document du ministère qui dit lui-même ne fixer aucune couleur.
+
+Les blancs cassés (Italie, Pologne, Thaïlande) sont conservés tels quels : couleurs exactes, choix assumé.
+[x] 2026-09-20 — douze pays corrigés dans le bloc de chacun, sans déborder sur les couleurs partagées ; icônes
+régénérées : **une seule change**, la France, dont le bleu officiel bascule de `Blue` vers `Navy` après réduction
+— rendu validé. Les onze autres corrections ne se verront que sur les futures pastilles, en couleurs brutes.
 
 ## Risks
 - `.ico` à entrées DIB (non PNG) : le repli `System.Drawing.Icon` ne rend pas l'entrée 256 px → la lib lève un throw explicite plutôt qu'une icône incomplète ; nos `.ico` actuels sont tous PNG.
@@ -113,6 +171,7 @@ Cette piste rendrait sa langue au jeu « original » de T9, au prix d'un fichier
 | T6 — Version 0.1.2, doc, release | S | [x] |
 | T7 — Aplat des icônes drapeau | M | [x] |
 | T8 — Jeux d'icônes sélectionnables | M | [x] |
-| T9 — Icône originale de LoL | M | [ ] |
-| T10 — Drapeaux en fond + SVG importable | L | [ ] |
+| T9 — Icône originale de LoL, deux jeux | L | [ ] |
+| T10 — Drapeaux en fond + SVG importable | L | [ ] en attente |
+| T11 — Couleurs officielles des drapeaux | S | [x] |
 | **Total** | **~XL (8-11 h)** | |

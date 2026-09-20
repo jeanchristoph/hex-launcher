@@ -1,5 +1,13 @@
 # Log â€” icons
 
+- [2026-09-20 05:30] T11 : douze drapeaux corrigés d'après les sources officielles. Une seule icône change (France, bleu #000091 → Navy après réduction), rendu validé par l'utilisateur ; les onze autres ne se verront que sur les pastilles.
+- [2026-09-20 05:25] Politique de couleurs : spécification officielle là où elle existe, SVG de Wikimedia Commons ailleurs — jamais un mélange. Peu de pays légifèrent : Corée, Roumanie, Hongrie, Thaïlande, Espagne, Pologne, France, et partiellement Émirats et Indonésie.
+- [2026-09-20 05:05] Pastilles : ni voile nuit ni palette réduite (choix utilisateur) — la palette reste pour les icônes, où elle unifie l'ensemble. Mesuré : elle ne déplace fortement que 5 couleurs sur 50.
+- [2026-09-20 04:55] Pastille pays en couleurs brutes, sans le voile nuit des icônes (choix utilisateur) : le voile sert à détacher le logo HL, inutile sur une pastille. `app/lib/flag.lib.ps1` dessinera donc neutre, l'atténuation restant au générateur.
+- [2026-09-20 04:45] Pastille pays : drapeau redimensionné dans un carré, cercle de découpe inscrit (diamètre = côté). Toutes les couleurs restées visibles, seuls les coins perdus — le recadrage centré est écarté.
+- [2026-09-20 04:35] Pastille pays = drapeau miniature, et `$FlagDrawings` migre de `tools/` vers `app/lib/flag.lib.ps1` (choix utilisateur) : une seule définition des drapeaux, aucune dépendance ajoutée — vérifié que seul le logo HL passe par resvg, les drapeaux étant dessinés en GDI+ natif. Vignettes livrées écartées.
+- [2026-09-20 04:20] T10 mise en attente ; la pastille pays qu'elle portait passe en T9, qui en dépend.
+- [2026-09-20 04:20] Décisions utilisateur sur T9 : deux jeux distincts — `original` (icône nue, sans pastille) et `original-badges` (pastilles pays + compagnon composées dessus, sur le poste). Sous 32 px, une seule pastille subsiste : le pays.
 - [2026-09-20 03:30] Ordre des pastilles fixé par l'utilisateur pour T10 : empilement vertical, pays en haut, compagnon en dessous. Reste à trancher dans la tâche : ce qui subsiste sous 32 px, où deux pastilles ne seraient plus lisibles.
 - [2026-09-20 03:20] T9 et T10 ajoutées au plan : icône originale de LoL référencée depuis le binaire (sans pastille), puis drapeaux en image de fond avec SVG importable. Le relevé technique de T9 a été fait sur la branche `launcher` et reporté dans le plan pour ne pas être refait.
 - [2026-09-17 02:12] Gravé : 84df5b0 sur icons, dev (créée depuis master, poussée) et master ; release GitHub v0.1.5 publiée (hex-launcher-0.1.5.zip, 5,5 Mo, flat + classic, sans tools/tests/companion).
