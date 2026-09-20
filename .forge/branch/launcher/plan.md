@@ -42,9 +42,9 @@ Tests : succès API sans rejeu, lockfile absent → rejeu, API en erreur → rej
 **Effort:** S
 **Files:** `app/version.txt`, `README.md`, `README.fr.md`, `README.ja.md`, `LISEZMOI.txt`, `.forge/project.md`
 **Description:** Essai sur le Bureau depuis un raccourci langue × compagnon : jeu lancé sans clic, `settings.locale`
-conservé après coup (journaux du Riot Client relus). Version 0.1.7, README ×3 et `project.md` : nouvelle lib et
+conservé après coup (journaux du Riot Client relus). Version 0.2.0, README ×3 et `project.md` : nouvelle lib et
 lancement par l'API locale.
-[x] 2026-09-20 — essai réel : jeu lancé sans clic en 17 s, `settings.locale` appliqué et `default_locale` intact ; version 0.1.7, README ×3, project.md, relevé d'API dans OUTPUT ; suite à 421 verts
+[x] 2026-09-20 — essai réel : jeu lancé sans clic en 17 s, `settings.locale` appliqué et `default_locale` intact ; version 0.2.0, README ×3, project.md, relevé d'API dans OUTPUT ; suite à 421 verts
 
 ### T5 — Distinguer l'attente du refus définitif
 **Effort:** S
