@@ -245,6 +245,29 @@ Describe 'Jeu d''icônes de la page Raccourcis' {
         New-IconSetPreviewImage $null 64 | Should BeNullOrEmpty
         New-IconSetPreviewImage @{ Name = 'x'; Path = (Join-Path $TestDrive 'absent') } 64 | Should BeNullOrEmpty
     }
+
+    Context 'jeu externe (icône du binaire installé)' {
+        $original = Find-IconSet @(Get-IconSets (Join-Path $here '..\app\ico')) 'original'
+        $originalBadges = Find-IconSet @(Get-IconSets (Join-Path $here '..\app\ico')) 'original-badges'
+
+        It 'donne en aperçu l''icône du binaire, lue en mémoire à 64 px' {
+            Mock Find-LeagueClientPath { Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe' }
+            $image = New-IconSetPreviewImage $original 64
+            try { $image.Width | Should Be 64 } finally { if ($image) { $image.Dispose() } }
+        }
+
+        It 'laisse l''aperçu vide quand le binaire est introuvable' {
+            Mock Find-LeagueClientPath { $null }
+            New-IconSetPreviewImage $original 64 | Should BeNullOrEmpty
+        }
+
+        It 'explique le jeu nu (raccourcis distingués par leur nom) et le jeu à pastilles ; rien pour un jeu de fichiers' {
+            Get-IconSetNoteText $original | Should Be (Get-Text 'setup.shortcuts.iconSetNote.bare')
+            Get-IconSetNoteText $originalBadges | Should Be (Get-Text 'setup.shortcuts.iconSetNote.badges')
+            Get-IconSetNoteText @{ Name = 'flat'; Path = 'C:\x\flat' } | Should Be ''
+            Get-IconSetNoteText $null | Should Be ''
+        }
+    }
 }
 
 # ---------------------------------------------------------------- Détection

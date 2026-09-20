@@ -27,14 +27,15 @@ they get installed for you, and you get one shortcut per language × companion a
 | `app/detect-config.ps1` | Called by `setup.bat`: detects Riot and the companion apps already installed |
 | `app/manage-companion-app.ps1` | Called by `setup.bat`: companion app picker, installs the missing ones, uninstalls on request |
 | `app/create-shortcuts.ps1` | Called by `setup.bat`: language + companion picker, then one `.lnk` per combination on the desktop (falls back to this folder if the desktop is not writable) |
-| `app/lib/icon.lib.ps1` / `icon-badge.lib.ps1` | `.ico` read/write and composition of the companion badge over the flag icon |
+| `app/lib/icon.lib.ps1` / `icon-badge.lib.ps1` | `.ico` read/write, a binary's icon read in memory, composition of the companion and country badges |
+| `app/lib/flag.lib.ps1` / `riot-install.lib.ps1` | Flags drawn in GDI+ (a single definition for icons and country badges); Riot Client and `LeagueClient.exe` read from `RiotClientInstalls.json` |
 | `app/lib/i18n.lib.ps1` / `app/i18n/` | Wizard and console translations: one `fr.json` / `en.json` / `ja.json` dictionary per language, same keys everywhere |
 | `app/lib/companion-app.lib.ps1` | Shared functions: catalogue, detection through the registry (read-only), uninstall command, Authenticode signature check |
 | `app/lib/launch-config.lib.ps1` | Shared functions: reading/writing `config.json`, migration of the old single-app format |
 | `app/lib/splash.lib.ps1` | Shared animated splash (game launch, companion app install) |
 | `tests/` | Pester tests (`Invoke-Pester -Path tests`) |
 | `tools/` | Development only, not shipped: `make-release.ps1`, `make-flag-icons.ps1` (rebuilds the `flat` icon set from the vector logo), `logo/make-logo-svg.py` + `logo/hex-launcher-logo-drawing.png` → `logo/hex-launcher-logo.svg` (the original HL logo, source of truth) |
-| `app/ico/` | Icon sets, one folder each: `flat/` (default: flat flag behind the HL logo) and `classic/` (the former embossed icons); each holds the base icon + one flag variant per language (`hex-launcher-xx.ico`), and a generated `companion/` subfolder with the flag + badge icons composed on this machine |
+| `app/ico/` | Icon sets, one folder each: `flat/` (default: flat flag behind the HL logo) and `classic/` (the former embossed icons); each holds the base icon + one flag variant per language (`hex-launcher-xx.ico`), and a generated `companion/` subfolder with the flag + badge icons composed on this machine. `original/` and `original-badges/` hold only an `icon-source.json` marker: the official game icon, referenced from the installed `LeagueClient.exe` — bare, or with country and companion badges composed on this machine |
 
 ## Setting up on a new machine
 
@@ -193,16 +194,25 @@ Badge colours are those of the catalogue; a set can style them with a `badge-sty
 `{ "nightVeil": true, "reducedPalette": false }` — the flags' night veil and/or their reduced palette (`flat` uses the veil,
 `classic` neither). Both shipped sets carry the file with every key spelled out, as a template for new sets.
 
+Two “external” sets use the official League of Legends icon, referenced from the installed `LeagueClient.exe`
+(folder read from `RiotClientInstalls.json`) — never copied into the project, never distributed:
+- `original`: the bare icon (`IconLocation` points at the binary). Shortcuts then differ by their name only.
+- `original-badges`: the icon topped with a country badge (miniature flag, raw official colours) and, below it, the
+  companion badge; below 32 px only the country badge remains. The composed `.ico` is written to
+  `app/ico/original-badges/companion/`, local to this machine and outside the release.
+Such a set is a folder without any `.ico`, marked by `icon-source.json`: `{ "source": "league-client", "badges": true }`.
+If `LeagueClient.exe` cannot be found, shortcuts get the default set's icons.
+
 For a language missing from the catalogue (new Riot locale):
 1. add a line to `locales.json` with the exact code as it appears in `available_locales` of the yaml file;
-2. (optional) add the flag drawing to `$FlagDrawings` in `tools/make-flag-icons.ps1` and run
-   `powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-flag-icons.ps1 -Locales xx_XX`.
+2. (optional) add the flag drawing to `$FlagDrawings` in `app/lib/flag.lib.ps1` (used by the icons and the country
+   badge) and run `powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-flag-icons.ps1 -Locales xx_XX`.
 
 ### Icons
 
 The `flat` set is built from the vector logo `tools/logo/hex-launcher-logo.svg` (gold frame + HL monogram + gem,
 transparent background): `tools/make-flag-icons.ps1` renders it with `resvg` at 256/128/64/48/32/16 px and composes it
-over a flat, muted flag drawn in GDI+ and clipped to the inside of the frame, into `app/ico/flat/`. Requires `resvg` in the PATH
+over a flat, muted flag drawn in GDI+ (`$FlagDrawings` in `app/lib/flag.lib.ps1`) and clipped to the inside of the frame, into `app/ico/flat/`. Requires `resvg` in the PATH
 (`scoop install resvg`); regenerate everything with `powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-flag-icons.ps1`
 (`-Base` for the plain blue/green icons only, `-PreviewDir` to also get 256 px PNGs). The SVG itself is produced by
 `python tools\logo\make-logo-svg.py` from the reference drawing `tools/logo/hex-launcher-logo-drawing.png`

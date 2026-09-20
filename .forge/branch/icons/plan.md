@@ -114,7 +114,30 @@ Relevé du 2026-09-20 (branche `launcher`), à ne pas remesurer :
 - `LeagueClient.exe` s'y trouve, et `IconLocation = "<exe>,0"` suffit à référencer son icône ;
 - l'aperçu pour l'assistant s'obtient en mémoire par `[Drawing.Icon]::ExtractAssociatedIcon` (32 px), sans rien écrire ;
 - piège rencontré : dans un `-replace`, la chaîne de remplacement ne traite pas `\` comme un échappement.
-[ ]
+
+Décomposition du 2026-09-20 (avant démarrage) :
+[x] T9.1 (2026-09-20 : lib créée, générateur branché, 29 .ico régénérés sans diff, 9 tests) — `app/lib/flag.lib.ps1` : primitives de dessin, `$CenterEmblem`, `$FlagDrawings` migrés depuis `tools/` ;
+    `New-FlagBitmap -Drawing -Size -Region [-ColorResolver]` — couleurs brutes par défaut, le générateur injecte
+    `ConvertTo-PaletteColor` ; 29 `.ico` régénérés et comparés octet à octet (aucune différence attendue) ;
+    `tests/flag.lib.tests.ps1` (un dessin par langue du catalogue, couleurs brutes, résolveur appliqué).
+[x] T9.2 (2026-09-20 : PrivateExtractIcons, 4 tests sur powershell.exe) — `icon.lib.ps1` : `Read-ExecutableIconEntries <exe> [<tailles>]` — icône d'un binaire en mémoire par
+    `PrivateExtractIcons` (user32, `Add-Type`), 256 → 16 px, `DestroyIcon` systématique ; test sur `powershell.exe`.
+[x] T9.3 (2026-09-20 : pastille pays + pile, 41 tests, planche de contrôle regardée puis supprimée) — `icon-badge.lib.ps1` : pastille pays (drapeau dessiné en haute résolution, réduit `HighQualityBicubic`
+    dans un carré, disque inscrit découpé, même anneau) ; emplacements empilés (`Get-BadgeMetrics -Slot`, pays en
+    haut, compagnon dessous) ; `Add-StackedBadgesToBitmap` — sous 32 px, pays seul ; `Get-StackedBadgeSignature`
+    (code, texte du dessin, pastille, style) ; tests pixel à 256/48/32/16.
+[x] T9.4 (2026-09-20 : lib créée, detect-config branché, 7 tests) — `app/lib/riot-install.lib.ps1` : `Find-RiotClientPath` (déplacé de `detect-config.ps1`, comportement
+    inchangé) et `Find-LeagueClientPath` (`associated_client` → `LeagueClient.exe`, `$null` sinon) — lu à
+    l'installation, jamais mémorisé dans `config.json` (un fichier existant n'est jamais réécrit) ; tests.
+[x] T9.5 (2026-09-20 : marqueur lu par Get-IconSetSource, deux jeux livrés, 20 tests) — `icon-set.lib.ps1` : marqueur `icon-source.json` (`{ "source": "league-client", "badges": bool }`),
+    `Get-IconSetSource`, jeux `app/ico/original/` et `app/ico/original-badges/` livrés ; tests.
+[x] T9.6 (2026-09-20 : Resolve-ExternalIconPath, pile composée, replis, 4 clés i18n ×3, 36 tests) — `create-shortcuts.ps1` : jeu externe → `IconLocation = <exe>,0` (`original`) ou `.ico` composé dans
+    `ico/original-badges/companion/` (`hex-launcher-<xx>[-<id>]-<empreinte>.ico`, purge des variantes) ; binaire
+    introuvable → avertissement et icônes du jeu par défaut ; échec de composition → icône nue ; clés i18n ×3 ; tests.
+[x] T9.7 (2026-09-20 : aperçu du binaire, note par jeu, 3 tests ; README ×3, project.md) — `setup.ps1` : aperçu des jeux externes extrait du binaire (64 px), note sous la liste pour `original`
+    (raccourcis distingués par leur nom seul) et `original-badges` (fichier composé localement) ; tests ; README ×3,
+    `project.md`.
+[x] 2026-09-20 — deux jeux `original` / `original-badges` livrés (marqueur icon-source.json) ; pastille pays + pile sur l'icône de LeagueClient.exe lue en mémoire ; flag.lib.ps1 et riot-install.lib.ps1 créés ; 575 tests Pester verts ; planche de contrôle regardée puis supprimée, captures setup fr/ja. Reste : contrôle sur le Bureau par l'utilisateur, version, release
 
 ### T10 — Drapeaux en image de fond, et logo SVG importable — EN ATTENTE
 **Effort:** L
@@ -171,7 +194,7 @@ régénérées : **une seule change**, la France, dont le bleu officiel bascule 
 | T6 — Version 0.1.2, doc, release | S | [x] |
 | T7 — Aplat des icônes drapeau | M | [x] |
 | T8 — Jeux d'icônes sélectionnables | M | [x] |
-| T9 — Icône originale de LoL, deux jeux | L | [ ] |
+| T9 — Icône originale de LoL, deux jeux | L | [x] |
 | T10 — Drapeaux en fond + SVG importable | L | [ ] en attente |
 | T11 — Couleurs officielles des drapeaux | S | [x] |
 | **Total** | **~XL (8-11 h)** | |

@@ -32,9 +32,10 @@ Windows 向け League of Legends 起動アシスタント：デスクトップ�
 | `app/lib/splash.lib.ps1` | 共通のアニメーション付きスプラッシュ（ゲーム起動、補助アプリのインストール） |
 | `tests/` | Pester テスト（`Invoke-Pester -Path tests`） |
 | `tools/` | 開発専用、配布物には含まれません：`make-release.ps1`、`make-flag-icons.ps1`（ベクターロゴから `app/ico/` の全アイコンを再生成）、`logo/make-logo-svg.py` ＋ `logo/hex-launcher-logo-drawing.png` → `logo/hex-launcher-logo.svg`（オリジナル HL ロゴ、原本） |
-| `app/lib/icon.lib.ps1` / `icon-badge.lib.ps1` | `.ico` の読み書きと、国旗アイコンへの補助アプリバッジの合成 |
+| `app/lib/icon.lib.ps1` / `icon-badge.lib.ps1` | `.ico` の読み書き、実行ファイルのアイコンのメモリ上での読み取り、補助アプリバッジと国バッジの合成 |
+| `app/lib/flag.lib.ps1` / `riot-install.lib.ps1` | GDI+ で描く国旗（アイコンと国バッジで共通の定義）；`RiotClientInstalls.json` から読む Riot Client と `LeagueClient.exe` の場所 |
 | `app/lib/i18n.lib.ps1` / `app/i18n/` | アシスタントとコンソールの翻訳：言語ごとの辞書 `fr.json` / `en.json` / `ja.json`（すべて同じキー） |
-| `app/ico/` | アイコンセット（フォルダーごとに 1 セット）：`flat/`（既定：HL ロゴの背後にフラットな国旗）と `classic/`（以前の立体アイコン）。各セットに基本アイコン＋言語ごとの国旗バージョン（`hex-launcher-xx.ico`）と、この PC で合成された国旗＋バッジのアイコンが入る生成フォルダー `companion/` があります |
+| `app/ico/` | アイコンセット（フォルダーごとに 1 セット）：`flat/`（既定：HL ロゴの背後にフラットな国旗）と `classic/`（以前の立体アイコン）。各セットに基本アイコン＋言語ごとの国旗バージョン（`hex-launcher-xx.ico`）と、この PC で合成された国旗＋バッジのアイコンが入る生成フォルダー `companion/` があります。`original/` と `original-badges/` にはマーカー `icon-source.json` しかありません：インストール済みの `LeagueClient.exe` から参照するゲームの公式アイコンで、そのまま、または国と補助アプリのバッジをこの PC で合成して使います |
 
 ## 新しい PC でのセットアップ
 
@@ -185,16 +186,24 @@ Riot が提供するすべての言語が `locales.json` にあり、インス�
 バッジの色はカタログのままです。セットのフォルダーに `badge-style.json`（`{ "nightVeil": true, "reducedPalette": false }`）を置くと、
 国旗の夜色のベールや縮小パレットをバッジに適用できます（`flat` はベールのみ、`classic` はどちらも無効）。同梱の 2 セットには全キーを明記したこのファイルが入っており、新しいセットのひな形になります。
 
+2 つの「外部」セットは League of Legends の公式アイコンを使います。インストール済みの `LeagueClient.exe`（フォルダーは
+`RiotClientInstalls.json` から読み取り）を参照するだけで、プロジェクトにコピーも配布もしません：
+- `original`：アイコンそのまま（`IconLocation` が実行ファイルを指す）。ショートカットは名前でしか区別できません。
+- `original-badges`：アイコンの上に国バッジ（小さな国旗、公式の色をそのまま）、その下に補助アプリバッジを重ねます。32 px 未満では
+  国バッジだけが残ります。合成した `.ico` は `app/ico/original-badges/companion/` に書き出され、この PC 限りでリリースには含まれません。
+こうしたセットは `.ico` を持たないフォルダーで、`icon-source.json`（`{ "source": "league-client", "badges": true }`）が目印です。
+`LeagueClient.exe` が見つからなければ、ショートカットには既定セットのアイコンが使われます。
+
 カタログにない言語（Riot の新しいロケール）を追加するには：
 1. yaml ファイルの `available_locales` にある正確なコードで `locales.json` に 1 行追加；
-2. （任意）`tools/make-flag-icons.ps1` の `$FlagDrawings` に国旗の描画を追加し、
+2. （任意）`app/lib/flag.lib.ps1` の `$FlagDrawings`（アイコンと国バッジの両方で使用）に国旗の描画を追加し、
    `powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-flag-icons.ps1 -Locales xx_XX` を実行。
 
 ### アイコン
 
 `flat` セットはベクターロゴ `tools/logo/hex-launcher-logo.svg`（金の枠＋HL モノグラム＋宝石、背景は透明）から作られます。
 `tools/make-flag-icons.ps1` が `resvg` で 256/128/64/48/32/16 px にレンダリングし、GDI+ で描いたフラットで控えめな国旗
-（枠の内側で切り抜き）の上に合成し、`app/ico/flat/` に書き出します。PATH に `resvg` が必要です（`scoop install resvg`）。全アイコンの再生成は
+（`app/lib/flag.lib.ps1` の `$FlagDrawings`、枠の内側で切り抜き）の上に合成し、`app/ico/flat/` に書き出します。PATH に `resvg` が必要です（`scoop install resvg`）。全アイコンの再生成は
 `powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-flag-icons.ps1`（`-Base` で単色の青/緑アイコンのみ、
 `-PreviewDir` で 256 px の PNG も出力）。SVG 自体は基準の下絵 `tools/logo/hex-launcher-logo-drawing.png` から
 `python tools\logo\make-logo-svg.py` で生成します（Python 3、Pillow、numpy、PATH に `potrace` と `resvg`。`--preview DIR` で確認用の画像を出力）。ロゴを際立たせるため国旗は控えめにしています：国旗の各色を 8 色のパレット（`$FlagPalette`）に丸めたうえで、

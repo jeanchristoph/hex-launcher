@@ -1,4 +1,4 @@
-﻿{
+{
   "common.none": "none",
   "common.apply": "Apply",
   "common.cancel": "Cancel",
@@ -32,6 +32,8 @@
   "setup.shortcuts.companions": "Companion apps",
   "setup.shortcuts.iconSet": "Icon set",
   "setup.shortcuts.iconSetChosen": "Icon set: {0}",
+  "setup.shortcuts.iconSetNote.bare": "Official icon, no badge: shortcuts differ by their name only.",
+  "setup.shortcuts.iconSetNote.badges": "Official icon + country and companion badges, composed on this PC.",
   "setup.shortcuts.legacyLaunch": "Fallback mode — if the game does not start",
   "setup.shortcuts.legacyLaunchChosen": "Startup: fallback mode",
   "setup.shortcuts.directLaunchChosen": "Startup: direct game launch",
@@ -80,6 +82,8 @@
   "shortcuts.localesMissing": "locales.json not found: {0}",
   "shortcuts.badgesUnavailable": "Companion badges unavailable ({0}) — flag icons only",
   "shortcuts.iconNotComposed": "Companion icon '{0}' not composed ({1}) — flag icon only",
+  "shortcuts.leagueClientMissing": "LeagueClient.exe not found in RiotClientInstalls.json — default icon set used",
+  "shortcuts.iconNotStacked": "Icon '{0}' not composed ({1}) — bare official icon",
   "shortcuts.pickerTitle": "League of Legends — shortcuts to install",
   "shortcuts.pickerHint": "One shortcut will be created on the Desktop per checked language, and per checked companion app.",
   "shortcuts.languages": "Languages",

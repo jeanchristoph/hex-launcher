@@ -99,6 +99,35 @@ Describe 'Write-Ico / Read-IcoEntries' {
     }
 }
 
+Describe 'Read-ExecutableIconEntries' {
+    $powershellExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+
+    It 'lit l''icône d''un binaire en mémoire, une entrée 32 bits par taille demandée' {
+        $entries = @(Read-ExecutableIconEntries $powershellExe @(64, 32, 16))
+        try {
+            ($entries | ForEach-Object { $_.Size }) -join ',' | Should Be '64,32,16'
+            $entries[0].Bitmap.PixelFormat | Should Be ([System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+            $entries[0].Bitmap.Width | Should Be 64
+        } finally { Remove-Entries $entries }
+    }
+
+    It 'rend par défaut les six tailles des .ico générés' {
+        $entries = @(Read-ExecutableIconEntries $powershellExe)
+        try { ($entries | ForEach-Object { $_.Size }) -join ',' | Should Be '256,128,64,48,32,16' }
+        finally { Remove-Entries $entries }
+    }
+
+    It 'refuse un binaire introuvable' {
+        { Read-ExecutableIconEntries (Join-Path $TestDrive 'absent.exe') } | Should Throw
+    }
+
+    It 'refuse un fichier sans icône plutôt que de rendre une liste vide' {
+        $path = Join-Path $TestDrive 'plain.exe'
+        Set-Content -Path $path -Value 'pas un binaire'
+        { Read-ExecutableIconEntries $path } | Should Throw
+    }
+}
+
 Describe 'make-flag-icons.ps1 avec la lib .ico' {
     It 'génère toujours une icône drapeau relisible en six tailles' {
         $out = Join-Path $TestDrive 'ico'

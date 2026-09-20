@@ -5,12 +5,16 @@
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $here '..\app\lib\icon-set.lib.ps1')
 
-# Racine ico\ de test : un dossier par nom, avec ou sans hex-launcher.ico
-function New-TestIcoRoot([string[]]$SetsWithBase, [string[]]$FoldersWithoutBase = @()) {
+# Racine ico\ de test : un dossier par nom, avec hex-launcher.ico, avec icon-source.json (jeu externe), ou vide
+function New-TestIcoRoot([string[]]$SetsWithBase, [string[]]$FoldersWithoutBase = @(), [string[]]$ExternalSets = @()) {
     $root = Join-Path $TestDrive ([Guid]::NewGuid().ToString('N'))
     foreach ($name in $SetsWithBase) {
         $dir = New-Item -ItemType Directory -Path (Join-Path $root $name) -Force
         Set-Content -Path (Join-Path $dir.FullName 'hex-launcher.ico') -Value 'x'
+    }
+    foreach ($name in $ExternalSets) {
+        $dir = New-Item -ItemType Directory -Path (Join-Path $root $name) -Force
+        Set-Content -Path (Join-Path $dir.FullName 'icon-source.json') -Value '{ "source": "league-client", "badges": true }' -Encoding UTF8
     }
     foreach ($name in $FoldersWithoutBase) { New-Item -ItemType Directory -Path (Join-Path $root $name) -Force | Out-Null }
     return $root
@@ -24,7 +28,12 @@ Describe 'Get-IconSets' {
         $sets[1].Path | Should Be (Join-Path $root 'flat')
     }
 
-    It 'ignore un dossier sans hex-launcher.ico (ico\companion par exemple)' {
+    It 'liste aussi un jeu externe, reconnu par icon-source.json sans aucun .ico' {
+        $root = New-TestIcoRoot @('flat') @() @('original')
+        (@(Get-IconSets $root) | ForEach-Object { $_.Name }) -join ',' | Should Be 'flat,original'
+    }
+
+    It 'ignore un dossier sans hex-launcher.ico ni icon-source.json (ico\companion par exemple)' {
         $root = New-TestIcoRoot @('flat') @('companion')
         @(Get-IconSets $root).Count | Should Be 1
     }
@@ -103,6 +112,42 @@ Describe 'Get-IconSetBadgeStyle' {
     }
 }
 
+Describe 'Get-IconSetSource' {
+    # $Content non typé : un [string] transformerait $null en chaîne vide et écrirait un marqueur vide
+    function New-TestSet($Content) {
+        $dir = New-Item -ItemType Directory -Path (Join-Path $TestDrive ([Guid]::NewGuid().ToString('N'))) -Force
+        if ($null -ne $Content) { Set-Content -Path (Join-Path $dir.FullName 'icon-source.json') -Value $Content -Encoding UTF8 }
+        return @{ Name = 'x'; Path = $dir.FullName }
+    }
+
+    It 'lit la source league-client et le choix des pastilles' {
+        $source = Get-IconSetSource (New-TestSet '{ "source": "league-client", "badges": true }')
+        $source.Source | Should Be 'league-client'
+        $source.Badges | Should Be $true
+        (Get-IconSetSource (New-TestSet '{ "source": "league-client" }')).Badges | Should Be $false
+    }
+
+    It 'rend null pour un jeu de fichiers, sans jeu, ou sans marqueur' {
+        Get-IconSetSource (New-TestSet $null) | Should BeNullOrEmpty
+        Get-IconSetSource $null | Should BeNullOrEmpty
+        Test-IconSetExternal (New-TestSet $null) | Should Be $false
+    }
+
+    It 'rend null avec avertissement sur un marqueur illisible ou une source inconnue' {
+        Mock Write-Warning {}
+        Get-IconSetSource (New-TestSet '{ pas du json') | Should BeNullOrEmpty
+        Get-IconSetSource (New-TestSet '{ "source": "autre-chose", "badges": true }') | Should BeNullOrEmpty
+        Assert-MockCalled Write-Warning -Scope It -Exactly 2
+    }
+
+    It 'reconnaît les deux jeux externes livrés : original nu, original-badges avec pastilles' {
+        $sets = @(Get-IconSets (Join-Path $here '..\app\ico'))
+        (Get-IconSetSource (Find-IconSet $sets 'original')).Badges | Should Be $false
+        (Get-IconSetSource (Find-IconSet $sets 'original-badges')).Badges | Should Be $true
+        Test-IconSetExternal (Find-IconSet $sets 'flat') | Should Be $false
+    }
+}
+
 Describe 'Get-IconSetFilePath' {
     It 'compose le chemin d''une icône dans le dossier du jeu' {
         $set = @{ Name = 'flat'; Path = 'C:\x\ico\flat' }
@@ -111,14 +156,14 @@ Describe 'Get-IconSetFilePath' {
 }
 
 Describe 'jeux livrés dans app\ico' {
-    It 'propose flat (défaut) et classic, chacun avec les 27 drapeaux du catalogue' {
+    It 'propose flat (défaut), classic, original et original-badges ; les jeux de fichiers ont les 27 drapeaux du catalogue' {
         . (Join-Path $here '..\app\lib\launch-config.lib.ps1')
         $root  = Join-Path $here '..\app\ico'
         $sets  = @(Get-IconSets $root)
-        ($sets | ForEach-Object { $_.Name }) -join ',' | Should Be 'classic,flat'
+        ($sets | ForEach-Object { $_.Name }) -join ',' | Should Be 'classic,flat,original,original-badges'
         (Get-DefaultIconSet $sets).Name | Should Be 'flat'
         $codes = @(Read-JsonCatalog (Join-Path $here '..\app\locales.json') | ForEach-Object { $_.code })
-        foreach ($set in $sets) {
+        foreach ($set in @($sets | Where-Object { -not (Test-IconSetExternal $_) })) {
             $missing = @($codes | Where-Object { -not (Test-Path (Get-IconSetFilePath $set "hex-launcher-$($_.Split('_')[1].ToLower()).ico")) })
             "$($set.Name): $($missing -join ',')" | Should Be "$($set.Name): "
         }

@@ -28,13 +28,14 @@ installe, et on obtient un raccourci par langue × appli compagnon
 | `app/manage-companion-app.ps1` | Appelé par `setup.bat` : choix des applis compagnon, installation des manquantes, désinstallation sur demande |
 | `app/create-shortcuts.ps1` | Appelé par `setup.bat` : choix des langues et des compagnons, puis un `.lnk` par combinaison sur le Bureau (repli dans ce dossier si le Bureau est inaccessible) |
 | `app/lib/companion-app.lib.ps1` | Fonctions partagées : catalogue, détection via le registre (lecture seule), commande de désinstallation, vérification de signature Authenticode |
-| `app/lib/icon.lib.ps1` / `icon-badge.lib.ps1` | Lecture/écriture des `.ico` et composition de la pastille compagnon sur l'icône drapeau |
+| `app/lib/icon.lib.ps1` / `icon-badge.lib.ps1` | Lecture/écriture des `.ico`, icône d'un binaire lue en mémoire, composition des pastilles compagnon et pays |
+| `app/lib/flag.lib.ps1` / `riot-install.lib.ps1` | Drapeaux dessinés en GDI+ (une seule définition pour les icônes et les pastilles pays) ; Riot Client et `LeagueClient.exe` lus dans `RiotClientInstalls.json` |
 | `app/lib/i18n.lib.ps1` / `app/i18n/` | Traductions de l'assistant et de la console : un dictionnaire `fr.json` / `en.json` / `ja.json` par langue, mêmes clés partout |
 | `app/lib/launch-config.lib.ps1` | Fonctions partagées : lecture/écriture de `config.json`, migration de l'ancien format à une seule appli |
 | `app/lib/splash.lib.ps1` | Splash animé partagé (lancement du jeu, installation des applis compagnon) |
 | `tests/` | Tests Pester (`Invoke-Pester -Path tests`) |
 | `tools/` | Développement uniquement, hors release : `make-release.ps1`, `make-flag-icons.ps1` (régénère toutes les icônes de `app/ico/` depuis le logo vectoriel), `logo/make-logo-svg.py` + `logo/hex-launcher-logo-drawing.png` → `logo/hex-launcher-logo.svg` (logo HL original, source de vérité) |
-| `app/ico/` | Jeux d'icônes, un dossier chacun : `flat/` (défaut : drapeau plat derrière le logo HL) et `classic/` (les anciennes icônes en relief) ; chacun contient l'icône de base + une variante drapeau par langue (`hex-launcher-xx.ico`) et un sous-dossier généré `companion/` avec les icônes drapeau + pastille composées sur ce poste |
+| `app/ico/` | Jeux d'icônes, un dossier chacun : `flat/` (défaut : drapeau plat derrière le logo HL) et `classic/` (les anciennes icônes en relief) ; chacun contient l'icône de base + une variante drapeau par langue (`hex-launcher-xx.ico`) et un sous-dossier généré `companion/` avec les icônes drapeau + pastille composées sur ce poste. `original/` et `original-badges/` ne contiennent qu'un marqueur `icon-source.json` : l'icône officielle du jeu, référencée depuis `LeagueClient.exe` installé — nue, ou avec pastilles pays et compagnon composées sur ce poste |
 
 ## Mise en route sur une nouvelle machine
 
@@ -193,17 +194,26 @@ Les couleurs de pastille sont celles du catalogue ; un jeu peut les styler par u
 `{ "nightVeil": true, "reducedPalette": false }` — voile nuit des drapeaux et/ou leur palette réduite (`flat` prend le
 voile, `classic` ni l'un ni l'autre). Les deux jeux livrés portent le fichier avec toutes les clés explicites, modèle pour un nouveau jeu.
 
+Deux jeux « externes » utilisent l'icône officielle de League of Legends, référencée depuis le `LeagueClient.exe` installé
+(dossier lu dans `RiotClientInstalls.json`) — jamais copiée dans le projet, jamais distribuée :
+- `original` : l'icône nue (`IconLocation` pointe sur le binaire). Les raccourcis ne se distinguent alors que par leur nom.
+- `original-badges` : l'icône surmontée d'une pastille pays (drapeau miniature, couleurs officielles brutes) puis, en dessous,
+  de la pastille compagnon ; sous 32 px seule la pastille pays subsiste. Le `.ico` composé est écrit dans
+  `app/ico/original-badges/companion/`, propre à ce poste et hors release.
+Un tel jeu est un dossier sans `.ico`, marqué par `icon-source.json` : `{ "source": "league-client", "badges": true }`.
+Si `LeagueClient.exe` est introuvable, les raccourcis reçoivent les icônes du jeu par défaut.
+
 Pour une langue absente du catalogue (nouvelle locale Riot) :
 1. ajouter une ligne dans `locales.json` avec le code exact tel qu'il apparaît dans `available_locales`
    du fichier yaml ;
-2. (optionnel) ajouter le dessin du drapeau dans `$FlagDrawings` de `tools/make-flag-icons.ps1` et lancer
-   `powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-flag-icons.ps1 -Locales xx_XX`.
+2. (optionnel) ajouter le dessin du drapeau dans `$FlagDrawings` de `app/lib/flag.lib.ps1` (il sert aux icônes et à la
+   pastille pays) et lancer `powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-flag-icons.ps1 -Locales xx_XX`.
 
 ### Icônes
 
 Le jeu `flat` est construit à partir du logo vectoriel `tools/logo/hex-launcher-logo.svg` (cadre or +
 monogramme HL + gemme, fond transparent) : `tools/make-flag-icons.ps1` le rend avec `resvg` à 256/128/64/48/32/16 px et le
-compose sur un drapeau plat atténué, dessiné en GDI+ et découpé à l'intérieur du cadre, dans `app/ico/flat/`. Nécessite `resvg` dans le PATH
+compose sur un drapeau plat atténué, dessiné en GDI+ (`$FlagDrawings` de `app/lib/flag.lib.ps1`) et découpé à l'intérieur du cadre, dans `app/ico/flat/`. Nécessite `resvg` dans le PATH
 (`scoop install resvg`) ; tout régénérer avec `powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-flag-icons.ps1`
 (`-Base` pour les seules icônes unies bleue/verte, `-PreviewDir` pour obtenir aussi des PNG 256 px). Le SVG lui-même
 est produit par `python tools\logo\make-logo-svg.py` depuis le dessin de référence `tools/logo/hex-launcher-logo-drawing.png`

@@ -190,17 +190,37 @@ function Get-PreselectedIconSetName($Config, [object[]]$Sets) {
     return ''
 }
 
-# Image d'aperçu d'un jeu : l'entrée de hex-launcher.ico de la taille demandée (ou la plus grande en dessous) ; $null si illisible
+# Entrées d'aperçu d'un jeu : hex-launcher.ico pour un jeu de fichiers, l'icône du binaire installé (lue en mémoire,
+# jamais copiée) pour un jeu externe ; binaire introuvable → throw, l'aperçu reste vide
+function Read-IconSetPreviewEntries($Set, [int]$Size) {
+    if (Test-IconSetExternal $Set) {
+        $exe = Find-LeagueClientPath
+        if (-not $exe) { throw 'LeagueClient.exe introuvable' }
+        return @(Read-ExecutableIconEntries $exe @($Size))
+    }
+    return @(Read-IcoEntries (Get-IconSetFilePath $Set $IconSetBaseIcon))
+}
+
+# Image d'aperçu d'un jeu : l'entrée de la taille demandée (ou la plus grande en dessous) ; $null si illisible
 function New-IconSetPreviewImage($Set, [int]$Size) {
     if (-not $Set) { return $null }
     try {
-        $entries = @(Read-IcoEntries (Get-IconSetFilePath $Set $IconSetBaseIcon))
+        $entries = @(Read-IconSetPreviewEntries $Set $Size)
         $chosen  = @($entries | Where-Object { $_.Size -le $Size } | Sort-Object Size -Descending | Select-Object -First 1)
         if ($chosen.Count -eq 0) { $chosen = @($entries | Sort-Object Size | Select-Object -First 1) }
         $image = $chosen[0].Bitmap.Clone()
         $entries | ForEach-Object { $_.Bitmap.Dispose() }
         return $image
     } catch { return $null }
+}
+
+# Note sous la liste des jeux : ce qu'implique un jeu externe (icône nue → raccourcis distingués par leur nom seul ;
+# pastilles → fichier composé sur ce poste) ; vide pour un jeu de fichiers
+function Get-IconSetNoteText($Set) {
+    $source = Get-IconSetSource $Set
+    if (-not $source) { return '' }
+    if ($source.Badges) { return Get-Text 'setup.shortcuts.iconSetNote.badges' }
+    return Get-Text 'setup.shortcuts.iconSetNote.bare'
 }
 
 function Get-ShortcutCompanionListItems([object[]]$CompanionApps) {
@@ -624,6 +644,9 @@ function New-SetupShortcutsControls {
     # pas dans une demi-colonne — la tronquer priverait la case de ce qui la rend utilisable
     $legacyTop      = 306
     $logTop         = $legacyTop + 34
+    # Note sous la liste des jeux (jeux externes), dans l'espace qui reste au-dessus de la case
+    $noteTop        = $iconSetsTop + 24 + $previewSize + 2
+    $controls.IconSetNote   = New-ThemedLabel '' $rightColumn $noteTop $columnWidth ([Math]::Max(28, $legacyTop - $noteTop)) 'Muted' 8.25
     $controls.LegacyLaunchBox = New-SetupLegacyLaunchBox $state 0 $legacyTop $layout.ContentWidth
     $controls.Log           = New-ThemedLog 0 $logTop $layout.ContentWidth ($layout.ContentHeight - $logTop)
     $controls.Inputs        = @($controls.LocaleList, $controls.CompanionList, $controls.IconSetList)
@@ -638,6 +661,7 @@ function New-SetupShortcutsControls {
         $controls.CompanionList
         $controls.IconSetList
         $controls.IconSetPreview
+        $controls.IconSetNote
         $controls.LegacyLaunchBox
         $controls.Log
     )
@@ -687,6 +711,7 @@ function Update-SetupIconSetPreview {
     $previous = $controls.IconSetPreview.Image
     $controls.IconSetPreview.Image = New-IconSetPreviewImage $set $controls.IconSetPreview.Width
     if ($previous) { $previous.Dispose() }
+    if ($null -ne $controls.IconSetNote) { $controls.IconSetNote.Text = Get-IconSetNoteText $set }
 }
 
 function Show-SetupShortcutsPage {

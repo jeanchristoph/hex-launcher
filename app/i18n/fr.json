@@ -1,4 +1,4 @@
-﻿{
+{
   "common.none": "aucune",
   "common.apply": "Appliquer",
   "common.cancel": "Annuler",
@@ -32,6 +32,8 @@
   "setup.shortcuts.companions": "Applis compagnon",
   "setup.shortcuts.iconSet": "Jeu d'icônes",
   "setup.shortcuts.iconSetChosen": "Jeu d'icônes : {0}",
+  "setup.shortcuts.iconSetNote.bare": "Icône officielle, sans pastille : les raccourcis ne diffèrent que par leur nom.",
+  "setup.shortcuts.iconSetNote.badges": "Icône officielle + pastilles pays et compagnon, composée sur ce poste.",
   "setup.shortcuts.legacyLaunch": "Mode de secours — si le jeu ne se lance pas",
   "setup.shortcuts.legacyLaunchChosen": "Démarrage : mode de secours",
   "setup.shortcuts.directLaunchChosen": "Démarrage : lancement direct du jeu",
@@ -80,6 +82,8 @@
   "shortcuts.localesMissing": "locales.json introuvable : {0}",
   "shortcuts.badgesUnavailable": "Pastilles compagnon indisponibles ({0}) — icônes drapeau seules",
   "shortcuts.iconNotComposed": "Icône compagnon '{0}' non composée ({1}) — icône drapeau seule",
+  "shortcuts.leagueClientMissing": "LeagueClient.exe introuvable dans RiotClientInstalls.json — icônes du jeu par défaut",
+  "shortcuts.iconNotStacked": "Icône '{0}' non composée ({1}) — icône officielle nue",
   "shortcuts.pickerTitle": "League of Legends — raccourcis à installer",
   "shortcuts.pickerHint": "Un raccourci sera créé sur le Bureau par langue cochée, et par appli compagnon cochée.",
   "shortcuts.languages": "Langues",

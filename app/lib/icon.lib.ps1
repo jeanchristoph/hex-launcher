@@ -10,6 +10,8 @@
     Read-IcoEntries appartiennent à l'appelant, qui les libère (Dispose) une fois utilisés.
     Write-Ico n'écrit que des entrées PNG (supportées depuis Vista) ; Read-IcoEntries accepte aussi les entrées DIB
     classiques via System.Drawing.Icon.
+    Read-ExecutableIconEntries lit en mémoire l'icône principale d'un binaire (.exe, .dll) aux tailles demandées,
+    sans rien copier sur le disque : le jeu d'icônes « original » y référence l'icône installée de League of Legends.
 #>
 
 Add-Type -AssemblyName System.Drawing
@@ -17,6 +19,16 @@ Add-Type -AssemblyName System.Drawing
 $IcoHeaderLength = 6
 $IcoEntryLength  = 16
 $PngSignature    = [byte[]](0x89, 0x50, 0x4E, 0x47)
+$ExecutableIconSizes = @(256, 128, 64, 48, 32, 16)   # mêmes tailles que les .ico générés
+
+# PrivateExtractIcons rend l'icône d'une ressource à la taille exacte demandée (jusqu'à 256 px), là où
+# ExtractAssociatedIcon ne rend que 32 px ; chaque handle obtenu est libéré par DestroyIcon
+if (-not ([Management.Automation.PSTypeName]'HexLauncher.NativeIcon').Type) {
+    Add-Type -Namespace HexLauncher -Name NativeIcon -MemberDefinition @'
+[DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern uint PrivateExtractIcons(string lpszFile, int nIconIndex, int cxIcon, int cyIcon, IntPtr[] phicon, uint[] piconid, uint nIcons, uint flags);
+[DllImport("user32.dll")] public static extern bool DestroyIcon(IntPtr hIcon);
+'@
+}
 
 # Chemin absolu au sens de PowerShell : les API .NET résolvent un chemin relatif contre le cwd du process, pas Set-Location
 function Resolve-IcoPath([string]$Path) {
@@ -95,4 +107,42 @@ function Read-IcoEntries([string]$Path) {
                   else { ConvertFrom-DibEntry $Path $entry.Size }
         [PSCustomObject]@{ Size = $bitmap.Width; Bitmap = $bitmap }
     })
+}
+
+# ---------------------------------------------------------------- Icône d'un binaire (en mémoire)
+
+# Handle de l'icône principale du binaire à la taille demandée ; IntPtr.Zero si la ressource manque
+function Get-ExecutableIconHandle([string]$Path, [int]$Size) {
+    $handles = New-Object IntPtr[] 1
+    $ids     = New-Object uint32[] 1
+    $found   = [HexLauncher.NativeIcon]::PrivateExtractIcons($Path, 0, $Size, $Size, $handles, $ids, 1, 0)
+    if ($found -lt 1) { return [IntPtr]::Zero }
+    return $handles[0]
+}
+
+# Bitmap 32 bits détaché du handle, qui est libéré ici quoi qu'il arrive
+function ConvertFrom-IconHandle([IntPtr]$Handle) {
+    try {
+        $icon = [System.Drawing.Icon]::FromHandle($Handle)
+        $bmp  = $icon.ToBitmap()
+        $area = New-Object System.Drawing.Rectangle(0, 0, $bmp.Width, $bmp.Height)
+        $copy = $bmp.Clone($area, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+        $bmp.Dispose(); $icon.Dispose()
+        return $copy
+    } finally { [HexLauncher.NativeIcon]::DestroyIcon($Handle) | Out-Null }
+}
+
+# Icône principale d'un .exe ou .dll, une entrée par taille demandée (celles des .ico générés par défaut) ; les
+# bitmaps appartiennent à l'appelant. Binaire absent ou sans icône → throw explicite, l'appelant décide du repli
+function Read-ExecutableIconEntries([string]$Path, [int[]]$Sizes = $ExecutableIconSizes) {
+    if (-not (Test-Path $Path)) { throw "Binaire introuvable : $Path" }
+    $Path = Resolve-IcoPath $Path
+    $entries = @(foreach ($size in $Sizes) {
+        $handle = Get-ExecutableIconHandle $Path $size
+        if ($handle -eq [IntPtr]::Zero) { continue }
+        $bitmap = ConvertFrom-IconHandle $handle
+        [PSCustomObject]@{ Size = $bitmap.Width; Bitmap = $bitmap }
+    })
+    if ($entries.Count -eq 0) { throw "Aucune icône dans le binaire : $Path" }
+    return $entries
 }

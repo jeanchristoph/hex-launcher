@@ -23,24 +23,12 @@ param(
     [string]$Language
 )
 
-$RiotInstallsPath  = Join-Path $env:ProgramData 'Riot Games\RiotClientInstalls.json'
-$RiotClientDefault = 'C:\Riot Games\Riot Client\RiotClientServices.exe'
-$ProductSettings   = Join-Path $env:ProgramData 'Riot Games\Metadata\league_of_legends.live\league_of_legends.live.product_settings.yaml'
+$ProductSettings = Join-Path $env:ProgramData 'Riot Games\Metadata\league_of_legends.live\league_of_legends.live.product_settings.yaml'
 
 . (Join-Path $PSScriptRoot 'lib\i18n.lib.ps1')
 . (Join-Path $PSScriptRoot 'lib\companion-app.lib.ps1')
+. (Join-Path $PSScriptRoot 'lib\riot-install.lib.ps1')   # Find-RiotClientPath : RiotClientInstalls.json, fichier officiel de Riot
 $CompanionCatalogPath = Join-Path $PSScriptRoot 'companion-apps.json'
-
-function Find-RiotClientPath {
-    if (Test-Path $RiotInstallsPath) {
-        $installs = Get-Content -Path $RiotInstallsPath -Raw -Encoding UTF8 | ConvertFrom-Json
-        foreach ($key in 'rc_live', 'rc_default') {
-            $candidate = $installs.$key
-            if ($candidate -and (Test-Path $candidate)) { return ($candidate -replace '/', '\') }
-        }
-    }
-    return $RiotClientDefault
-}
 
 # Ajouter une appli : une entrée dans companion-apps.json (voir README.md).
 # Une appli n'entre dans config.json que si son exécutable de lancement existe ; un catalogue absent ou
