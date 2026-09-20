@@ -56,6 +56,47 @@
 [x] T8.2 — 2026-09-17 : -IconSet, Set-ActiveIconSet, repli en chaîne, pastilles dans ico/<jeu>/companion (choix utilisateur), iconSet mémorisé par Select-IconSetForConfig, .gitignore et release
 [x] T8.3 — 2026-09-17 : liste des jeux + aperçu hex-launcher.ico (PictureBox 64 px) sur la page Raccourcis, icône de fenêtre depuis le jeu par défaut ; 322 tests verts ; README ×3, project.md
 
+### T9 — Troisième jeu : l'icône originale de League of Legends
+**Effort:** M
+**Files:** `app/ico/original/icon-source.json` (nouveau), `app/lib/icon-set.lib.ps1`, `app/lib/launch-config.lib.ps1`, `app/detect-config.ps1`, `app/create-shortcuts.ps1`, `app/setup.ps1`, `app/i18n/{fr,en,ja}.json`, `tests/icon-set.lib.tests.ps1`, `tests/create-shortcuts.tests.ps1`, `tests/setup.tests.ps1`, README ×3
+**Description:** Un jeu d'icônes sans aucun `.ico`, reconnu par un marqueur `icon-source.json`
+(`{ "source": "league-client" }`) — les jeux portent déjà `badge-style.json`, la mécanique de découverte existe.
+`Resolve-ShortcutIconPath` rend `"<LeagueClient.exe>,0"` : Windows extrait l'icône du binaire installé, aucun actif
+de Riot n'entre dans le dépôt ni dans la release. **Aucune pastille compagnon composée** sur ce jeu : les raccourcis ne s'y distinguent que par leur nom, ce que
+l'assistant doit dire. Repli sur le jeu par défaut si le binaire est introuvable, l'installation aboutit toujours.
+
+Relevé du 2026-09-20 (branche `launcher`), à ne pas remesurer :
+- le dossier du jeu est déclaré par Riot dans `associated_client` de `%ProgramData%\Riot Games\RiotClientInstalls.json`
+  (« C:/Riot Games/League of Legends/ ») — fichier que `detect-config.ps1` lit déjà pour le Riot Client ;
+- `LeagueClient.exe` s'y trouve, et `IconLocation = "<exe>,0"` suffit à référencer son icône ;
+- l'aperçu pour l'assistant s'obtient en mémoire par `[Drawing.Icon]::ExtractAssociatedIcon` (32 px), sans rien écrire ;
+- piège rencontré : dans un `-replace`, la chaîne de remplacement ne traite pas `\` comme un échappement.
+[ ]
+
+### T10 — Drapeaux en image de fond, et logo SVG importable
+**Effort:** L
+**Files:** `tools/make-flag-icons.ps1`, `app/ico/<jeu>/`, éventuellement `app/setup.ps1` et une lib de génération, tests, README ×3
+**Description:** Séparer le drapeau — aujourd'hui dessiné en GDI+ par `$FlagDrawings` dans le générateur — en image
+de fond distincte, et permettre à l'utilisateur de fournir son propre SVG comme logo pour la génération des icônes.
+
+Question de cadrage à trancher avant d'écrire une ligne : le générateur vit dans `tools/`, exclu de la release, et
+dépend de `resvg` installé par scoop. Un utilisateur final n'a ni l'un ni l'autre. Trois voies — embarquer `resvg`
+dans la release (MPL-2.0, ~3 Mo, redistribuable), accepter un PNG plutôt qu'un SVG (GDI+ le lit nativement, aucune
+dépendance), ou réserver la génération à `tools/`.
+
+Piste à évaluer ici : le drapeau en **seconde pastille**, empilement **vertical** — pays en premier (en haut),
+compagnon en second (en dessous). L'ordre suit la lecture, du plus discriminant (la langue, qui définit le
+raccourci) au plus contextuel (l'appli compagnon). La pastille compagnon est aujourd'hui en haut-droite
+(`$BadgeShape` de `icon-badge.lib.ps1` : disque Ø 34 % du côté, centre à 58 % du diamètre depuis le coin) : elle
+descend, et les métriques restent en fractions du côté.
+
+À trancher dans la tâche : la lisibilité aux petites tailles. Une pastille seule perd déjà sa lettre sous 32 px et
+devient un point de couleur ; deux pastilles empilées à 16 px donneraient deux points de ~5 px indistinguables. Il
+faudra décider ce qui subsiste sous un seuil — le pays seul, le compagnon seul, ou aucune pastille.
+
+Cette piste rendrait sa langue au jeu « original » de T9, au prix d'un fichier composé sur le disque de l'utilisateur, jamais distribué.
+[ ]
+
 ## Risks
 - `.ico` à entrées DIB (non PNG) : le repli `System.Drawing.Icon` ne rend pas l'entrée 256 px → la lib lève un throw explicite plutôt qu'une icône incomplète ; nos `.ico` actuels sont tous PNG.
 - Cache d'icônes Explorer : une pastille modifiée peut ne pas s'afficher avant relance d'Explorer — documenté, pas d'action système.
@@ -72,4 +113,6 @@
 | T6 — Version 0.1.2, doc, release | S | [x] |
 | T7 — Aplat des icônes drapeau | M | [x] |
 | T8 — Jeux d'icônes sélectionnables | M | [x] |
+| T9 — Icône originale de LoL | M | [ ] |
+| T10 — Drapeaux en fond + SVG importable | L | [ ] |
 | **Total** | **~XL (8-11 h)** | |

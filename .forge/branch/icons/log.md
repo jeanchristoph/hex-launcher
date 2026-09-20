@@ -1,5 +1,7 @@
 # Log â€” icons
 
+- [2026-09-20 03:30] Ordre des pastilles fixé par l'utilisateur pour T10 : empilement vertical, pays en haut, compagnon en dessous. Reste à trancher dans la tâche : ce qui subsiste sous 32 px, où deux pastilles ne seraient plus lisibles.
+- [2026-09-20 03:20] T9 et T10 ajoutées au plan : icône originale de LoL référencée depuis le binaire (sans pastille), puis drapeaux en image de fond avec SVG importable. Le relevé technique de T9 a été fait sur la branche `launcher` et reporté dans le plan pour ne pas être refait.
 - [2026-09-17 02:12] Gravé : 84df5b0 sur icons, dev (créée depuis master, poussée) et master ; release GitHub v0.1.5 publiée (hex-launcher-0.1.5.zip, 5,5 Mo, flat + classic, sans tools/tests/companion).
 - [2026-09-17 02:11] Gravure interrompue : master avait avancé (1869d7b setup multilingue, v0.1.4 déjà publiée). master fusionné dans icons, 6 conflits résolus (page Raccourcis : présélections mémorisées + clés i18n setup.shortcuts.iconSet/iconSetChosen dans fr/en/ja ; theme.lib : ListBox/Picture + ComboBox ; create-shortcuts : -IconSet + -Language). Version → 0.1.5. Pester 381 verts.
 - [2026-09-17 02:01] badge-style.json livré dans les deux jeux avec toutes les clés explicites (classic : tout à false) — modèle pour un nouveau jeu.
