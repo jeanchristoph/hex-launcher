@@ -1,4 +1,4 @@
-# hex-launcher
+﻿# hex-launcher
 
 [English](README.md) · [Français](README.fr.md) · **日本語**
 
@@ -206,10 +206,18 @@ Riot Client の「言語」設定はランチャーの言語を変えるだけ�
 `product_settings.yaml` の `settings.locale` から読み込まれ、Riot Client は終了するたびにこのファイルを書き直します。
 そのためランチャーは次の順序で処理します：
 
-1. Riot Client と LoL クライアントが起動していれば終了する（そうしないと変更が上書きされます）。
-2. `settings.locale` を指定の言語に書き換える（Riot が管理する `default_locale` は変更しません）。
-3. 念のため `--locale=xx_XX` を付けて Riot Client を起動する。
-4. `config.json` の他の補助アプリを閉じてから、`-Companion` で指定された補助アプリがあれば起動する。
+1. LoL クライアントが起動していれば終了する。Riot Client は終了せず、起動していなければ起動する。
+2. Riot Client のローカル API で言語を設定する。`settings.locale` は Riot Client 自身が書き込む
+   （ファイルを直接書き換えても、数秒でメモリ上の値に上書きされます）。
+3. 同じ API でゲームの起動を依頼し（**Play** ボタンと同じ動作）、クライアントが実際に起動したことを
+   確認してから成功とみなす。
+4. それ以外の場合は従来の経路：Riot の全プロセスを終了し、`settings.locale` を書き換え（Riot が管理する
+   `default_locale` は変更しません）、`--launch-product` で再起動します。最後の手段として Play ボタンが
+   残るため、ランチャーが完全に失敗することはありません。`-NoLocalApi` でこの経路を強制できます。
+5. `config.json` の他の補助アプリを閉じてから、`-Companion` で指定された補助アプリがあれば起動する。
+
+ランチャーはこの PC で何が動作するかを `app\launch-state.json` に覚えています。直接起動が 2 回連続で
+失敗すると以降は従来の方式を直接使い、Riot Client のバージョンが変われば自動で再試行します。設定は不要です。
 
 ## 開発するには
 

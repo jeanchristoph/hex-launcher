@@ -44,8 +44,8 @@ function New-TestInstalledApp($App, $Registry = $null) {
     return [pscustomobject]@{ App = $App; Registry = $Registry }
 }
 
-function New-TempFile([string]$Prefix, [string]$Content) {
-    $path = Join-Path $env:TEMP ("{0}-{1}.json" -f $Prefix, [guid]::NewGuid())
+function New-TempFile([string]$Prefix, [string]$Content, [string]$Extension = 'json') {
+    $path = Join-Path $env:TEMP ("{0}-{1}.{2}" -f $Prefix, [guid]::NewGuid(), $Extension)
     [IO.File]::WriteAllText($path, $Content, (New-Object Text.UTF8Encoding($false)))
     $script:TestTempFiles += $path
     return $path

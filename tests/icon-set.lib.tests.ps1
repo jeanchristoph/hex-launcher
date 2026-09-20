@@ -95,9 +95,9 @@ Describe 'Get-IconSetBadgeStyle' {
         Assert-MockCalled Write-Warning -Scope It -Exactly 1
     }
 
-    It 'voile les pastilles du jeu flat livré, pas celles de classic (fichiers livrés, toutes clés explicites)' {
+    It 'ne voile plus les pastilles des jeux livrés (fichiers livrés, toutes clés explicites)' {
         $sets = @(Get-IconSets (Join-Path $here '..\app\ico'))
-        (Get-IconSetBadgeStyle (Find-IconSet $sets 'flat')).NightVeil | Should Be $true
+        (Get-IconSetBadgeStyle (Find-IconSet $sets 'flat')).NightVeil | Should Be $false
         (Get-IconSetBadgeStyle (Find-IconSet $sets 'flat')).ReducedPalette | Should Be $false
         (Get-IconSetBadgeStyle (Find-IconSet $sets 'classic')).NightVeil | Should Be $false
     }

@@ -1,10 +1,9 @@
-{
+﻿{
   "common.none": "aucune",
   "common.apply": "Appliquer",
   "common.cancel": "Annuler",
   "common.warning": "Avertissement : {0}",
   "common.notElevated": "Ne pas exécuter en tant qu'administrateur : les installeurs sont per-user et les désinstalleurs sont lus dans le registre utilisateur",
-
   "setup.windowTitle": "hex-launcher — configuration",
   "setup.language": "Langue",
   "setup.page.detect": "Bienvenue",
@@ -33,6 +32,9 @@
   "setup.shortcuts.companions": "Applis compagnon",
   "setup.shortcuts.iconSet": "Jeu d'icônes",
   "setup.shortcuts.iconSetChosen": "Jeu d'icônes : {0}",
+  "setup.shortcuts.legacyLaunch": "Mode de secours — si le jeu ne se lance pas",
+  "setup.shortcuts.legacyLaunchChosen": "Démarrage : mode de secours",
+  "setup.shortcuts.directLaunchChosen": "Démarrage : lancement direct du jeu",
   "setup.shortcuts.noLanguage": "Aucune langue cochée : cochez au moins une langue pour créer un raccourci.",
   "setup.done.title": "Installation terminée.",
   "setup.done.config": "Configuration : {0}",
@@ -43,7 +45,6 @@
   "setup.done.hint": "Double-cliquez sur un raccourci pour lancer le jeu dans la langue voulue. Relancez setup.bat pour ajouter ou retirer des langues ou des applis compagnon.",
   "setup.error.failed": "L'installation a échoué :\r\n\r\n{0}",
   "setup.error.elevatedHint": "Relancez setup.bat normalement.",
-
   "companion.title": "Applications compagnon",
   "companion.pickerTitle": "League of Legends — applications compagnon",
   "companion.hint": "Applis lancées après le jeu (un raccourci par appli cochée). Les applis cochées absentes seront installées.",
@@ -76,7 +77,6 @@
   "companion.chosen": "Applications compagnon choisies : {0}",
   "companion.dryRun": "[DryRun] Rien n'a été exécuté, config.json inchangé.",
   "companion.uninstallFailed": "Désinstallation non aboutie ({0}) : rien n'a été installé, config.json inchangé.",
-
   "shortcuts.localesMissing": "locales.json introuvable : {0}",
   "shortcuts.badgesUnavailable": "Pastilles compagnon indisponibles ({0}) — icônes drapeau seules",
   "shortcuts.iconNotComposed": "Icône compagnon '{0}' non composée ({1}) — icône drapeau seule",
@@ -97,7 +97,6 @@
   "shortcuts.unknownLocales": "Langue(s) inconnue(s) dans locales.json : {0}",
   "shortcuts.unknownCompanions": "Appli(s) compagnon absente(s) de config.json : {0} — relancer setup.bat",
   "shortcuts.noLanguage": "Aucune langue cochée : aucun raccourci créé.",
-
   "detect.kept": "config.json existant conservé : {0}",
   "detect.keptHint": "  (supprimer le fichier ou relancer avec -Force pour re-détecter)",
   "detect.generated": "config.json généré : {0}",

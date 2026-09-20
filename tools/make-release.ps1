@@ -20,7 +20,7 @@ param(
 )
 
 $ReleaseRootFiles = @('setup.bat', 'LISEZMOI.txt', 'LICENSE', 'README.md', 'README.fr.md', 'README.ja.md')
-$ReleaseExcluded     = @('config.json')
+$ReleaseExcluded     = @('config.json', 'launch-state.json', 'launch.log')
 $ReleaseExcludedDirs = @('ico\*\companion')   # icônes drapeau + pastille composées sur chaque poste par create-shortcuts.ps1, dans chaque jeu
 
 function Get-ProjectRoot {

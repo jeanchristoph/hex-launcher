@@ -807,3 +807,29 @@ Describe 'Start-SetupWizard' {
         Assert-MockCalled -Scope It New-SetupWindow -Exactly -Times 0
     }
 }
+
+Describe 'New-SetupLegacyLaunchBox' {
+    It 'reste décochée quand le poste utilise le lancement direct' {
+        Reset-SetupTestState @{ Config = (New-TestLaunchConfig) }
+        $box = New-SetupLegacyLaunchBox $script:InstallState 0 0 300
+        $box.Checked | Should Be $false
+    }
+
+    It 'apparaît cochée quand le poste a déjà choisi le lancement classique' {
+        $config = New-TestLaunchConfig
+        Set-LaunchUseLocalApi $config $false
+        Reset-SetupTestState @{ Config = $config }
+        $box = New-SetupLegacyLaunchBox $script:InstallState 0 0 300
+        $box.Checked | Should Be $true
+    }
+
+    It 'porte un libellé qui dit quand la cocher, pas ce qu''elle fait techniquement' {
+        Reset-SetupTestState @{ Config = (New-TestLaunchConfig) }
+        (New-SetupLegacyLaunchBox $script:InstallState 0 0 300).Text | Should Be (Get-Text 'setup.shortcuts.legacyLaunch')
+    }
+
+    It 'retrouve la saisie en attente après un redessin de la page' {
+        Reset-SetupTestState @{ Config = (New-TestLaunchConfig); PendingSelection = @{ LegacyLaunchBox = @('True') } }
+        (New-SetupLegacyLaunchBox $script:InstallState 0 0 300).Checked | Should Be $true
+    }
+}

@@ -154,7 +154,8 @@ function Get-ThemedComboBoxKey($Combo) {
     return $Combo.Tag[$Combo.SelectedIndex]
 }
 
-# Case plate : liseré or, fond or sombre quand cochée (le glyphe seul serait invisible sur fond nuit)
+# Carré natif de Windows : blanc quand la case est décochée, donc bien détaché du fond nuit. Le style Flat,
+# essayé d'abord, rendait ce carré bleu terne (R95 G126 B175 mesurés) — on croyait la case cochée.
 function New-ThemedCheckBox([string]$Text, [int]$Left, [int]$Top, [int]$Width) {
     $box                                      = New-Object System.Windows.Forms.CheckBox
     $box.Text                                 = $Text
@@ -162,11 +163,7 @@ function New-ThemedCheckBox([string]$Text, [int]$Left, [int]$Top, [int]$Width) {
     $box.Size                                 = New-Object System.Drawing.Size($Width, 26)
     $box.ForeColor                            = Get-ThemeColor 'Cream'
     $box.BackColor                            = Get-ThemeColor 'Background'
-    $box.FlatStyle                            = 'Flat'
-    $box.FlatAppearance.BorderColor           = Get-ThemeColor 'Gold'
-    $box.FlatAppearance.BorderSize            = 1
-    $box.FlatAppearance.CheckedBackColor      = Get-ThemeColor 'GoldDark'
-    $box.FlatAppearance.MouseOverBackColor    = Get-ThemeColor 'Panel'
+    $box.FlatStyle                            = 'Standard'
     return $box
 }
 

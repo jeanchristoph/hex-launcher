@@ -1,10 +1,9 @@
-{
+﻿{
   "common.none": "なし",
   "common.apply": "適用",
   "common.cancel": "キャンセル",
   "common.warning": "警告：{0}",
   "common.notElevated": "管理者として実行しないでください：インストーラーはユーザーごとに動作し、アンインストーラーはユーザーのレジストリから読み取られます",
-
   "setup.windowTitle": "hex-launcher — セットアップ",
   "setup.language": "言語",
   "setup.page.detect": "ようこそ",
@@ -33,6 +32,9 @@
   "setup.shortcuts.companions": "コンパニオンアプリ",
   "setup.shortcuts.iconSet": "アイコンセット",
   "setup.shortcuts.iconSetChosen": "アイコンセット：{0}",
+  "setup.shortcuts.legacyLaunch": "予備モード — ゲームが起動しない場合",
+  "setup.shortcuts.legacyLaunchChosen": "起動：予備モード",
+  "setup.shortcuts.directLaunchChosen": "起動：ゲームを直接起動",
   "setup.shortcuts.noLanguage": "言語が選択されていません：ショートカットを作成するには、少なくとも 1 つの言語をチェックしてください。",
   "setup.done.title": "セットアップが完了しました。",
   "setup.done.config": "設定ファイル：{0}",
@@ -43,7 +45,6 @@
   "setup.done.hint": "ショートカットをダブルクリックすると、選んだ言語でゲームが起動します。言語やコンパニオンアプリを追加・削除するには、setup.bat をもう一度実行してください。",
   "setup.error.failed": "セットアップに失敗しました：\r\n\r\n{0}",
   "setup.error.elevatedHint": "setup.bat を通常の権限で再実行してください。",
-
   "companion.title": "コンパニオンアプリ",
   "companion.pickerTitle": "League of Legends — コンパニオンアプリ",
   "companion.hint": "ゲームの後に起動するアプリです（チェックしたアプリごとにショートカットを 1 つ作成）。チェックした未インストールのアプリはインストールされます。",
@@ -76,7 +77,6 @@
   "companion.chosen": "選択したコンパニオンアプリ：{0}",
   "companion.dryRun": "[DryRun] 何も実行されず、config.json は変更されていません。",
   "companion.uninstallFailed": "アンインストールが完了しませんでした（{0}）：何もインストールされず、config.json は変更されていません。",
-
   "shortcuts.localesMissing": "locales.json が見つかりません：{0}",
   "shortcuts.badgesUnavailable": "コンパニオンバッジを利用できません（{0}） — 国旗アイコンのみ使用します",
   "shortcuts.iconNotComposed": "コンパニオンアイコン「{0}」を合成できませんでした（{1}） — 国旗アイコンのみ使用します",
@@ -97,7 +97,6 @@
   "shortcuts.unknownLocales": "locales.json に存在しない言語：{0}",
   "shortcuts.unknownCompanions": "config.json に存在しないコンパニオンアプリ：{0} — setup.bat を再実行してください",
   "shortcuts.noLanguage": "言語が選択されていません：ショートカットは作成されていません。",
-
   "detect.kept": "既存の config.json を保持しました：{0}",
   "detect.keptHint": "  （再検出するには、ファイルを削除するか -Force を付けて再実行してください）",
   "detect.generated": "config.json を生成しました：{0}",
