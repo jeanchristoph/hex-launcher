@@ -1015,6 +1015,37 @@ Describe 'New-SetupLegacyLaunchBox' {
     }
 }
 
+Describe 'Section « Compatibilité Riot » de la page Raccourcis' {
+    $section = Get-SetupRiotCompatibilityLayout 350
+
+    It 'empile le titre, la case puis la note, le journal en dessous' {
+        $section.TitleTop | Should Be 350
+        $section.BoxTop   | Should BeGreaterThan ($section.TitleTop + 21)
+        $section.HintTop  | Should BeGreaterThan ($section.BoxTop + 25)
+        $section.LogTop   | Should BeGreaterThan ($section.HintTop + $section.HintHeight - 1)
+    }
+
+    It 'laisse au journal au moins deux lignes dans la fenêtre de l''assistant' {
+        $layout = Get-SetupLayout 784 641
+        $layout.ContentHeight - $section.LogTop | Should BeGreaterThan 40
+    }
+
+    It 'donne à la note deux lignes de texte, jamais tronquées en une' {
+        $section.HintHeight | Should BeGreaterThan 30
+    }
+
+    It 'a un titre et une note traduits qui disent quand cocher la case' {
+        try {
+            foreach ($language in @('fr', 'en', 'ja')) {
+                Initialize-Translation $language | Out-Null
+                (Get-Text 'setup.shortcuts.riotCompatibility') | Should Not BeNullOrEmpty
+                (Get-Text 'setup.shortcuts.legacyLaunchHint') -match 'Riot' | Should Be $true
+            }
+        }
+        finally { Initialize-Translation 'fr' | Out-Null }
+    }
+}
+
 Describe 'Page de détection : saisie des chemins Riot' {
     Mock Test-Path { $true }
     $riotItem = (Get-DetectionItems (New-TestLaunchConfig))[0]

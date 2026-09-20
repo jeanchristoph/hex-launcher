@@ -1,6 +1,6 @@
 ﻿<#
 .SYNOPSIS
-    API locale du Riot Client : lockfile, requêtes HTTPS sur 127.0.0.1, lancement d'un produit.
+    API locale du Riot Client : lockfile, requêtes HTTPS sur 127.0.0.1, lancement et fermeture d'un produit.
 
 .DESCRIPTION
     Le Riot Client expose une API HTTP locale sur un port tiré au démarrage, protégée par le lockfile qu'il écrit
@@ -12,7 +12,8 @@
     avec un avertissement, jamais un throw : l'appelant garde son repli (ligne de commande, puis bouton Play).
 
     INVARIANT : le mot de passe du lockfile ne sort jamais dans un message, un avertissement ou une exception —
-    ni dans le journal, qui ne reçoit que la méthode, le chemin et le code.
+    ni dans le journal, qui ne reçoit que la méthode, le chemin et le code. Même règle pour l'identifiant de
+    session d'un produit, qui est le jeton de son client de jeu : jamais dans le journal.
 
     Suppose lib\launch-log.lib.ps1 déjà dot-sourcé par l'appelant.
 #>
@@ -27,6 +28,8 @@ $LockfileFieldCount = 5
 # Chemins de l'API locale, relevés sur swagger/v3/openapi.json du Riot Client — jamais supposés
 $RiotClientProductLaunchPath = '/product-launcher/v1/products/{0}/patchlines/{1}'
 $RiotClientProductLocalePath = '/riotclient/product-locales/products/{0}/patchlines/{1}'
+$RiotClientProductSessionsPath = '/product-session/v1/sessions'
+$RiotClientProductSessionPath = '/product-session/v1/sessions/{0}'
 
 # Route de lecture sans effet, présente dès que l'API du Riot Client est chargée : sert à savoir si elle répond
 $RiotClientReadinessPath = '/riotclient/region-locale'
@@ -98,8 +101,10 @@ function New-RiotClientResult([bool]$Success, [int]$StatusCode) {
     return [pscustomobject]@{ Success = $Success; StatusCode = $StatusCode }
 }
 
-# Seul point de contact avec WinHTTP : rend le code HTTP, lève si la connexion n'aboutit pas
-function Send-WinHttpRequest([string]$Method, [string]$Uri, [string]$Authorization, [string]$Body, [int]$TimeoutSeconds) {
+# Seul point de contact avec WinHTTP : statut et corps de la réponse, lève si la connexion n'aboutit pas.
+# Le lanceur ne lit jamais le corps ; les sondes de développement, si — en masquant le mot de passe du lockfile,
+# que Riot renvoie dans les arguments de ses sessions (--remoting-auth-token).
+function Invoke-WinHttpRequest([string]$Method, [string]$Uri, [string]$Authorization, [string]$Body, [int]$TimeoutSeconds) {
     $milliseconds = $TimeoutSeconds * 1000
     $request = $null
     try {
@@ -114,20 +119,27 @@ function Send-WinHttpRequest([string]$Method, [string]$Uri, [string]$Authorizati
         } else {
             $request.Send()
         }
-        return [int]$request.Status
+        return [pscustomobject]@{ Status = [int]$request.Status; Text = [string]$request.ResponseText }
     } finally {
         # Une requête par tentative, et la boucle en fait des dizaines : l'objet COM est rendu tout de suite
         if ($request) { [void][Runtime.InteropServices.Marshal]::ReleaseComObject($request) }
     }
 }
 
+function Send-WinHttpRequest([string]$Method, [string]$Uri, [string]$Authorization, [string]$Body, [int]$TimeoutSeconds) {
+    return (Invoke-WinHttpRequest $Method $Uri $Authorization $Body $TimeoutSeconds).Status
+}
+
+# -LoggedPath : ce que le journal montre à la place du chemin, quand celui-ci porte un secret (identifiant de
+# session d'un produit : c'est aussi le jeton d'authentification de son client de jeu)
 function Invoke-RiotClientRequest {
     param(
         [Parameter(Mandatory)][ValidateSet('GET', 'POST', 'PUT', 'DELETE')][string]$Method,
         [Parameter(Mandatory)][string]$Path,
         [Parameter(Mandatory)]$Lockfile,
         [string]$Body,
-        [int]$TimeoutSeconds = 5
+        [int]$TimeoutSeconds = 5,
+        [string]$LoggedPath = $Path
     )
 
     $uri = 'https://127.0.0.1:{0}{1}' -f $Lockfile.Port, $Path
@@ -139,7 +151,29 @@ function Invoke-RiotClientRequest {
         $result = New-RiotClientResult $false 0
     }
 
-    Write-LaunchLogLine 'API' ('{0} {1} -> {2} en {3}' -f $Method, $Path, $result.StatusCode, (Format-LaunchLogDuration $chrono)) | Out-Null
+    Write-LaunchLogLine 'API' ('{0} {1} -> {2} en {3}' -f $Method, $LoggedPath, $result.StatusCode, (Format-LaunchLogDuration $chrono)) | Out-Null
+    return $result
+}
+
+# Seule lecture d'un corps de réponse dans le lanceur : rend { Success; StatusCode; Text }. Le texte ne va jamais
+# au journal — les sessions d'un produit portent son jeton et le mot de passe du lockfile en clair
+function Read-RiotClientResource {
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)]$Lockfile,
+        [int]$TimeoutSeconds = 5
+    )
+
+    $uri = 'https://127.0.0.1:{0}{1}' -f $Lockfile.Port, $Path
+    $chrono = [Diagnostics.Stopwatch]::StartNew()
+    try {
+        $response = Invoke-WinHttpRequest 'GET' $uri (Get-RiotClientAuthorization $Lockfile) '' $TimeoutSeconds
+        $result = [pscustomobject]@{ Success = (Test-HttpSuccessStatus $response.Status); StatusCode = $response.Status; Text = $response.Text }
+    } catch {
+        $result = [pscustomobject]@{ Success = $false; StatusCode = 0; Text = '' }
+    }
+
+    Write-LaunchLogLine 'API' ('GET {0} -> {1} en {2}' -f $Path, $result.StatusCode, (Format-LaunchLogDuration $chrono)) | Out-Null
     return $result
 }
 
@@ -197,6 +231,59 @@ function Start-RiotProduct {
     return Invoke-RiotClientRequest -Method POST -Path ($RiotClientProductLaunchPath -f $ProductId, $PatchlineId) -Lockfile $Lockfile
 }
 
+# ---------------------------------------------------------------- Fermeture d'un produit
+
+# La session d'un produit en marche, telle que le Riot Client la décrit : { Id; Body }, Body étant l'objet JSON
+# à lui renvoyer tel quel. $null si l'API ne répond pas, si le produit n'a pas de session ou si la réponse est
+# illisible. L'identifiant est aussi le jeton d'authentification du client de jeu : jamais journalisé.
+function Find-RiotProductSession {
+    param(
+        [Parameter(Mandatory)][string]$ProductId,
+        [Parameter(Mandatory)]$Lockfile
+    )
+
+    $sessions = Read-RiotClientResource -Path $RiotClientProductSessionsPath -Lockfile $Lockfile
+    if (-not $sessions.Success) { return $null }
+    try {
+        $catalog = $sessions.Text | ConvertFrom-Json
+    } catch {
+        return $null
+    }
+    $entry = $catalog.PSObject.Properties | Where-Object { $_.Value.productId -eq $ProductId } | Select-Object -First 1
+    if (-not $entry) { return $null }
+    return [pscustomobject]@{ Id = $entry.Name; Body = ($entry.Value | ConvertTo-Json -Depth 10 -Compress) }
+}
+
+# DELETE sur la session, l'objet de la session en corps : sans lui, le Riot Client répond 400 « A value for
+# 'session' is required » et ne fait rien (relevé du 2026-09-20). Réservé aux lanceurs de produit d'après le
+# swagger — ce que nous sommes. Mesuré : 204 immédiat, client de jeu parti en 0,5 s, et le Riot Client quitte
+# à son tour dans la seconde au lieu de rester replié — l'appelant le redémarre s'il en a encore besoin.
+function Remove-RiotProductSession {
+    param(
+        [Parameter(Mandatory)]$Session,
+        [Parameter(Mandatory)]$Lockfile
+    )
+
+    return Invoke-RiotClientRequest -Method DELETE -Path ($RiotClientProductSessionPath -f $Session.Id) -Lockfile $Lockfile `
+        -Body $Session.Body -LoggedPath ($RiotClientProductSessionPath -f '<session>')
+}
+
+# Ferme un produit comme le Riot Client le ferait lui-même, au lieu de tuer son process pendant que Vanguard y
+# est attaché (VAN 216 après des kills rapprochés, 2026-09-20). Vrai quand la fermeture est acceptée ; faux
+# sinon — l'appelant garde le kill en dernier recours.
+function Stop-RiotProduct {
+    param(
+        [Parameter(Mandatory)][string]$ProductId,
+        [Parameter(Mandatory)]$Lockfile
+    )
+
+    $session = Find-RiotProductSession -ProductId $ProductId -Lockfile $Lockfile
+    if (-not $session) { return $false }
+    return (Remove-RiotProductSession -Session $session -Lockfile $Lockfile).Success
+}
+
+# ---------------------------------------------------------------- Attente d'une opération
+
 # Le lancement est rejoué tant que la session n'est pas prête : aucune sonde ne prédit cet instant
 # (relevé du 2026-09-20 à froid : 464 à 3,8 s, 200 à 8,2 s, alors que /riotclient/region-locale répond 200 dès 7 s).
 # Rejoue une opération de l'API tant que le Riot Client répond « pas encore » : le lockfile est relu à chaque
@@ -211,6 +298,11 @@ function Start-RiotProduct {
 # L'écoulement est mesuré par un Stopwatch, jamais par l'heure système : une horloge qui recule (synchronisation
 # NTP, changement d'heure) rendrait une échéance calculée sur (Get-Date) inatteignable pendant tout le décalage.
 # Le budget est aussi vérifié après l'opération : une requête qui consomme son propre délai ne le fait pas déborder.
+#
+# -SuccessProbe : sonde évaluée avant chaque tentative ; vraie → l'opération est acquise (Kind 'probe'), quel que
+# soit le dernier code. Mesuré le 2026-09-20 : une demande de lancement peut expirer côté client (code 0 après 7 s)
+# alors que Riot l'a exécutée — les tentatives suivantes répondent 423 « un client de jeu tourne » jusqu'au bout du
+# budget, et c'est le nôtre. Seule une preuve extérieure (le client de jeu présent) lève l'ambiguïté.
 function Wait-RiotClientOperation {
     param(
         [Parameter(Mandatory)][scriptblock]$Operation,
@@ -218,13 +310,15 @@ function Wait-RiotClientOperation {
         [string]$LockfilePath = $RiotClientLockfilePath,
         [int]$TimeoutSeconds = 30,
         [scriptblock]$OnTick,
-        [scriptblock]$ShouldStop
+        [scriptblock]$ShouldStop,
+        [scriptblock]$SuccessProbe
     )
 
     $chrono = [Diagnostics.Stopwatch]::StartNew()
     $lastStatus = 0
     while ($chrono.Elapsed.TotalSeconds -lt $TimeoutSeconds) {
         if (Test-StopRequested $ShouldStop) { return New-RiotClientOperationResult $false 'cancelled' $lastStatus }
+        if (Test-SuccessProbed $SuccessProbe) { return New-RiotClientOperationResult $true 'probe' $lastStatus }
         $lockfile = Read-RiotClientLockfile $LockfilePath -Quiet
         if (-not $lockfile) {
             # Sans cette trace, un budget épuisé sans aucune tentative reste inexplicable après coup
@@ -243,6 +337,8 @@ function Wait-RiotClientOperation {
         if ($OnTick) { & $OnTick } else { Start-Sleep -Seconds 1 }
     }
 
+    # Dernière chance : la preuve a pu arriver pendant la tentative qui a consommé le budget
+    if (Test-SuccessProbed $SuccessProbe) { return New-RiotClientOperationResult $true 'probe' $lastStatus }
     Write-Warning ('{0} : rien accepté en {1} s.' -f $FailureMessage, $TimeoutSeconds)
     return New-RiotClientOperationResult $false 'timeout' $lastStatus
 }
@@ -250,6 +346,11 @@ function Wait-RiotClientOperation {
 function Test-StopRequested([scriptblock]$ShouldStop) {
     if (-not $ShouldStop) { return $false }
     return [bool](& $ShouldStop)
+}
+
+function Test-SuccessProbed([scriptblock]$SuccessProbe) {
+    if (-not $SuccessProbe) { return $false }
+    return [bool](& $SuccessProbe)
 }
 
 function New-RiotClientOperationResult([bool]$Success, [string]$Kind, [int]$StatusCode) {
@@ -272,6 +373,8 @@ function Wait-RiotProductLocale {
         -FailureMessage $message -LockfilePath $LockfilePath -TimeoutSeconds $TimeoutSeconds -OnTick $OnTick -ShouldStop $ShouldStop
 }
 
+# -SuccessProbe : l'appelant sait reconnaître le produit lancé (son client de jeu en marche) — la lib, elle, ne
+# connaît que des codes HTTP
 function Wait-RiotProductLaunch {
     param(
         [Parameter(Mandatory)][string]$ProductId,
@@ -279,10 +382,11 @@ function Wait-RiotProductLaunch {
         [string]$LockfilePath = $RiotClientLockfilePath,
         [int]$TimeoutSeconds = 30,
         [scriptblock]$OnTick,
-        [scriptblock]$ShouldStop
+        [scriptblock]$ShouldStop,
+        [scriptblock]$SuccessProbe
     )
 
     $message = 'Riot Client : lancement de {0} refusé par l''API locale' -f $ProductId
     return Wait-RiotClientOperation -Operation { param($Lockfile) Start-RiotProduct -ProductId $ProductId -PatchlineId $PatchlineId -Lockfile $Lockfile } `
-        -FailureMessage $message -LockfilePath $LockfilePath -TimeoutSeconds $TimeoutSeconds -OnTick $OnTick -ShouldStop $ShouldStop
+        -FailureMessage $message -LockfilePath $LockfilePath -TimeoutSeconds $TimeoutSeconds -OnTick $OnTick -ShouldStop $ShouldStop -SuccessProbe $SuccessProbe
 }

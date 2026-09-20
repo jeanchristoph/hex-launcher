@@ -13,7 +13,12 @@
     powershell -NoProfile -ExecutionPolicy Bypass -File tools\probe-riot-client-api.ps1
     powershell -NoProfile -ExecutionPolicy Bypass -File tools\probe-riot-client-api.ps1 "GET /riotclient/region-locale" "PUT /riotclient/product-locales/products/league_of_legends/patchlines/live ""fr_FR"""
 #>
-param([Parameter(ValueFromRemainingArguments)][string[]]$Requests)
+param(
+    [Parameter(ValueFromRemainingArguments)][string[]]$Requests,
+    # Affiche le corps de chaque réponse (tronqué à 600 caractères), mot de passe du lockfile masqué : Riot le
+    # renvoie tel quel dans les arguments de ses sessions (--remoting-auth-token), relevé le 2026-09-20
+    [switch]$ShowBody
+)
 
 $appRoot = Join-Path (Split-Path $PSScriptRoot -Parent) 'app'
 . (Join-Path $appRoot 'lib\launch-log.lib.ps1')
@@ -43,8 +48,26 @@ function Split-ProbeRequest([string]$Request) {
 function Send-ProbeRequest($Lockfile, [string]$Request) {
     $probe = Split-ProbeRequest $Request
     $chrono = [Diagnostics.Stopwatch]::StartNew()
-    $result = Invoke-RiotClientRequest -Method $probe.Method -Path $probe.Path -Lockfile $Lockfile -Body $probe.Body
-    return '{0,-6} {1,-75} -> {2,3} en {3}' -f $probe.Method, $probe.Path, $result.StatusCode, (Format-LaunchLogDuration $chrono)
+    if (-not $ShowBody) {
+        $result = Invoke-RiotClientRequest -Method $probe.Method -Path $probe.Path -Lockfile $Lockfile -Body $probe.Body
+        return '{0,-6} {1,-75} -> {2,3} en {3}' -f $probe.Method, $probe.Path, $result.StatusCode, (Format-LaunchLogDuration $chrono)
+    }
+    $uri = 'https://127.0.0.1:{0}{1}' -f $Lockfile.Port, $probe.Path
+    try { $raw = Invoke-WinHttpRequest $probe.Method $uri (Get-RiotClientAuthorization $Lockfile) $probe.Body 5 }
+    catch { $raw = [pscustomobject]@{ Status = 0; Text = $_.Exception.Message } }
+    $text = Hide-LockfilePassword $raw.Text $Lockfile
+    if ($text.Length -gt 600) { $text = $text.Substring(0, 600) + '…' }
+    return ('{0,-6} {1,-75} -> {2,3} en {3}' -f $probe.Method, $probe.Path, $raw.Status, (Format-LaunchLogDuration $chrono)) + "`n    " + $text
+}
+
+# INVARIANT du lanceur : le mot de passe du lockfile ne sort jamais — ni brut, ni dans un argument de session
+function Hide-LockfilePassword([string]$Text, $Lockfile) {
+    if ([string]::IsNullOrEmpty($Text)) { return '' }
+    $masked = $Text
+    if ($Lockfile.Password) { $masked = $masked.Replace($Lockfile.Password, '********') }
+    # Le jeton de session de l'interface Riot sert aussi de clé d'objet : masqué partout où il apparaît
+    foreach ($match in [regex]::Matches($masked, 'remoting-auth-token=([^"\s]+)')) { $masked = $masked.Replace($match.Groups[1].Value, '********') }
+    return $masked
 }
 
 Show-RiotProcesses

@@ -3,15 +3,17 @@
     Lance League of Legends dans la langue demandée, avec un splash animé.
 
 .DESCRIPTION
-    Chemin rapide : ferme le seul client de jeu, pose la langue par l'API locale du Riot Client (qui écrit alors
-    le yaml lui-même) et lui demande le lancement — l'équivalent du bouton Play, sans fermer le Riot Client.
+    Chemin rapide : ferme le seul client de jeu — par l'API locale du Riot Client, qui clôt la session de jeu
+    proprement là où un kill vaut une manipulation pour Vanguard (VAN 216), le kill restant le dernier recours —,
+    pose la langue par cette même API (le Riot Client écrit alors le yaml lui-même) et lui demande le lancement,
+    l'équivalent du bouton Play. Le Riot Client quitte après une fermeture par l'API : il est redémarré à froid.
     Chemin historique, conservé en repli : ferme tous les process Riot, réécrit settings.locale dans
     league_of_legends.live.product_settings.yaml, relance avec --launch-product. Il sert dès que l'API locale ne
     répond pas, refuse, ou que le client de jeu n'apparaît pas — et sur demande avec -NoLocalApi.
     Un Riot Client replié sur son icône dont la partie s'est terminée n'a plus ni fenêtre ni API (toutes ses
     routes répondent 404, son serveur a changé de port) : le chemin rapide le relance sans argument — la même
     instance rouvre sa fenêtre et recharge son API en deux secondes, sans kill ni session serveur abandonnée.
-    Passé 15 s d'attente, le splash montre « Forcer en démarrage manuel » : un clic abandonne le chemin rapide et
+    Passé 1 min 30 d'attente, le splash montre « Forcer en démarrage manuel » : un clic abandonne le chemin rapide et
     passe en démarrage manuel (Riot relancé, Jouer à cliquer) pour ce lancement seulement — rien n'est mémorisé.
     Chaque étape est tracée dans launch.log, une ligne horodatée par événement, appels d'API compris.
     Le lanceur n'a pas de mémoire : l'API est tentée à chaque lancement, sauf -NoLocalApi ou la case
@@ -72,16 +74,22 @@ $LeaguePatchlineId = 'live'
 # Budget total du chemin rapide : pose de la langue ET acceptation du lancement, dans une seule enveloppe.
 # Un seul budget plutôt qu'un par étape — une machine lente peut consommer l'essentiel sur l'une ou sur l'autre
 # sans que le total dérive. Les mesures de développement (3,4 s à chaud, 8,2 s à froid) viennent d'un poste
-# rapide : elles ne servent pas de seuil, d'où la marge.
-$LocalApiBudgetSeconds = 60
+# rapide : elles ne servent pas de seuil — sur un poste ordinaire, un lancement approche la minute (2026-09-20),
+# d'où cinq minutes avant le repli en démarrage manuel ; le bouton du splash reste là pour abréger.
+$LocalApiBudgetSeconds = 300
 
 # Un lancement accepté ne prouve rien : le client de jeu doit apparaître. Large, car c'est l'étape qui souffre
 # le plus d'un disque lent ou d'un Vanguard qui démarre.
-$GameClientStartTimeoutSeconds = 30
+$GameClientStartTimeoutSeconds = 90
 
-# Délai avant de proposer « Forcer en démarrage manuel » : un lancement normal tient en 8 à 13 s, le bouton ne doit tenter
-# personne quand tout va bien — il n'a de sens que sur une attente qui s'éternise (session à libérer, API muette)
-$ForceStartButtonDelaySeconds = 15
+# Temps laissé au client de jeu pour disparaître après une fermeture acceptée par l'API (mesuré : 0,5 s) ; au-delà,
+# le kill reprend la main
+$GameClientStopTimeoutSeconds = 5
+
+# Délai avant de proposer « Forcer en démarrage manuel » : un lancement normal tient en 8 à 13 s sur un poste rapide,
+# près d'une minute sur un poste ordinaire — le bouton ne doit tenter personne quand tout va bien, il n'a de sens
+# que sur une attente qui s'éternise (session à libérer, API muette)
+$ForceStartButtonDelaySeconds = 90
 
 # Temps laissé au Riot Client pour rouvrir sa fenêtre et recharger son API après une relance sans argument
 # (mesuré : 2 s sur ce poste). Large, et l'échéance n'est pas un échec : le chemin rapide tente l'API quand même.
@@ -140,6 +148,8 @@ function Get-RiotClientVersion([string]$Path) {
     }
 }
 
+# Dernier recours : Vanguard attaché au client de jeu prend un kill pour une manipulation (VAN 216 après des
+# fermetures brutales rapprochées, 2026-09-20). La fermeture par l'API passe d'abord (Stop-GameClient).
 function Stop-GameClientProcesses {
     $running = @(Get-Process -Name $GameClientProcessNames -ErrorAction SilentlyContinue)
     if ($running.Count -eq 0) { return }
@@ -150,6 +160,35 @@ function Stop-GameClientProcesses {
 
 function Test-GameClientRunning {
     return @(Get-Process -Name $GameClientProcessNames -ErrorAction SilentlyContinue).Count -gt 0
+}
+
+# Demande au Riot Client de fermer sa session de jeu — ce qu'il fait lui-même en 0,5 s (mesuré le 2026-09-20).
+# Faux si son API ne répond pas ou ne connaît pas de session : le kill reste alors le seul moyen
+function Stop-GameClientByLocalApi {
+    $lockfile = Read-RiotClientLockfile -Quiet
+    if (-not $lockfile) { return $false }
+    return (Stop-RiotProduct -ProductId $LeagueProductId -Lockfile $lockfile)
+}
+
+function Wait-GameClientExit([int]$TimeoutSeconds, [scriptblock]$OnTick) {
+    $chrono = [Diagnostics.Stopwatch]::StartNew()
+    while ($chrono.Elapsed.TotalSeconds -lt $TimeoutSeconds) {
+        if (-not (Test-GameClientRunning)) { return $true }
+        if ($OnTick) { & $OnTick } else { Start-Sleep -Seconds 1 }
+    }
+    return (-not (Test-GameClientRunning))
+}
+
+# Ferme le client de jeu proprement quand l'API le permet, le tue sinon. Le Riot Client quitte lui aussi après
+# une fermeture par l'API au lieu de rester replié : le chemin rapide le redémarre à froid, sans session à libérer
+function Stop-GameClient([scriptblock]$OnTick) {
+    if (-not (Test-GameClientRunning)) { return }
+    $chrono = [Diagnostics.Stopwatch]::StartNew()
+    if ((Stop-GameClientByLocalApi) -and (Wait-GameClientExit $GameClientStopTimeoutSeconds $OnTick)) {
+        Write-LaunchLogLine 'GAME' ('client de jeu fermé par l''API en {0}' -f (Format-LaunchLogDuration $chrono)) | Out-Null
+        return
+    }
+    Stop-GameClientProcesses
 }
 
 # Un endpoint déprécié chez Riot continue de répondre en ayant perdu son effet (/riotclient/new-args rend 204
@@ -255,10 +294,14 @@ function Start-LeagueClientByLocalApi([string]$Path, [string]$Value, [scriptbloc
         -TimeoutSeconds (Get-RemainingBudgetSeconds $chrono $LocalApiBudgetSeconds) -OnTick $guardedTick -ShouldStop $ShouldStop
     if (-not $localeSet.Success) { return New-LocalApiAttempt $false (New-LocalApiFailure $localeSet.Kind $localeSet.StatusCode 'locale') }
 
+    # Le client de jeu en marche vaut acceptation : une demande expirée côté client (code 0) a pu être exécutée
+    # par Riot, qui répond ensuite 423 « un client de jeu tourne » — le nôtre (mesuré le 2026-09-20, 55 s perdues)
     Write-LaunchStatus $OnStatus 'Demande de lancement au Riot Client…'
     $launched = Wait-RiotProductLaunch -ProductId $LeagueProductId -PatchlineId $LeaguePatchlineId `
-        -TimeoutSeconds (Get-RemainingBudgetSeconds $chrono $LocalApiBudgetSeconds) -OnTick $guardedTick -ShouldStop $ShouldStop
+        -TimeoutSeconds (Get-RemainingBudgetSeconds $chrono $LocalApiBudgetSeconds) -OnTick $guardedTick -ShouldStop $ShouldStop `
+        -SuccessProbe { Test-GameClientRunning }
     if (-not $launched.Success) { return New-LocalApiAttempt $false (New-LocalApiFailure $launched.Kind $launched.StatusCode 'launch') }
+    if ($launched.Kind -eq 'probe') { Write-LaunchLogLine 'GAME' ('client de jeu déjà en marche pendant la demande de lancement (dernier code {0})' -f $launched.StatusCode) | Out-Null }
 
     Write-LaunchStatus $OnStatus 'Le jeu se prépare…'
     $gameChrono = [Diagnostics.Stopwatch]::StartNew()
@@ -269,13 +312,15 @@ function Start-LeagueClientByLocalApi([string]$Path, [string]$Value, [scriptbloc
     }
 
     Write-LaunchLogLine 'GAME' ('client de jeu détecté en {0}' -f (Format-LaunchLogDuration $gameChrono)) | Out-Null
-
-    # Le jeu est lancé : la fenêtre du Riot Client n'a plus rien à montrer. On lui demande de se fermer — avec
-    # une partie en cours il se replie sur son icône près de l'horloge au lieu de quitter, rend près de 600 Mo,
-    # et son API continue de répondre. Jamais en démarrage manuel, où elle sert encore à cliquer sur Jouer.
-    if (Close-RiotClientWindow) { Write-LaunchLogLine 'RIOT' 'fenêtre du Riot Client fermée (repli sur l''icône)' | Out-Null }
-
+    Complete-LocalApiLaunch
     return New-LocalApiAttempt $true $null
+}
+
+# Le jeu est lancé : la fenêtre du Riot Client n'a plus rien à montrer. On lui demande de se fermer — avec
+# une partie en cours il se replie sur son icône près de l'horloge au lieu de quitter, rend près de 600 Mo,
+# et son API continue de répondre. Jamais en démarrage manuel, où elle sert encore à cliquer sur Jouer.
+function Complete-LocalApiLaunch {
+    if (Close-RiotClientWindow) { Write-LaunchLogLine 'RIOT' 'fenêtre du Riot Client fermée (repli sur l''icône)' | Out-Null }
 }
 
 function New-LocalApiAttempt([bool]$Success, $Failure) {
@@ -326,13 +371,18 @@ function Start-LeagueClient([string]$Path, [string]$YamlPath, [string]$Value, [s
 
     if (-not $NoLocalApi) {
         Write-LaunchStatus $OnStatus 'Fermeture du client de jeu…'
-        Stop-GameClientProcesses
+        Stop-GameClient $OnTick
         $attempt = Start-LeagueClientByLocalApi $Path $Value $OnTick $OnStatus $ShouldStop
         if ($attempt.Success) { return New-LaunchOutcome 'api' $null }
 
         # Le client de jeu a pu apparaître juste après l'échéance : le chemin historique le tuerait pour le
-        # relancer, et l'utilisateur verrait le jeu s'ouvrir, disparaître, puis s'ouvrir de nouveau
-        if (Test-GameClientRunning) { return New-LaunchOutcome 'api' $null }
+        # relancer, et l'utilisateur verrait le jeu s'ouvrir, disparaître, puis s'ouvrir de nouveau. Fin du chemin
+        # rapide comme après un succès franc : fenêtre Riot repliée (oubliée jusqu'au 2026-09-20)
+        if (Test-GameClientRunning) {
+            Write-LaunchLogLine 'GAME' 'client de jeu apparu après l''échéance — lancement retenu' | Out-Null
+            Complete-LocalApiLaunch
+            return New-LaunchOutcome 'api' $null
+        }
 
         $failure = $attempt.Failure
         Write-LaunchLogLine 'LEGACY' ('reprise en démarrage manuel — cause={0} code={1} étape={2}' -f $failure.Kind, $failure.StatusCode, $failure.Stage) | Out-Null

@@ -1,4 +1,4 @@
-# API locale du Riot Client — relevé du 2026-09-20
+﻿# API locale du Riot Client — relevé du 2026-09-20
 
 Riot Client version 139.0.5.4957, Windows 11, mesures faites sur la machine de développement.
 
@@ -98,3 +98,43 @@ fallait le fermer pour éviter qu'il l'écrase, et ce redémarrage coûtait l'es
 
 Un troisième code d'attente s'est ajouté à `0` et `464` : **`424`**, rendu quand le Riot Client n'a pas encore pris
 acte de la fermeture du client de jeu. Il est transitoire, donc traité comme les autres : on réessaie.
+
+## Complément du 2026-09-20 — fermer le client de jeu par l'API (T22)
+
+Contexte : VAN 216 (Vanguard) revient après des fermetures brutales rapprochées du client de jeu (`Stop-Process`
+pendant que Vanguard y est attaché). `CloseMainWindow` est ignoré par le client. Le swagger expose
+`DELETE /product-session/v1/sessions/{session-id}` — « *Only intended to be called by product launchers, like
+Riot Client.* Handles deleting a session. »
+
+Relevé jeu ouvert, après redémarrage de Windows :
+
+| Étape | Résultat |
+|---|---|
+| `GET /product-session/v1/sessions` | objet clé par identifiant de session : `league_of_legends` (`patchlineId=live`, `phase=None`, locale du lancement dans `launchConfiguration.arguments`) et `host_app` (`riot_client`) |
+| `DELETE /product-session/v1/sessions/{id}` sans corps | **400** `RPC_ERROR` « A value for 'session' is required » — sans effet |
+| `DELETE /product-session/v1/sessions/{id}` avec l'objet session (celui du GET) en corps JSON | **204** en 0,0 s |
+| Client de jeu (`LeagueClient`, `LeagueClientUx`, `LeagueClientUxRender`) | disparu **0,5 s** après le 204 |
+| Riot Client | **quitté** ~1 s après (connexion coupée, aucun process, lockfile périmé), puis **relancé par lui-même en arrière-plan** 2 min 30 plus tard : sans fenêtre, API déchargée (404 partout) |
+
+Ce que ça change pour le lanceur :
+- Fermeture propre en 0,5 s au lieu d'un kill : Vanguard voit un arrêt normal.
+- Plus de session à libérer ensuite : la relance repart d'un démarrage à froid du Riot Client (12,7 s mesurés en T6)
+  au lieu d'attendre 3,5 à 57 s de `424`.
+- L'identifiant de session est aussi le `--riotclient-auth-token` du client de jeu : jamais dans le journal.
+- Le corps attendu est l'objet rendu par le GET : le lanceur le renvoie tel quel, sans le lire ni le construire.
+
+Journal du Riot Client à la réception du DELETE :
+
+```
+riot-client-lifecycle: Checking if we can quit
+riot-client-lifecycle: Running in background is enabled, so not quitting.
+riot-client-lifecycle: Attempting to quit and switch to background mode
+SDK: loyalty-v2: External process DELETE event received. productId: league_of_legends, patchlineId: live
+SDK: product-session: Session for league_of_legends.live terminated with exit code 0
+App: End of MainLoop.
+```
+
+Le jeu se termine avec `exit code 0` (arrêt propre, vu comme tel par Vanguard) ; le Riot Client quitte et se
+relance en arrière-plan — l'état « replié après une partie » que le lanceur sait réveiller (`Restore-RiotClientInterface`,
+T14). Selon l'instant du lancement suivant, le lanceur trouve le Riot Client absent (démarrage à froid) ou replié
+sans API (relance sans argument) : les deux chemins existent déjà.

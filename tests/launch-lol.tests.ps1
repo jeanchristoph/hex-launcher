@@ -156,6 +156,84 @@ Describe 'Stop-GameClientProcesses' {
     }
 }
 
+Describe 'Stop-GameClientByLocalApi' {
+    It 'demande au Riot Client de fermer la session du jeu' {
+        Mock Read-RiotClientLockfile { return [pscustomobject]@{ Port = 4711; Password = 'x' } }
+        Mock Stop-RiotProduct { return $true }
+        Stop-GameClientByLocalApi | Should Be $true
+        Assert-MockCalled Stop-RiotProduct -Scope It -Exactly 1 -ParameterFilter { $ProductId -eq 'league_of_legends' }
+    }
+
+    It 'rend faux sans rien demander quand le lockfile est absent — Riot Client éteint' {
+        Mock Read-RiotClientLockfile { return $null }
+        Mock Stop-RiotProduct { return $true }
+        Stop-GameClientByLocalApi | Should Be $false
+        Assert-MockCalled Stop-RiotProduct -Scope It -Exactly 0
+    }
+}
+
+Describe 'Wait-GameClientExit' {
+    It 'confirme la fermeture dès que le client de jeu a disparu' {
+        Mock Test-GameClientRunning { return $false }
+        Wait-GameClientExit 5 { } | Should Be $true
+    }
+
+    It 'laisse au client de jeu le temps de disparaître' {
+        $script:polls = 0
+        Mock Test-GameClientRunning { $script:polls++; return ($script:polls -lt 3) }
+        Wait-GameClientExit 5 { } | Should Be $true
+        $script:polls | Should Be 3
+    }
+
+    It 'renonce à l''échéance quand le client de jeu reste là' {
+        Mock Test-GameClientRunning { return $true }
+        Wait-GameClientExit 1 { } | Should Be $false
+    }
+}
+
+Describe 'Stop-GameClient' {
+    Mock Write-LaunchLogLine { }
+
+    It 'ne fait rien quand le jeu ne tourne pas' {
+        Mock Test-GameClientRunning { return $false }
+        Mock Stop-GameClientByLocalApi { return $true }
+        Mock Stop-GameClientProcesses { }
+        Stop-GameClient { }
+        Assert-MockCalled Stop-GameClientByLocalApi -Scope It -Exactly 0
+        Assert-MockCalled Stop-GameClientProcesses -Scope It -Exactly 0
+    }
+
+    It 'ferme le jeu par l''API et ne tue rien quand le client disparaît' {
+        Mock Test-GameClientRunning { return $true }
+        Mock Stop-GameClientByLocalApi { return $true }
+        Mock Wait-GameClientExit { return $true }
+        Mock Stop-GameClientProcesses { }
+        Stop-GameClient { }
+        Assert-MockCalled Stop-GameClientProcesses -Scope It -Exactly 0
+        Assert-MockCalled Write-LaunchLogLine -Scope It -Exactly 1 -ParameterFilter { $Step -eq 'GAME' -and $Detail -like 'client de jeu fermé par l''API en *' }
+    }
+
+    It 'tue le client de jeu en dernier recours quand l''API refuse la fermeture' {
+        Mock Test-GameClientRunning { return $true }
+        Mock Stop-GameClientByLocalApi { return $false }
+        Mock Wait-GameClientExit { return $true }
+        Mock Stop-GameClientProcesses { }
+        Stop-GameClient { }
+        Assert-MockCalled Wait-GameClientExit -Scope It -Exactly 0
+        Assert-MockCalled Stop-GameClientProcesses -Scope It -Exactly 1
+    }
+
+    It 'tue le client de jeu quand il survit à une fermeture acceptée' {
+        Mock Test-GameClientRunning { return $true }
+        Mock Stop-GameClientByLocalApi { return $true }
+        Mock Wait-GameClientExit { return $false }
+        Mock Stop-GameClientProcesses { }
+        Stop-GameClient { }
+        Assert-MockCalled Wait-GameClientExit -Scope It -Exactly 1 -ParameterFilter { $TimeoutSeconds -eq $GameClientStopTimeoutSeconds }
+        Assert-MockCalled Stop-GameClientProcesses -Scope It -Exactly 1
+    }
+}
+
 Describe 'Wait-GameClientStart' {
     It 'confirme le lancement dès que le client de jeu est là' {
         Mock Test-GameClientRunning { return $true }
@@ -185,6 +263,24 @@ Describe 'Wait-GameClientStart' {
         Mock Test-GameClientRunning { return $false }
         Mock Get-Date { return [datetime]'2000-01-01' }
         Wait-GameClientStart 1 { } | Should Be $false
+    }
+}
+
+Describe 'Budgets du chemin rapide' {
+    It 'laisse cinq minutes au chemin rapide avant le repli en démarrage manuel' {
+        $LocalApiBudgetSeconds | Should Be 300
+    }
+
+    It 'propose « Forcer en démarrage manuel » à partir d''une minute trente' {
+        $ForceStartButtonDelaySeconds | Should Be 90
+    }
+
+    It 'propose le bouton avant la fin du budget, sinon il ne servirait à rien' {
+        $ForceStartButtonDelaySeconds | Should BeLessThan $LocalApiBudgetSeconds
+    }
+
+    It 'laisse une minute trente au client de jeu pour apparaître après un lancement accepté' {
+        $GameClientStartTimeoutSeconds | Should Be 90
     }
 }
 
@@ -237,6 +333,21 @@ Describe 'Start-LeagueClientByLocalApi' {
         (Start-LeagueClientByLocalApi $riotClient 'ja_JP' { } $null).Success | Should Be $true
         Assert-MockCalled Wait-RiotProductLocale -Scope It -Exactly 1 -ParameterFilter { $Locale -eq 'ja_JP' -and $ProductId -eq 'league_of_legends' -and $PatchlineId -eq 'live' }
         Assert-MockCalled Set-LeagueLocale -Scope It -Exactly 0
+    }
+
+    It 'donne à la demande de lancement une sonde qui reconnaît le client de jeu en marche' {
+        Mock Test-RiotClientRunning { return $true }
+        Mock Start-RiotClient { return $true }
+        Mock Wait-RiotProductLocale { return [pscustomobject]@{ Success = $true; Kind = ''; StatusCode = 201 } }
+        Mock Wait-RiotProductLaunch { return [pscustomobject]@{ Success = $true; Kind = 'probe'; StatusCode = 423 } }
+        Mock Wait-GameClientStart { return $true }
+        Mock Test-GameClientRunning { return $true }
+        Mock Close-RiotClientWindow { return $true }
+        Mock Write-LaunchLogLine { }
+        (Start-LeagueClientByLocalApi $riotClient 'ja_JP' { } $null).Success | Should Be $true
+        Assert-MockCalled Wait-RiotProductLaunch -Scope It -Exactly 1 -ParameterFilter { $null -ne $SuccessProbe -and [bool](& $SuccessProbe) }
+        Assert-MockCalled Write-LaunchLogLine -Scope It -Exactly 1 -ParameterFilter { $Detail -match 'déjà en marche pendant la demande de lancement \(dernier code 423\)' }
+        Assert-MockCalled Close-RiotClientWindow -Scope It -Exactly 1
     }
 
     It 'réutilise la session du Riot Client quand elle tourne déjà, sans la redémarrer' {
@@ -360,6 +471,23 @@ Describe 'Start-LeagueClientByLocalApi' {
         Mock Wait-RiotProductLaunch { return [pscustomobject]@{ Success = $true; Kind = ''; StatusCode = 200 } }
         Mock Wait-GameClientStart { return $false }
         (Start-LeagueClientByLocalApi $riotClient 'ja_JP' { } $null).Success | Should Be $false
+    }
+}
+
+# Describe à part : les mocks de Pester 3 vivent jusqu'à la fin du Describe, et celui de Start-LeagueClient
+# remplace le chemin historique — ici, c'est le vrai qui doit tourner
+Describe 'Start-LeagueClient en démarrage manuel' {
+    It 'ferme le client de jeu comme avant — par les process, sans aucun appel à l''API' {
+        Mock Stop-GameClient { }
+        Mock Stop-RiotProduct { return $true }
+        Mock Stop-RiotProcesses { }
+        Mock Set-LeagueLocale { }
+        Mock Start-Process { }
+        Mock Write-LaunchLogLine { }
+        Start-LeagueClient -Path 'C:\Riot\RiotClientServices.exe' -YamlPath 'C:\yaml' -Value 'ja_JP' -NoLocalApi -OnTick { } | Select-Object -ExpandProperty Outcome | Should Be 'legacy'
+        Assert-MockCalled Stop-RiotProcesses -Scope It -Exactly 1
+        Assert-MockCalled Stop-GameClient -Scope It -Exactly 0
+        Assert-MockCalled Stop-RiotProduct -Scope It -Exactly 0
     }
 }
 
@@ -590,7 +718,7 @@ Describe 'Start-LeagueClientByCommandLine' {
 
 Describe 'Start-LeagueClient' {
     It 'passe par l''API locale et ne touche pas au chemin historique quand tout répond' {
-        Mock Stop-GameClientProcesses { }
+        Mock Stop-GameClient { }
         Mock Start-LeagueClientByLocalApi { return [pscustomobject]@{ Success = $true; Failure = $null } }
         Mock Start-LeagueClientByCommandLine { return $true }
         Start-LeagueClient -Path 'C:\Riot\RiotClientServices.exe' -YamlPath 'C:\yaml' -Value 'ja_JP' -OnTick { } | Select-Object -ExpandProperty Outcome | Should Be 'api'
@@ -598,7 +726,7 @@ Describe 'Start-LeagueClient' {
     }
 
     It 'reprend le chemin historique dès que l''API locale échoue' {
-        Mock Stop-GameClientProcesses { }
+        Mock Stop-GameClient { }
         Mock Start-LeagueClientByLocalApi { return [pscustomobject]@{ Success = $false; Failure = [pscustomobject]@{ Kind = 'timeout'; StatusCode = 464; Stage = 'launch' } } }
         Mock Test-GameClientRunning { return $false }
         Mock Start-LeagueClientByCommandLine { return $true }
@@ -606,17 +734,21 @@ Describe 'Start-LeagueClient' {
         Assert-MockCalled Start-LeagueClientByCommandLine -Scope It -Exactly 1 -ParameterFilter { $Value -eq 'ja_JP' }
     }
 
-    It 'ne tue pas un client de jeu apparu juste après l''échéance' {
-        Mock Stop-GameClientProcesses { }
+    It 'ne tue pas un client de jeu apparu juste après l''échéance, et replie la fenêtre Riot comme après un succès' {
+        Mock Stop-GameClient { }
         Mock Start-LeagueClientByLocalApi { return [pscustomobject]@{ Success = $false; Failure = [pscustomobject]@{ Kind = 'timeout'; StatusCode = 464; Stage = 'launch' } } }
         Mock Test-GameClientRunning { return $true }
         Mock Start-LeagueClientByCommandLine { return $true }
+        Mock Close-RiotClientWindow { return $true }
+        Mock Write-LaunchLogLine { }
         Start-LeagueClient -Path 'C:\Riot\RiotClientServices.exe' -YamlPath 'C:\yaml' -Value 'ja_JP' -OnTick { } | Select-Object -ExpandProperty Outcome | Should Be 'api'
         Assert-MockCalled Start-LeagueClientByCommandLine -Scope It -Exactly 0
+        Assert-MockCalled Close-RiotClientWindow -Scope It -Exactly 1
+        Assert-MockCalled Write-LaunchLogLine -Scope It -Exactly 1 -ParameterFilter { $Detail -match 'fenêtre du Riot Client fermée' }
     }
 
     It 'remonte la cause de l''échec du chemin rapide, pour le journal' {
-        Mock Stop-GameClientProcesses { }
+        Mock Stop-GameClient { }
         Mock Start-LeagueClientByLocalApi { return [pscustomobject]@{ Success = $false; Failure = [pscustomobject]@{ Kind = 'route'; StatusCode = 404; Stage = 'launch' } } }
         Mock Test-GameClientRunning { return $false }
         Mock Start-LeagueClientByCommandLine { return $true }
@@ -628,7 +760,7 @@ Describe 'Start-LeagueClient' {
     }
 
     It 'passe en démarrage manuel quand l''utilisateur force le démarrage, avec la cause pour le journal' {
-        Mock Stop-GameClientProcesses { }
+        Mock Stop-GameClient { }
         Mock Start-LeagueClientByLocalApi { return [pscustomobject]@{ Success = $false; Failure = [pscustomobject]@{ Kind = 'cancelled'; StatusCode = 464; Stage = 'launch' } } }
         Mock Test-GameClientRunning { return $false }
         Mock Start-LeagueClientByCommandLine { return $true }
@@ -639,14 +771,14 @@ Describe 'Start-LeagueClient' {
     }
 
     It 'ne retient aucune cause quand l''API a réussi' {
-        Mock Stop-GameClientProcesses { }
+        Mock Stop-GameClient { }
         Mock Start-LeagueClientByLocalApi { return [pscustomobject]@{ Success = $true; Failure = $null } }
         Mock Start-LeagueClientByCommandLine { return $true }
         (Start-LeagueClient -Path 'C:\Riot\RiotClientServices.exe' -YamlPath 'C:\yaml' -Value 'ja_JP' -OnTick { }).Failure | Should BeNullOrEmpty
     }
 
     It 'signale l''échec quand même le chemin historique ne peut pas démarrer le Riot Client' {
-        Mock Stop-GameClientProcesses { }
+        Mock Stop-GameClient { }
         Mock Start-LeagueClientByLocalApi { return [pscustomobject]@{ Success = $false; Failure = [pscustomobject]@{ Kind = 'timeout'; StatusCode = 464; Stage = 'launch' } } }
         Mock Test-GameClientRunning { return $false }
         Mock Start-LeagueClientByCommandLine { return $false }
@@ -654,17 +786,17 @@ Describe 'Start-LeagueClient' {
     }
 
     It 'prend directement le chemin historique avec -NoLocalApi, sans rien tenter par l''API' {
-        Mock Stop-GameClientProcesses { }
+        Mock Stop-GameClient { }
         Mock Start-LeagueClientByLocalApi { return [pscustomobject]@{ Success = $true; Failure = $null } }
         Mock Start-LeagueClientByCommandLine { return $true }
         Start-LeagueClient -Path 'C:\Riot\RiotClientServices.exe' -YamlPath 'C:\yaml' -Value 'ja_JP' -NoLocalApi -OnTick { } | Select-Object -ExpandProperty Outcome | Should Be 'legacy'
         Assert-MockCalled Start-LeagueClientByLocalApi -Scope It -Exactly 0
-        Assert-MockCalled Stop-GameClientProcesses -Scope It -Exactly 0
+        Assert-MockCalled Stop-GameClient -Scope It -Exactly 0
         Assert-MockCalled Start-LeagueClientByCommandLine -Scope It -Exactly 1
     }
 
     It 'n''interrompt jamais l''installation, même quand rien ne répond' {
-        Mock Stop-GameClientProcesses { }
+        Mock Stop-GameClient { }
         Mock Start-LeagueClientByLocalApi { return [pscustomobject]@{ Success = $false; Failure = [pscustomobject]@{ Kind = 'timeout'; StatusCode = 464; Stage = 'launch' } } }
         Mock Test-GameClientRunning { return $false }
         Mock Start-LeagueClientByCommandLine { return $false }

@@ -1,7 +1,7 @@
 ﻿<#
 .SYNOPSIS
     Tests Pester 3.4 de lib\riot-client-api.lib.ps1 : lockfile du Riot Client, transport WinHTTP sur la boucle
-    locale, attente de session et lancement d'un produit.
+    locale, attente de session, lancement et fermeture d'un produit.
 #>
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $here '..\app\lib\launch-log.lib.ps1')
@@ -119,6 +119,40 @@ Describe 'Invoke-RiotClientRequest' {
         $result.Success    | Should Be $false
         $result.StatusCode | Should Be 0
     }
+
+    It 'journalise le chemin de substitution quand le vrai chemin porte un secret' {
+        Mock Send-WinHttpRequest { return 204 }
+        Mock Write-LaunchLogLine { }
+        Invoke-RiotClientRequest -Method DELETE -Path '/sessions/jeton-secret' -Lockfile (New-TestLockfile) -LoggedPath '/sessions/<session>' | Out-Null
+        Assert-MockCalled Send-WinHttpRequest -Scope It -Exactly 1 -ParameterFilter { $Uri -like '*/sessions/jeton-secret' }
+        Assert-MockCalled Write-LaunchLogLine -Scope It -Exactly 1 -ParameterFilter { $Detail -like '*/sessions/<session>*' -and $Detail -notlike '*jeton-secret*' }
+    }
+}
+
+Describe 'Read-RiotClientResource' {
+    It 'rend le corps de la réponse avec son code' {
+        Mock Invoke-WinHttpRequest { return [pscustomobject]@{ Status = 200; Text = '{"a":1}' } }
+        $result = Read-RiotClientResource -Path '/x' -Lockfile (New-TestLockfile 4711)
+        $result.Success    | Should Be $true
+        $result.StatusCode | Should Be 200
+        $result.Text       | Should Be '{"a":1}'
+        Assert-MockCalled Invoke-WinHttpRequest -Scope It -Exactly 1 -ParameterFilter { $Uri -eq 'https://127.0.0.1:4711/x' -and $Method -eq 'GET' }
+    }
+
+    It 'rend un échec sans corps quand la connexion n''aboutit pas' {
+        Mock Invoke-WinHttpRequest { throw 'connexion interrompue' }
+        $result = Read-RiotClientResource -Path '/x' -Lockfile (New-TestLockfile)
+        $result.Success    | Should Be $false
+        $result.StatusCode | Should Be 0
+        $result.Text       | Should Be ''
+    }
+
+    It 'ne journalise jamais le corps, seulement le chemin et le code' {
+        Mock Invoke-WinHttpRequest { return [pscustomobject]@{ Status = 200; Text = 'remoting-auth-token=secret' } }
+        Mock Write-LaunchLogLine { }
+        Read-RiotClientResource -Path '/x' -Lockfile (New-TestLockfile) | Out-Null
+        Assert-MockCalled Write-LaunchLogLine -Scope It -Exactly 1 -ParameterFilter { $Detail -like 'GET /x -> 200 *' -and $Detail -notlike '*secret*' }
+    }
 }
 
 Describe 'Test-RiotClientRetryableStatus' {
@@ -187,6 +221,68 @@ Describe 'Start-RiotProduct' {
     }
 }
 
+$SessionsCatalog = '{"jeton-du-jeu":{"productId":"league_of_legends","patchlineId":"live","phase":"None"},"host_app":{"productId":"riot_client","phase":"None"}}'
+
+Describe 'Find-RiotProductSession' {
+    It 'relève la session du produit avec son identifiant et son objet à renvoyer tel quel' {
+        Mock Read-RiotClientResource { return [pscustomobject]@{ Success = $true; StatusCode = 200; Text = $SessionsCatalog } }
+        $session = Find-RiotProductSession -ProductId 'league_of_legends' -Lockfile (New-TestLockfile)
+        $session.Id | Should Be 'jeton-du-jeu'
+        ($session.Body | ConvertFrom-Json).patchlineId | Should Be 'live'
+        Assert-MockCalled Read-RiotClientResource -Scope It -Exactly 1 -ParameterFilter { $Path -eq '/product-session/v1/sessions' }
+    }
+
+    It 'rend rien quand le produit n''a pas de session — jeu fermé' {
+        Mock Read-RiotClientResource { return [pscustomobject]@{ Success = $true; StatusCode = 200; Text = '{"host_app":{"productId":"riot_client"}}' } }
+        Find-RiotProductSession -ProductId 'league_of_legends' -Lockfile (New-TestLockfile) | Should BeNullOrEmpty
+    }
+
+    It 'rend rien quand l''API ne répond pas' {
+        Mock Read-RiotClientResource { return [pscustomobject]@{ Success = $false; StatusCode = 0; Text = '' } }
+        Find-RiotProductSession -ProductId 'league_of_legends' -Lockfile (New-TestLockfile) | Should BeNullOrEmpty
+    }
+
+    It 'rend rien sans lever d''exception quand la réponse n''est pas du JSON' {
+        Mock Read-RiotClientResource { return [pscustomobject]@{ Success = $true; StatusCode = 200; Text = '<html>' } }
+        { Find-RiotProductSession -ProductId 'league_of_legends' -Lockfile (New-TestLockfile) } | Should Not Throw
+        Find-RiotProductSession -ProductId 'league_of_legends' -Lockfile (New-TestLockfile) | Should BeNullOrEmpty
+    }
+}
+
+Describe 'Remove-RiotProductSession' {
+    $session = [pscustomobject]@{ Id = 'jeton-du-jeu'; Body = '{"productId":"league_of_legends"}' }
+
+    It 'envoie le DELETE sur la session, son objet en corps, sans que l''identifiant aille au journal' {
+        Mock Invoke-RiotClientRequest { return [pscustomobject]@{ Success = $true; StatusCode = 204 } }
+        (Remove-RiotProductSession -Session $session -Lockfile (New-TestLockfile)).Success | Should Be $true
+        Assert-MockCalled Invoke-RiotClientRequest -Scope It -Exactly 1 -ParameterFilter {
+            $Method -eq 'DELETE' -and $Path -eq '/product-session/v1/sessions/jeton-du-jeu' -and $Body -eq '{"productId":"league_of_legends"}' -and $LoggedPath -eq '/product-session/v1/sessions/<session>'
+        }
+    }
+}
+
+Describe 'Stop-RiotProduct' {
+    It 'ferme le produit quand sa session existe et que le Riot Client accepte' {
+        Mock Read-RiotClientResource { return [pscustomobject]@{ Success = $true; StatusCode = 200; Text = $SessionsCatalog } }
+        Mock Invoke-RiotClientRequest { return [pscustomobject]@{ Success = $true; StatusCode = 204 } }
+        Stop-RiotProduct -ProductId 'league_of_legends' -Lockfile (New-TestLockfile) | Should Be $true
+        Assert-MockCalled Invoke-RiotClientRequest -Scope It -Exactly 1 -ParameterFilter { $Method -eq 'DELETE' }
+    }
+
+    It 'rend faux sans rien envoyer quand le produit n''a pas de session' {
+        Mock Read-RiotClientResource { return [pscustomobject]@{ Success = $true; StatusCode = 200; Text = '{}' } }
+        Mock Invoke-RiotClientRequest { return [pscustomobject]@{ Success = $true; StatusCode = 204 } }
+        Stop-RiotProduct -ProductId 'league_of_legends' -Lockfile (New-TestLockfile) | Should Be $false
+        Assert-MockCalled Invoke-RiotClientRequest -Scope It -Exactly 0
+    }
+
+    It 'rend faux quand le Riot Client refuse la fermeture' {
+        Mock Read-RiotClientResource { return [pscustomobject]@{ Success = $true; StatusCode = 200; Text = $SessionsCatalog } }
+        Mock Invoke-RiotClientRequest { return [pscustomobject]@{ Success = $false; StatusCode = 400 } }
+        Stop-RiotProduct -ProductId 'league_of_legends' -Lockfile (New-TestLockfile) | Should Be $false
+    }
+}
+
 Describe 'Wait-RiotClientOperation' {
     AfterEach { Remove-TestTempFiles }
 
@@ -216,6 +312,54 @@ Describe 'Wait-RiotClientOperation' {
             return [pscustomobject]@{ Success = $false; StatusCode = 464 }
         } -FailureMessage 'essai' -LockfilePath $path -TimeoutSeconds 5 -OnTick { } | Select-Object -ExpandProperty Success | Should Be $true
         $script:attempts | Should Be 3
+    }
+
+    It 'tient l''opération pour acquise dès que la sonde de succès le dit, sans aucune requête' {
+        $path = New-TempLockfile
+        $script:attempts = 0
+        $result = Wait-RiotClientOperation -Operation { param($Lockfile) $script:attempts++; [pscustomobject]@{ Success = $false; StatusCode = 423 } } `
+            -FailureMessage 'essai' -LockfilePath $path -TimeoutSeconds 5 -OnTick { } -SuccessProbe { $true }
+        $result.Success | Should Be $true
+        $result.Kind | Should Be 'probe'
+        $script:attempts | Should Be 0
+    }
+
+    It 'arrête d''insister sur un 423 dès que la sonde voit le produit lancé (demande expirée côté client)' {
+        $path = New-TempLockfile
+        $script:attempts = 0
+        $result = Wait-RiotClientOperation -Operation {
+            param($Lockfile)
+            $script:attempts++
+            if ($script:attempts -eq 1) { return [pscustomobject]@{ Success = $false; StatusCode = 0 } }
+            return [pscustomobject]@{ Success = $false; StatusCode = 423 }
+        } -FailureMessage 'essai' -LockfilePath $path -TimeoutSeconds 5 -OnTick { } -SuccessProbe { $script:attempts -ge 2 }
+        $result.Success | Should Be $true
+        $result.Kind | Should Be 'probe'
+        $result.StatusCode | Should Be 423
+        $script:attempts | Should Be 2
+    }
+
+    It 'garde le comportement d''attente quand la sonde reste fausse' {
+        $path = New-TempLockfile
+        $script:attempts = 0
+        $result = Wait-RiotClientOperation -Operation {
+            param($Lockfile)
+            $script:attempts++
+            if ($script:attempts -ge 2) { return [pscustomobject]@{ Success = $true; StatusCode = 200 } }
+            return [pscustomobject]@{ Success = $false; StatusCode = 423 }
+        } -FailureMessage 'essai' -LockfilePath $path -TimeoutSeconds 5 -OnTick { } -SuccessProbe { $false }
+        $result.Success | Should Be $true
+        $result.Kind | Should Be ''
+        $script:attempts | Should Be 2
+    }
+
+    It 'consulte la sonde une dernière fois quand le budget est épuisé' {
+        $path = New-TempLockfile
+        $script:attempts = 0
+        $result = Wait-RiotClientOperation -Operation { param($Lockfile) $script:attempts++; Start-Sleep -Milliseconds 1200; [pscustomobject]@{ Success = $false; StatusCode = 423 } } `
+            -FailureMessage 'essai' -LockfilePath $path -TimeoutSeconds 1 -OnTick { } -SuccessProbe { $script:attempts -ge 1 } 3>$null
+        $result.Success | Should Be $true
+        $result.Kind | Should Be 'probe'
     }
 
     It 'renonce sans attendre sur un refus définitif, pour rendre la main au repli' {
@@ -338,6 +482,15 @@ Describe 'Wait-RiotProductLaunch' {
         Mock Start-RiotProduct { return [pscustomobject]@{ Success = $true; StatusCode = 200 } }
         Wait-RiotProductLaunch -ProductId 'league_of_legends' -PatchlineId 'live' -LockfilePath $path -TimeoutSeconds 5 -OnTick { } | Select-Object -ExpandProperty Success | Should Be $true
         Assert-MockCalled Start-RiotProduct -Scope It -Exactly 1 -ParameterFilter { $ProductId -eq 'league_of_legends' -and $PatchlineId -eq 'live' }
+    }
+
+    It 'transmet la sonde de succès : un produit déjà lancé n''est pas redemandé' {
+        $path = New-TempLockfile
+        Mock Start-RiotProduct { return [pscustomobject]@{ Success = $false; StatusCode = 423 } }
+        $result = Wait-RiotProductLaunch -ProductId 'league_of_legends' -PatchlineId 'live' -LockfilePath $path -TimeoutSeconds 5 -OnTick { } -SuccessProbe { $true }
+        $result.Success | Should Be $true
+        $result.Kind | Should Be 'probe'
+        Assert-MockCalled Start-RiotProduct -Scope It -Exactly 0
     }
 
     It 'réessaie tant que le Riot Client n''a pas pris acte de la fermeture du client de jeu' {

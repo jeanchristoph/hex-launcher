@@ -256,7 +256,9 @@ The Riot Client's "Language" setting only changes the launcher, not the game. Th
 from `settings.locale` in `product_settings.yaml`, which the Riot Client rewrites every time it closes.
 So the launcher does, in order:
 
-1. Close the game client if it is running. The Riot Client is left alone — and started if it is not running.
+1. Close the game client if it is running — through the Riot Client's local API, which ends the game session
+   cleanly (killing the process while Vanguard is attached to it is what triggers VAN 216 after a few quick
+   restarts); killing it is the last resort. The Riot Client is started if it is not running.
 2. Set the language through the Riot Client's local API, so that it writes `settings.locale` itself
    (writing that file behind its back does not hold: it rewrites it from memory within seconds).
 3. Ask it for the game through the same API — what the **Play** button does — then check that the game
@@ -264,12 +266,12 @@ So the launcher does, in order:
 4. Otherwise the manual start takes over: all Riot processes closed, `settings.locale` rewritten
    (`default_locale`, managed by Riot, is never touched), relaunch with `--launch-product`, and you press
    **Play** in the Riot Client yourself: the launcher never fails hard. `-NoLocalApi` forces that manual start.
-   When the wait drags on (more than 15 s), the splash offers **Force manual start**: one click switches to the
+   When the wait drags on (more than 1 min 30), the splash offers **Force manual start**: one click switches to the
    manual start for this launch only — nothing is remembered.
 5. Close the other companion apps of `config.json`, then start the one named by `-Companion`, if any.
 
 The launcher keeps no memory: the direct launch is attempted every time. If it keeps failing on your machine,
-tick "Manual start — press Play in Riot" in `setup.bat` — the launcher then goes straight to it.
+tick "Manual start" (Riot compatibility section) in `setup.bat` — the launcher then goes straight to it.
 
 ## Built with claude_forge
 

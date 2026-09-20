@@ -469,7 +469,9 @@ function New-SetupFooter($Layout) {
 
 function New-SetupWindow {
     $state    = $script:InstallState
-    $form     = New-ThemedForm (Get-SetupWindowTitle) 800 620 (Get-SetupWindowIconPath)
+    # 680 px de haut : la section « Compatibilité Riot » (titre, case, note) tient au-dessus du journal, et la
+    # fenêtre reste dans un écran 768 px
+    $form     = New-ThemedForm (Get-SetupWindowTitle) 800 680 (Get-SetupWindowIconPath)
     $layout   = Get-SetupLayout $form.ClientSize.Width $form.ClientSize.Height
     $controls = $state.Controls
     $controls.PageTitle = New-ThemedTitle '' $layout.ContentLeft 24 $layout.ContentWidth
@@ -800,15 +802,13 @@ function New-SetupShortcutsControls {
     $controls.CompanionList = New-SetupCheckedList (Get-ShortcutCompanionListItems $companionApps) (Get-SetupPreselection 'CompanionList' (Get-PreselectedShortcutCompanionIds $companionApps $state.ExistingShortcuts)) $rightColumn $columnsTop $columnWidth $companionHeight
     $controls.IconSetList   = New-SetupIconSetList $state.IconSets (Get-SetupPreselectedIconSetName $state) $rightColumn ($iconSetsTop + 24) ($columnWidth - $previewSize - 12) $iconListHeight
     $controls.IconSetPreview = New-ThemedPicture ($rightColumn + $columnWidth - $previewSize) ($iconSetsTop + 24) $previewSize
-    # Pleine largeur sous les deux colonnes : le libellé dit quand cocher la case, et cette explication ne tient
-    # pas dans une demi-colonne — la tronquer priverait la case de ce qui la rend utilisable
-    $legacyTop      = 350
-    $logTop         = $legacyTop + 34
-    # Note sous la liste des jeux (jeux externes), dans l'espace qui reste au-dessus de la case
+    # Section « Compatibilité Riot » en pleine largeur sous les deux colonnes, le journal dessous
+    $compatibility  = Get-SetupRiotCompatibilityLayout 350
+    # Note sous la liste des jeux (jeux externes), dans l'espace qui reste au-dessus de la section
     $noteTop        = $iconSetsTop + 24 + $iconListHeight + 2
-    $controls.IconSetNote   = New-ThemedLabel '' $rightColumn $noteTop $columnWidth ([Math]::Max(28, $legacyTop - $noteTop)) 'Muted' 8.25
-    $controls.LegacyLaunchBox = New-SetupLegacyLaunchBox $state 0 $legacyTop $layout.ContentWidth
-    $controls.Log           = New-ThemedLog 0 $logTop $layout.ContentWidth ($layout.ContentHeight - $logTop)
+    $controls.IconSetNote   = New-ThemedLabel '' $rightColumn $noteTop $columnWidth ([Math]::Max(28, $compatibility.TitleTop - $noteTop)) 'Muted' 8.25
+    $controls.LegacyLaunchBox = New-SetupLegacyLaunchBox $state 0 $compatibility.BoxTop $layout.ContentWidth
+    $controls.Log           = New-ThemedLog 0 $compatibility.LogTop $layout.ContentWidth ($layout.ContentHeight - $compatibility.LogTop)
     $controls.Inputs        = @($controls.LocaleList, $controls.CompanionList, $controls.IconSetList)
     $controls.IconSetList.Add_SelectedIndexChanged({ Invoke-SetupSafely { Update-SetupIconSetPreview } })
     Update-SetupIconSetPreview
@@ -822,9 +822,20 @@ function New-SetupShortcutsControls {
         $controls.IconSetList
         $controls.IconSetPreview
         $controls.IconSetNote
+        (New-ThemedLabel (Get-Text 'setup.shortcuts.riotCompatibility') 0 $compatibility.TitleTop $layout.ContentWidth 22 'Gold' 10 'Bold')
         $controls.LegacyLaunchBox
+        (New-ThemedLabel (Get-Text 'setup.shortcuts.legacyLaunchHint') 0 $compatibility.HintTop $layout.ContentWidth $compatibility.HintHeight 'Muted' 8.25)
         $controls.Log
     )
+}
+
+# Section « Compatibilité Riot », pleine largeur au-dessus du journal : titre doré comme les autres sections,
+# la case, puis une note qui dit quand la cocher et ce qui se passe alors — l'explication ne tient pas dans
+# une demi-colonne, la tronquer priverait la case de ce qui la rend utilisable
+function Get-SetupRiotCompatibilityLayout([int]$Top) {
+    $boxTop  = $Top + 24
+    $hintTop = $boxTop + 26
+    return @{ TitleTop = $Top; BoxTop = $boxTop; HintTop = $hintTop; HintHeight = 34; LogTop = $hintTop + 34 + 6 }
 }
 
 # Case décochée par défaut : le lancement direct est le comportement normal, la case est le recours quand il

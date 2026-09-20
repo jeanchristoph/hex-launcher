@@ -35,11 +35,15 @@ mot de passe, endpoint de lancement de produit). Le bouton Play reste un repli f
   et non quitter : après une partie, `RiotClientServices` reste seul, sans interface — c'est l'état où la route
   de la langue répond 404.
 - Vocabulaire utilisateur : le chemin de repli s'appelle « démarrage manuel » partout (splash, journal, README) —
-  ce qui reste à faire, c'est appuyer sur Jouer dans le Riot Client. Case de l'assistant : « Démarrage manuel —
-  appuyer sur Jouer dans Riot » ; bouton du splash : « Forcer en démarrage manuel ». Jamais « mode de secours »,
+  ce qui reste à faire, c'est appuyer sur Jouer dans le Riot Client. Case de l'assistant : « Démarrage manuel »
+  sous le titre « Compatibilité Riot », note dessous (texte validé le 2026-09-20) ; bouton du splash : « Forcer en démarrage manuel ». Jamais « mode de secours »,
   « lancement classique » ni « chemin historique » (règle utilisateur, 2026-09-20, révisée le même jour). `legacy`
   reste l'identifiant de code.
 - Nom de produit : « Hex Launcher » (deux mots, L majuscule) dans tout texte lu par l'utilisateur — README, LISEZMOI, titres de fenêtre, infobulles, release. `hex-launcher` reste le nom du dépôt, de l'archive, des dossiers et des fichiers (règle utilisateur, 2026-09-20).
+- Fermeture du client de jeu : par l'API du Riot Client (`DELETE` de la session, arrêt propre pour Vanguard) sur
+  le chemin rapide seulement ; le kill reste le repli si l'API ne ferme pas. En démarrage manuel (case de
+  l'assistant, `-NoLocalApi`), fonctionnement d'avant — kill des process, aucun appel d'API (règle utilisateur,
+  2026-09-20).
 - L'utilisateur ne doit jamais avoir à ouvrir `config.json` : tout réglage qu'il peut avoir à corriger se corrige
   dans l'assistant (règle utilisateur, 2026-09-20).
 - Jamais de lancement réel du jeu ni de kill de process Riot en série par Claude : un essai réel = une demande

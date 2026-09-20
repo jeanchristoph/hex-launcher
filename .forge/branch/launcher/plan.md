@@ -252,6 +252,57 @@ dossier du projet comme répertoire courant, où `app\ico\…` existe. Depuis `C
 relative rend un carré vide : le format .lnk n'a pas de repli relatif pour l'icône, seulement pour la cible. Décision de
 l'utilisateur : pas de raccourci dans l'archive. `New-ReleaseSetupShortcut`, ses tests et la mention README retirés.
 
+### T20 — Bug : jeu lancé mais boucle qui insiste (423), fenêtre Riot non repliée
+**Effort:** S
+**Files:** `app/lib/riot-client-api.lib.ps1`, `app/launch-lol.ps1`, `tests/riot-client-api.lib.tests.ps1`, `tests/launch-lol.tests.ps1`
+**Description:** Journal du 2026-09-20 15:45 : Riot replié, réveillé en 4 s, langue posée, puis `POST product-launcher`
+→ code 0 après 7,1 s (délai WinHTTP) alors que Riot a exécuté la demande ; toutes les tentatives suivantes → 423
+(« un client de jeu tourne » — le nôtre) jusqu'au bout des 60 s. La garde tardive de `Start-LeagueClient` concluait
+`api` mais sautait le repli de la fenêtre Riot. Correctif : `Wait-RiotClientOperation -SuccessProbe` (sonde évaluée
+avant chaque tentative et une dernière fois au budget épuisé ; vraie → `Kind = 'probe'`), transmise par
+`Wait-RiotProductLaunch` ; le lanceur passe `Test-GameClientRunning`. `Complete-LocalApiLaunch` (repli de la fenêtre)
+appelée aussi par la garde tardive. Délai de 7 s inchangé : la sonde couvre le cas.
+[x] 2026-09-20 — sonde de succès, journal `GAME client de jeu déjà en marche pendant la demande (dernier code N)`,
+garde tardive complète ; 8 tests ; 644 verts. Essai réel à faire par l'utilisateur au prochain lancement (scénario :
+Riot replié après une partie).
+
+### T22 — Fermeture propre du client de jeu par l'API du Riot Client
+**Effort:** M
+**Files:** `app/lib/riot-client-api.lib.ps1`, `app/launch-lol.ps1`, `tools/probe-riot-client-api.ps1`, tests, `output/`
+**Description:** VAN 216 revient après des fermetures brutales rapprochées du client de jeu (`Stop-Process` pendant
+que Vanguard y est attaché : ~15 cycles le matin, 4 lancements en 3 min l'après-midi). `CloseMainWindow` a été
+essayé le 2026-09-20 02:15 et ignoré par le client ; l'API du Riot Client n'a jamais été sollicitée pour fermer.
+Sonder `GET /product-session/v1/sessions` (lecture seule) pour relever l'identifiant de session du jeu, puis
+**un** essai réel à la main de l'utilisateur, après redémarrage de Windows, jeu ouvert : `DELETE` sur cette session.
+Ferme le jeu en quelques secondes → le lanceur l'utilise avant `Stop-Process` (dernier recours après échéance), et
+mesure si la session Riot est libérée sans les 3,5–57 s d'attente (424). Sinon → tâche close, kill conservé.
+T21 (ne pas relancer un jeu déjà dans la bonne langue) proposée et écartée par l'utilisateur.
+[x] 2026-09-20 — essai réel : DELETE (objet session en corps, sinon 400) → 204, jeu fermé en 0,5 s avec exit code 0,
+Riot Client quitté puis relancé seul en arrière-plan (état T14, déjà couvert). Lanceur : `Stop-GameClient` (API puis
+kill en dernier recours, attente 5 s), lib : `Read-RiotClientResource`, `Find/Remove-RiotProductSession`,
+`Stop-RiotProduct`, `-LoggedPath` (id de session = jeton du jeu, jamais journalisé) ; README ×3, project.md ; 665 verts
+
+### T23 — Budgets rallongés : 5 min avant repli, « Forcer » dès 1 min 30
+**Effort:** S
+**Files:** `app/launch-lol.ps1`, `tests/launch-lol.tests.ps1`, README ×3
+**Description:** Sur le poste de l'utilisateur, un lancement approche la minute : `$LocalApiBudgetSeconds` 60 → 300,
+`$ForceStartButtonDelaySeconds` 15 → 90, `$GameClientStartTimeoutSeconds` 30 → 90 (l'apparition du client est l'étape
+qui souffre le plus d'un disque lent). Commentaires des constantes et en-tête du lanceur réalignés, mention
+« plus de 15 s » des README ×3 → 1 min 30. Tests des seuils mis à jour. Demande de l'utilisateur (2026-09-20), après T22.
+[x] 2026-09-20 — trois seuils posés (300 / 90 / 90), en-tête du lanceur, README ×3, arbre de décision d'OUTPUT ;
+tests des seuils + test « démarrage manuel = kill des process, aucun appel d'API » (règle utilisateur) ; 670 verts
+
+### T24 — Section « Compatibilité Riot » dans l'assistant
+**Effort:** S
+**Files:** `app/setup.ps1`, `app/i18n/{fr,en,ja}.json`, `tests/setup.tests.ps1`, README ×3
+**Description:** Page Raccourcis : titre doré « Compatibilité Riot », case « Démarrage manuel » (libellé raccourci,
+règle utilisateur), note grise dessous : « Si le lancement automatisé ne fonctionne pas : vos paramètres sont appliqués
+(langue, appli compagnon), le client Riot s'ouvre et vous devez appuyer sur « Jouer ». » — texte validé mot à mot par
+l'utilisateur avant traduction. Fenêtre 620 → 680 px pour garder le journal. `Get-SetupRiotCompatibilityLayout` (pure,
+testée). Option C retenue parmi trois (libellé enrichi, note seule, section). Demande de l'utilisateur (2026-09-20).
+[x] 2026-09-20 — section en place, deux clés i18n ×3, « lancement direct » → « lancement automatisé » dans le journal
+de l'assistant, README ×3 (case) ; 674 verts. À voir dans setup.bat par l'utilisateur.
+
 ## Risks
 - Endpoint non documenté par Riot : relevé sur `swagger/v3/openapi.json` à l'exécution, et le repli rend l'échec non bloquant.
 - `ServerCertificateValidationCallback` est global à .NET : posé puis restauré dans un `finally`.
@@ -283,4 +334,8 @@ None
 | T17 — Chemins Riot modifiables dans l'assistant | M | [x] |
 | T18 — Raccourci « Hex Launcher » sur le Bureau | S | [x] |
 | T19 — Raccourci relatif « Hex Launcher » dans l'archive | S | [!] retirée le 2026-09-20 — l'icône d'un .lnk ne peut pas être relative |
+| T20 — Bug : 423 après demande expirée, fenêtre Riot non repliée | S | [x] |
+| T22 — Fermeture propre du client de jeu par l'API | M | [x] |
+| T23 — Budgets 5 min / « Forcer » à 1 min 30 | S | [x] |
+| T24 — Section « Compatibilité Riot » dans l'assistant | S | [x] |
 | **Total** | **~L (5-8 h)** | |
