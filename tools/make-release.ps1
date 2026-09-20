@@ -15,13 +15,20 @@
     avec le zip en pièce jointe (nécessite gh authentifié et un tag non existant). Les notes de release se
     terminent par l'empreinte SHA-256 du zip, pour que chacun puisse vérifier son téléchargement (Get-FileHash).
 
+    Les notes viennent de -Notes (texte) ou de -NotesFile (fichier Markdown, prioritaire). Elles sont toujours
+    remises à gh par un fichier (dist\release-notes-v<version>.md, conservé à côté du zip) : passées en argument,
+    PowerShell 5.1 les tronque au premier guillemet double — la release 0.2.0 est partie avec 558 caractères
+    sur 5 900 (2026-09-20), réparée à la main par `gh release edit --notes-file`.
+
 .EXAMPLE
     powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-release.ps1
     powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-release.ps1 -Publish -Notes "Première version"
+    powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-release.ps1 -Publish -NotesFile .forge\branch\launcher\output\20260920-release-notes-0-2-0.md
 #>
 param(
     [switch]$Publish,
-    [string]$Notes = ''
+    [string]$Notes = '',
+    [string]$NotesFile = ''
 )
 
 $ReleaseRootFiles = @('setup.bat', 'LISEZMOI.txt', 'LICENSE', 'README.md', 'README.fr.md', 'README.ja.md')
@@ -91,9 +98,25 @@ function Format-ReleaseNotes([string]$Notes, [string]$Zip) {
     return ($lines -join "`n")
 }
 
+# Notes de la release : le texte de -Notes, ou le contenu de -NotesFile s'il est donné (lu en UTF-8)
+function Read-ReleaseNotes([string]$Notes, [string]$NotesFile) {
+    if ([string]::IsNullOrWhiteSpace($NotesFile)) { return $Notes }
+    if (-not (Test-Path $NotesFile)) { throw "Fichier de notes introuvable : $NotesFile" }
+    return (Get-Content -Path $NotesFile -Raw -Encoding UTF8)
+}
+
+# Les notes formatées, écrites à côté du zip : c'est ce fichier que gh publie, jamais un argument de ligne de
+# commande (troncature au premier guillemet sous PowerShell 5.1). UTF-8 sans BOM, fins de ligne LF : GitHub les rend tels quels
+function Write-ReleaseNotesFile([string]$ReleaseNotes, [string]$Zip, [string]$Version) {
+    $path = Join-Path (Split-Path $Zip -Parent) "release-notes-v$Version.md"
+    [IO.File]::WriteAllText($path, (Format-ReleaseNotes $ReleaseNotes $Zip) + "`n", (New-Object Text.UTF8Encoding($false)))
+    return $path
+}
+
 function Publish-Release([string]$Version, [string]$Zip, [string]$ReleaseNotes) {
     $tag = "v$Version"
-    & gh release create $tag $Zip --title "Hex Launcher $tag" --notes (Format-ReleaseNotes $ReleaseNotes $Zip)
+    $notesFile = Write-ReleaseNotesFile $ReleaseNotes $Zip $Version
+    & gh release create $tag $Zip --title "Hex Launcher $tag" --notes-file $notesFile
     if ($LASTEXITCODE -ne 0) { throw "gh release create a échoué (code $LASTEXITCODE)" }
     return $tag
 }
@@ -108,7 +131,7 @@ if ($MyInvocation.InvocationName -ne '.') {
         $zip = New-ReleaseArchive $staging $version (Join-Path $root 'dist')
         "Archive : $zip ($([math]::Round((Get-Item $zip).Length / 1KB)) Ko)"
         "SHA-256 : $(Get-ReleaseChecksum $zip)"
-        if ($Publish) { "Release publiée : $(Publish-Release $version $zip $Notes)" }
+        if ($Publish) { "Release publiée : $(Publish-Release $version $zip (Read-ReleaseNotes $Notes $NotesFile))" }
     }
     finally { Remove-Item $staging -Recurse -Force -ErrorAction SilentlyContinue }
 }

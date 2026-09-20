@@ -398,6 +398,17 @@ première requête envoyée à une API absente. `$RiotClientInterfaceTimeoutSeco
 exécutable introuvable ; tests réécrits ; notes de release : Known limits 1 retirée, sans limite + croix + motif du 424 ;
 716 verts.
 
+### T34 — make-release : notes de release remises par fichier
+**Effort:** S
+**Files:** `tools/make-release.ps1`, `tests/make-release.tests.ps1`
+**Description:** Les notes de la release 0.2.0 sont parties tronquées (558 caractères sur 5 900) : passées en argument
+`--notes "<texte>"`, PowerShell 5.1 coupe au premier guillemet double. Réparé à la main (`gh release edit --notes-file`).
+`Publish-Release` écrit désormais les notes formatées dans `distelease-notes-v<version>.md` (UTF-8 sans BOM, LF,
+conservé à côté du zip) et appelle `gh release create … --notes-file`. Nouveau `-NotesFile <chemin>` (prioritaire sur
+`-Notes`). Tests : fichier écrit avec guillemets et retours intacts, lecture du fichier, `gh` reçoit `--notes-file`.
+[x] 2026-09-20 — `Read-ReleaseNotes`, `Write-ReleaseNotesFile`, `--notes-file` ; 4 tests ; archive reconstruite sans
+publier (SHA-256 identique) ; 719 verts.
+
 ## Risks
 - Endpoint non documenté par Riot : relevé sur `swagger/v3/openapi.json` à l'exécution, et le repli rend l'échec non bloquant.
 - `ServerCertificateValidationCallback` est global à .NET : posé puis restauré dans un `finally`.
@@ -442,4 +453,5 @@ None
 | T31 — Plus de limite d'attente (lancement, client de jeu) | S | [x] |
 | T32 — Croix de fermeture sur le splash | S | [x] |
 | T33 — Réveil de Riot sans limite, relance périodique | S | [x] |
+| T34 — make-release : notes par fichier | S | [x] |
 | **Total** | **~L (5-8 h)** | |

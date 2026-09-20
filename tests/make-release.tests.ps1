@@ -74,5 +74,36 @@ Describe 'New-ReleaseStaging et New-ReleaseArchive' {
         (Format-ReleaseNotes '' $zip) | Should Match '^SHA-256'
     }
 
+    It 'écrit les notes dans un fichier à côté du zip, guillemets et retours à la ligne intacts, sans BOM' {
+        $zip   = Join-Path $parent 'dist\hex-launcher-0.0.1.zip'
+        $notes = "## Title`n`nA `"quoted`" word, then a line break.`n- item"
+        $path  = Write-ReleaseNotesFile $notes $zip '0.0.1'
+        (Split-Path $path -Leaf) | Should Be 'release-notes-v0.0.1.md'
+        $bytes = [IO.File]::ReadAllBytes($path)
+        ($bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB) | Should Be $false
+        $written = [IO.File]::ReadAllText($path)
+        $written | Should Match '^## Title'
+        $written | Should Match 'A "quoted" word, then a line break\.'
+        $written | Should Match "SHA-256 of ``hex-launcher-0\.0\.1\.zip``"
+    }
+
+    It 'lit les notes depuis le fichier quand -NotesFile est donné, sinon prend le texte' {
+        $file = Join-Path $parent 'notes.md'
+        [IO.File]::WriteAllText($file, "Depuis le fichier `"avec guillemets`"", (New-Object Text.UTF8Encoding($false)))
+        Read-ReleaseNotes 'texte' $file | Should Match '^Depuis le fichier "avec guillemets"'
+        Read-ReleaseNotes 'texte' ''    | Should Be 'texte'
+        { Read-ReleaseNotes 'texte' (Join-Path $parent 'absent.md') } | Should Throw
+    }
+
+    It 'remet les notes à gh par --notes-file, jamais en argument' {
+        $zip = Join-Path $parent 'dist\hex-launcher-0.0.1.zip'
+        $script:ghArgs = @()
+        function gh { $script:ghArgs = $args; $global:LASTEXITCODE = 0 }
+        Publish-Release '0.0.1' $zip 'notes' | Should Be 'v0.0.1'
+        ($script:ghArgs -join ' ') | Should Match '--notes-file '
+        ($script:ghArgs -join ' ') | Should Not Match '--notes '
+        ($script:ghArgs -contains 'release') | Should Be $true
+    }
+
     Remove-Item $parent -Recurse -Force -ErrorAction SilentlyContinue
 }

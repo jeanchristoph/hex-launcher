@@ -1,5 +1,9 @@
 ﻿# Log — launcher
 
+- [2026-09-20 21:40] Notes de la release v0.2.0 tronquées à 558 caractères (guillemet double dans un argument natif, PowerShell 5.1) — réparées par `gh release edit --notes-file` (5 904 car.). T34 : make-release passe par `--notes-file` + `-NotesFile`, 4 tests. Non gravé.
+- [2026-09-20 21:20] Message d'annonce 0.2.0 pour les amis (FR, ton décontracté, texte validé) écrit dans output/20260920-release-announcement-friends.md. includeIf gitdir:D:/www/perso/ → ~/.gitconfig-perso posé dans le global, vérifié sur un dépôt neuf.
+- [2026-09-20 21:00] Adresse git de ce dépôt passée en perso (jeanchristophe.malaval@gmail.com, .git/config seul ; global pro inchangé) : le second « contributeur » GitHub venait des 37 commits signés malaval@topdata.fr, non vérifiée sur le compte. Historique non réécrit (tags/releases).
+- [2026-09-20 20:50] Gravé 1234734 (T25 → T33) sur launcher, fusionné dev + master, poussé. Release GitHub v0.2.0 publiée : hex-launcher-0.2.0.zip (5,6 Mo), SHA-256 e74170ec…9d695, notes d'OUTPUT.
 - [2026-09-20 20:40] T32 (croix ✕ du splash, arrêt sans démarrage manuel) et T33 (réveil de Riot sans limite, relance à 5 s puis toutes les 30 s) terminées ; notes de release mises à jour (Known limits 1 retirée). 716 verts. Plus aucune échéance ne mène au démarrage manuel : seuls un refus franc de l'API, « Forcer » ou la croix. Non gravé : T25 → T33.
 - [2026-09-20 20:10] T28 terminée (711 verts). Correction d'une réponse fausse à l'utilisateur : le réveil de Riot à 30 s mène bien au démarrage manuel par un faux 404 quand la fenêtre ne revient pas ; T33 (réveil sans limite, relance toutes les 30 s) validée, ainsi que T32 (croix d'arrêt sur le splash, sans démarrage manuel).
 - [2026-09-20 20:00] T31 terminée : budgets du lancement direct et de l'apparition du client de jeu à ∞ (« faire péter les limites », « 24 h est idiot ») ; tableau de toutes les limites présenté, les autres gardées. 700 verts.
