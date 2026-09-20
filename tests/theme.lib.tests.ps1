@@ -70,11 +70,25 @@ Describe 'New-ThemedComboBox' {
 }
 
 Describe 'New-ThemedCheckBox' {
-    It 'se remplit d''or sombre une fois cochée, liseré or' {
+    It 'garde le carré natif de Windows, pour qu''une case décochée reste blanche' {
         $box = New-ThemedCheckBox 'Option' 0 0 200
-        $box.FlatStyle | Should Be 'Flat'
-        $box.FlatAppearance.CheckedBackColor.ToArgb() | Should Be ((Get-ThemeColor 'GoldDark').ToArgb())
-        $box.FlatAppearance.BorderColor.ToArgb() | Should Be ((Get-ThemeColor 'Gold').ToArgb())
+        $box.FlatStyle | Should Be 'Standard'
+    }
+
+    It 'dessine un carré blanc tant que la case n''est pas cochée' {
+        $box = New-ThemedCheckBox 'Option' 0 0 200
+        $bitmap = New-Object Drawing.Bitmap(200, 26)
+        try {
+            $box.DrawToBitmap($bitmap, (New-Object Drawing.Rectangle(0, 0, 200, 26)))
+            $pixel = $bitmap.GetPixel(6, 13)
+            "$($pixel.R),$($pixel.G),$($pixel.B)" | Should Be '255,255,255'
+        } finally { $bitmap.Dispose() }
+    }
+
+    It 'garde le texte crème sur le fond nuit' {
+        $box = New-ThemedCheckBox 'Option' 0 0 200
+        $box.ForeColor.ToArgb() | Should Be ((Get-ThemeColor 'Cream').ToArgb())
+        $box.BackColor.ToArgb() | Should Be ((Get-ThemeColor 'Background').ToArgb())
     }
 }
 

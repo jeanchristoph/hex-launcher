@@ -620,8 +620,12 @@ function New-SetupShortcutsControls {
     $controls.CompanionList = New-SetupCheckedList (Get-ShortcutCompanionListItems $companionApps) (Get-SetupPreselection 'CompanionList' (Get-PreselectedShortcutCompanionIds $companionApps $state.ExistingShortcuts)) $rightColumn 72 $columnWidth $companionHeight
     $controls.IconSetList   = New-SetupIconSetList $state.IconSets (Get-SetupPreselectedIconSetName $state) $rightColumn ($iconSetsTop + 24) ($columnWidth - $previewSize - 12) $previewSize
     $controls.IconSetPreview = New-ThemedPicture ($rightColumn + $columnWidth - $previewSize) ($iconSetsTop + 24) $previewSize
-    $controls.LegacyLaunchBox = New-SetupLegacyLaunchBox $state $rightColumn ($iconSetsTop + 24 + $previewSize + 6) $columnWidth
-    $controls.Log           = New-ThemedLog 0 312 $layout.ContentWidth ($layout.ContentHeight - 312)
+    # Pleine largeur sous les deux colonnes : le libellé dit quand cocher la case, et cette explication ne tient
+    # pas dans une demi-colonne — la tronquer priverait la case de ce qui la rend utilisable
+    $legacyTop      = 306
+    $logTop         = $legacyTop + 34
+    $controls.LegacyLaunchBox = New-SetupLegacyLaunchBox $state 0 $legacyTop $layout.ContentWidth
+    $controls.Log           = New-ThemedLog 0 $logTop $layout.ContentWidth ($layout.ContentHeight - $logTop)
     $controls.Inputs        = @($controls.LocaleList, $controls.CompanionList, $controls.IconSetList)
     $controls.IconSetList.Add_SelectedIndexChanged({ Invoke-SetupSafely { Update-SetupIconSetPreview } })
     Update-SetupIconSetPreview
