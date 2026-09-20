@@ -1,5 +1,6 @@
-# Log â€” icons
+﻿# Log â€” icons
 
+- [2026-09-20 15:20] Reprise sur icons dans le dossier principal (worktree retiré, master fusionné : 627 verts, tout poussé). T10 abandonnée pour le moment (utilisateur). Restent hors plan : contrôle de T9 sur le Bureau, version/release (dernière publiée v0.1.6, version.txt à 0.2.0).
 - [2026-09-20 11:22] Session arrêtée par l'utilisateur, T9 livrée non commitée, contrôle Bureau et version/release à faire. T10 reste gelée.
 - [2026-09-20 11:05] T9 faite : jeux `original` et `original-badges` (marqueur icon-source.json, aucun .ico), pastille pays = drapeau de flag.lib.ps1 dessiné à 4× puis réduit en bicubique et découpé au disque inscrit, pile pays/compagnon (Slot 0/1), pays seul sous 32 px, icône du binaire lue par PrivateExtractIcons (256 → 16 px). Signature des pastilles compagnon changée (StackGap/StackMinSize dans $BadgeShape) : les icônes composées existantes seront renommées et purgées à la prochaine installation. 575 tests verts ; planche de contrôle regardée puis supprimée ; captures setup fr/ja.
 - [2026-09-20 11:05] Note de la page Raccourcis : sous la liste des jeux, 8,25 pt, adaptée à l'espace restant au-dessus de la case « Mode de secours » (rendu vérifié hors écran avec 1 et 4 compagnons). Avec quatre jeux, la liste des jeux (64 px) défile : `classic` passe au-dessus de `flat`.

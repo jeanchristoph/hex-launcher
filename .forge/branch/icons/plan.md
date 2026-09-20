@@ -150,7 +150,7 @@ Question de cadrage à trancher au dégel : le générateur vit dans `tools/`, e
 `resvg` installé par scoop. Un utilisateur final n'a ni l'un ni l'autre. Trois voies — embarquer `resvg` dans la
 release (MPL-2.0, ~3 Mo, redistribuable), accepter un PNG plutôt qu'un SVG (GDI+ le lit nativement, aucune
 dépendance), ou réserver la génération à `tools/`.
-[ ]
+[!] abandonnée pour le moment — décision de l'utilisateur, 2026-09-20 ; la question de cadrage reste ouverte si elle revient
 
 ### T11 — Couleurs officielles des drapeaux
 **Effort:** S
@@ -195,6 +195,6 @@ régénérées : **une seule change**, la France, dont le bleu officiel bascule 
 | T7 — Aplat des icônes drapeau | M | [x] |
 | T8 — Jeux d'icônes sélectionnables | M | [x] |
 | T9 — Icône originale de LoL, deux jeux | L | [x] |
-| T10 — Drapeaux en fond + SVG importable | L | [ ] en attente |
+| T10 — Drapeaux en fond + SVG importable | L | [!] abandonnée pour le moment (2026-09-20) |
 | T11 — Couleurs officielles des drapeaux | S | [x] |
 | **Total** | **~XL (8-11 h)** | |
