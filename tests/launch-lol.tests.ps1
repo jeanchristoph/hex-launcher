@@ -111,6 +111,26 @@ Describe 'Start-RiotClient' {
     }
 }
 
+Describe 'Get-RiotClientVersion' {
+    It 'lit la version produit du Riot Client sur le disque' {
+        Mock Get-Item { return [pscustomobject]@{ VersionInfo = [pscustomobject]@{ ProductVersion = '139.0.5.4957' } } } -ParameterFilter { $Path -like 'C:\Riot\*' }
+        Get-RiotClientVersion 'C:\Riot\RiotClientServices.exe' | Should Be '139.0.5.4957'
+    }
+
+    It 'rend une chaîne vide quand le chemin est périmé — jamais une exception' {
+        Get-RiotClientVersion 'C:\introuvable\RiotClientServices.exe' | Should Be ''
+    }
+}
+
+Describe 'New-LocalApiFailure' {
+    It 'porte la cause, le code HTTP et l''étape de l''échec' {
+        $failure = New-LocalApiFailure 'route' 404 'locale'
+        $failure.Kind       | Should Be 'route'
+        $failure.StatusCode | Should Be 404
+        $failure.Stage      | Should Be 'locale'
+    }
+}
+
 Describe 'Stop-GameClientProcesses' {
     Mock Wait-WithAnimation { }
 
@@ -140,6 +160,13 @@ Describe 'Wait-GameClientStart' {
     It 'confirme le lancement dès que le client de jeu est là' {
         Mock Test-GameClientRunning { return $true }
         Wait-GameClientStart 5 { } | Should Be $true
+    }
+
+    It 's''arrête tout de suite quand l''utilisateur force le démarrage, sans attendre l''échéance' {
+        Mock Test-GameClientRunning { return $false }
+        $chrono = [Diagnostics.Stopwatch]::StartNew()
+        Wait-GameClientStart 30 { Start-Sleep -Milliseconds 50 } { $true } | Should Be $false
+        $chrono.Elapsed.TotalSeconds | Should BeLessThan 5
     }
 
     It 'renonce à l''échéance quand le client de jeu n''apparaît jamais' {
@@ -197,6 +224,8 @@ Describe 'Assert-RiotClientRunning' {
 
 Describe 'Start-LeagueClientByLocalApi' {
     $riotClient = 'C:\Riot\RiotClientServices.exe'
+    # Un Riot Client avec sa fenêtre, sauf test contraire : le réveil a son propre Describe
+    Mock Test-RiotClientInterfaceRunning { return $true }
 
     It 'pose la langue puis lance le jeu, sans jamais écrire le yaml' {
         Mock Test-RiotClientRunning { return $true }
@@ -268,6 +297,40 @@ Describe 'Start-LeagueClientByLocalApi' {
         Assert-MockCalled Wait-RiotProductLaunch -Scope It -Exactly 0
     }
 
+    It 'transmet la demande d''arrêt aux deux attentes de l''API' {
+        Mock Test-RiotClientRunning { return $true }
+        Mock Start-RiotClient { return $true }
+        Mock Wait-RiotProductLocale { return [pscustomobject]@{ Success = $true; Kind = ''; StatusCode = 201 } }
+        Mock Wait-RiotProductLaunch { return [pscustomobject]@{ Success = $true; Kind = ''; StatusCode = 200 } }
+        Mock Wait-GameClientStart { return $true }
+        Start-LeagueClientByLocalApi $riotClient 'ja_JP' { } $null { $false } | Out-Null
+        Assert-MockCalled Wait-RiotProductLocale -Scope It -Exactly 1 -ParameterFilter { $null -ne $ShouldStop }
+        Assert-MockCalled Wait-RiotProductLaunch -Scope It -Exactly 1 -ParameterFilter { $null -ne $ShouldStop }
+    }
+
+    It 'qualifie d''abandon un démarrage forcé pendant l''attente du client de jeu — pas de lancement muet' {
+        Mock Test-RiotClientRunning { return $true }
+        Mock Start-RiotClient { return $true }
+        Mock Wait-RiotProductLocale { return [pscustomobject]@{ Success = $true; Kind = ''; StatusCode = 201 } }
+        Mock Wait-RiotProductLaunch { return [pscustomobject]@{ Success = $true; Kind = ''; StatusCode = 200 } }
+        Mock Wait-GameClientStart { return $false }
+        $attempt = Start-LeagueClientByLocalApi $riotClient 'ja_JP' { } $null { $true }
+        $attempt.Success       | Should Be $false
+        $attempt.Failure.Kind  | Should Be 'cancelled'
+        $attempt.Failure.Stage | Should Be 'game-client'
+    }
+
+    It 'remonte l''abandon décidé pendant la pose de la langue' {
+        Mock Test-RiotClientRunning { return $true }
+        Mock Start-RiotClient { return $true }
+        Mock Wait-RiotProductLocale { return [pscustomobject]@{ Success = $false; Kind = 'cancelled'; StatusCode = 464 } }
+        Mock Wait-RiotProductLaunch { return [pscustomobject]@{ Success = $true; Kind = ''; StatusCode = 200 } }
+        $attempt = Start-LeagueClientByLocalApi $riotClient 'ja_JP' { } $null { $true }
+        $attempt.Failure.Kind  | Should Be 'cancelled'
+        $attempt.Failure.Stage | Should Be 'locale'
+        Assert-MockCalled Wait-RiotProductLaunch -Scope It -Exactly 0
+    }
+
     It 'renonce quand l''API n''accepte pas le lancement' {
         Mock Test-RiotClientRunning { return $true }
         Mock Start-RiotClient { return $true }
@@ -300,6 +363,17 @@ Describe 'Start-LeagueClientByLocalApi' {
     }
 }
 
+Describe 'Get-FallbackStatusMessage' {
+    It 'dit « démarrage manuel forcé » quand c''est l''utilisateur qui l''a demandé' {
+        Get-FallbackStatusMessage ([pscustomobject]@{ Kind = 'cancelled'; StatusCode = 464; Stage = 'launch' }) | Should Match '^Démarrage manuel forcé'
+    }
+
+    It 'dit « démarrage manuel » sur tout autre échec, et sans cause' {
+        Get-FallbackStatusMessage ([pscustomobject]@{ Kind = 'route'; StatusCode = 404; Stage = 'locale' }) | Should Match '^Démarrage manuel :'
+        Get-FallbackStatusMessage $null | Should Match '^Démarrage manuel :'
+    }
+}
+
 Describe 'Write-LaunchStatus' {
     It 'transmet le message à qui veut l''afficher' {
         $script:vus = @()
@@ -319,8 +393,140 @@ Describe 'Format-WaitingStatus' {
     }
 }
 
+Describe 'Test-RiotClientInterfaceRunning' {
+    It 'rend faux quand seul RiotClientServices tourne' {
+        # Aucune sortie, comme Get-Process -ErrorAction SilentlyContinue : un $null explicite compterait pour un
+        Mock Get-Process { }
+        Test-RiotClientInterfaceRunning | Should Be $false
+    }
+
+    It 'reconnaît le process de l''interface, « Riot Client » avec une espace' {
+        Mock Get-Process { return @([pscustomobject]@{ Name = 'Riot Client' }) } -ParameterFilter { $Name -eq 'Riot Client' }
+        Test-RiotClientInterfaceRunning | Should Be $true
+    }
+}
+
+Describe 'Wait-RiotClientInterface' {
+    It 'rend vrai dès que l''interface est là et que l''API répond' {
+        Mock Test-RiotClientInterfaceRunning { return $true }
+        Mock Read-RiotClientLockfile { return [pscustomobject]@{ Port = 1; Password = 'x' } }
+        Mock Test-RiotClientReady { return $true }
+        Wait-RiotClientInterface 5 { } | Should Be $true
+    }
+
+    It 'continue d''attendre tant que l''interface est revenue mais pas l''API — 404 pendant le rechargement' {
+        Mock Test-RiotClientInterfaceRunning { return $true }
+        Mock Read-RiotClientLockfile { return [pscustomobject]@{ Port = 1; Password = 'x' } }
+        $script:probes = 0
+        Mock Test-RiotClientReady { $script:probes++; return ($script:probes -ge 3) }
+        Wait-RiotClientInterface 5 { } | Should Be $true
+        $script:probes | Should Be 3
+    }
+
+    It 'rend faux à l''échéance, sans exception, quand rien ne revient' {
+        Mock Test-RiotClientInterfaceRunning { return $false }
+        Wait-RiotClientInterface 1 { } | Should Be $false
+    }
+
+    It 's''arrête sur demande de l''utilisateur' {
+        Mock Test-RiotClientInterfaceRunning { return $false }
+        Wait-RiotClientInterface 30 { } { $true } | Should Be $false
+    }
+}
+
+Describe 'Restore-RiotClientInterface' {
+    $riotClient = 'C:\Riot\RiotClientServices.exe'
+
+    It 'ne fait rien quand la fenêtre du Riot Client est là' {
+        Mock Test-RiotClientInterfaceRunning { return $true }
+        Mock Start-RiotClient { return $true }
+        Restore-RiotClientInterface $riotClient { } | Should Be $true
+        Assert-MockCalled Start-RiotClient -Scope It -Exactly 0
+    }
+
+    It 'relance l''exécutable sans argument, puis attend l''interface et l''API — jamais de kill' {
+        Mock Test-RiotClientInterfaceRunning { return $false }
+        Mock Start-RiotClient { return $true }
+        Mock Wait-RiotClientInterface { return $true }
+        Mock Stop-Process { }
+        Restore-RiotClientInterface $riotClient { } | Should Be $true
+        Assert-MockCalled Start-RiotClient -Scope It -Exactly 1 -ParameterFilter { $Path -eq $riotClient }
+        Assert-MockCalled Wait-RiotClientInterface -Scope It -Exactly 1
+        Assert-MockCalled Stop-Process -Scope It -Exactly 0
+    }
+
+    It 'rend faux quand l''exécutable est introuvable, sans attendre' {
+        Mock Test-RiotClientInterfaceRunning { return $false }
+        Mock Start-RiotClient { return $false }
+        Mock Wait-RiotClientInterface { return $true }
+        Restore-RiotClientInterface 'C:\perime\RiotClientServices.exe' { } | Should Be $false
+        Assert-MockCalled Wait-RiotClientInterface -Scope It -Exactly 0
+    }
+
+    It 'rend faux quand l''interface ne revient pas dans le délai — l''appelant tentera l''API quand même' {
+        Mock Test-RiotClientInterfaceRunning { return $false }
+        Mock Start-RiotClient { return $true }
+        Mock Wait-RiotClientInterface { return $false }
+        Restore-RiotClientInterface $riotClient { } | Should Be $false
+    }
+}
+
+Describe 'Start-LeagueClientByLocalApi, Riot Client replié sans interface' {
+    $riotClient = 'C:\Riot\RiotClientServices.exe'
+
+    It 'réveille un Riot Client déjà en marche mais sans fenêtre, avant de poser la langue' {
+        Mock Test-RiotClientRunning { return $true }
+        Mock Test-RiotClientInterfaceRunning { return $false }
+        Mock Restore-RiotClientInterface { return $true }
+        Mock Wait-RiotProductLocale { return [pscustomobject]@{ Success = $true; Kind = ''; StatusCode = 201 } }
+        Mock Wait-RiotProductLaunch { return [pscustomobject]@{ Success = $true; Kind = ''; StatusCode = 200 } }
+        Mock Wait-GameClientStart { return $true }
+        $script:etapes = @()
+        (Start-LeagueClientByLocalApi $riotClient 'ja_JP' { } { param($Message) $script:etapes += $Message }).Success | Should Be $true
+        Assert-MockCalled Restore-RiotClientInterface -Scope It -Exactly 1
+        ($script:etapes -join ' | ') | Should Match 'Réveil du Riot Client'
+    }
+
+    It 'ne relance jamais un Riot Client qu''il vient de démarrer à froid, même sans fenêtre encore' {
+        Mock Test-RiotClientRunning { return $false }
+        Mock Start-RiotClient { return $true }
+        Mock Test-RiotClientInterfaceRunning { return $false }
+        Mock Restore-RiotClientInterface { return $true }
+        Mock Wait-RiotProductLocale { return [pscustomobject]@{ Success = $true; Kind = ''; StatusCode = 201 } }
+        Mock Wait-RiotProductLaunch { return [pscustomobject]@{ Success = $true; Kind = ''; StatusCode = 200 } }
+        Mock Wait-GameClientStart { return $true }
+        Start-LeagueClientByLocalApi $riotClient 'ja_JP' { } $null | Out-Null
+        Assert-MockCalled Start-RiotClient -Scope It -Exactly 1
+        Assert-MockCalled Restore-RiotClientInterface -Scope It -Exactly 0
+    }
+
+    It 'tente l''API quand même si le réveil n''aboutit pas dans le délai' {
+        Mock Test-RiotClientRunning { return $true }
+        Mock Test-RiotClientInterfaceRunning { return $false }
+        Mock Restore-RiotClientInterface { return $false }
+        Mock Wait-RiotProductLocale { return [pscustomobject]@{ Success = $true; Kind = ''; StatusCode = 201 } }
+        Mock Wait-RiotProductLaunch { return [pscustomobject]@{ Success = $true; Kind = ''; StatusCode = 200 } }
+        Mock Wait-GameClientStart { return $true }
+        (Start-LeagueClientByLocalApi $riotClient 'ja_JP' { } $null).Success | Should Be $true
+        Assert-MockCalled Wait-RiotProductLocale -Scope It -Exactly 1
+    }
+
+    It 'passe en démarrage manuel avec la cause « abandon » si l''utilisateur force le démarrage pendant le réveil' {
+        Mock Test-RiotClientRunning { return $true }
+        Mock Test-RiotClientInterfaceRunning { return $false }
+        Mock Restore-RiotClientInterface { return $false }
+        Mock Wait-RiotProductLocale { return [pscustomobject]@{ Success = $true; Kind = ''; StatusCode = 201 } }
+        $attempt = Start-LeagueClientByLocalApi $riotClient 'ja_JP' { } $null { $true }
+        $attempt.Success       | Should Be $false
+        $attempt.Failure.Kind  | Should Be 'cancelled'
+        $attempt.Failure.Stage | Should Be 'riot-client'
+        Assert-MockCalled Wait-RiotProductLocale -Scope It -Exactly 0
+    }
+}
+
 Describe 'Start-LeagueClientByLocalApi, suivi des étapes' {
     $riotClient = 'C:\Riot\RiotClientServices.exe'
+    Mock Test-RiotClientInterfaceRunning { return $true }
 
     It 'annonce chaque étape jusqu''à l''apparition du client de jeu' {
         Mock Test-RiotClientRunning { return $true }
@@ -409,7 +615,7 @@ Describe 'Start-LeagueClient' {
         Assert-MockCalled Start-LeagueClientByCommandLine -Scope It -Exactly 0
     }
 
-    It 'remonte la cause de l''échec du chemin rapide, pour que la mémoire la retienne' {
+    It 'remonte la cause de l''échec du chemin rapide, pour le journal' {
         Mock Stop-GameClientProcesses { }
         Mock Start-LeagueClientByLocalApi { return [pscustomobject]@{ Success = $false; Failure = [pscustomobject]@{ Kind = 'route'; StatusCode = 404; Stage = 'launch' } } }
         Mock Test-GameClientRunning { return $false }
@@ -419,6 +625,17 @@ Describe 'Start-LeagueClient' {
         $launch.Failure.Kind       | Should Be 'route'
         $launch.Failure.StatusCode | Should Be 404
         $launch.Failure.Stage      | Should Be 'launch'
+    }
+
+    It 'passe en démarrage manuel quand l''utilisateur force le démarrage, avec la cause pour le journal' {
+        Mock Stop-GameClientProcesses { }
+        Mock Start-LeagueClientByLocalApi { return [pscustomobject]@{ Success = $false; Failure = [pscustomobject]@{ Kind = 'cancelled'; StatusCode = 464; Stage = 'launch' } } }
+        Mock Test-GameClientRunning { return $false }
+        Mock Start-LeagueClientByCommandLine { return $true }
+        $launch = Start-LeagueClient -Path 'C:\Riot\RiotClientServices.exe' -YamlPath 'C:\yaml' -Value 'ja_JP' -OnTick { } -ShouldStop { $true }
+        $launch.Outcome      | Should Be 'legacy'
+        $launch.Failure.Kind | Should Be 'cancelled'
+        Assert-MockCalled Start-LeagueClientByLocalApi -Scope It -Exactly 1 -ParameterFilter { $null -ne $ShouldStop }
     }
 
     It 'ne retient aucune cause quand l''API a réussi' {

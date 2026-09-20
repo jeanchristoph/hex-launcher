@@ -1,8 +1,8 @@
-﻿# hex-launcher
+﻿# Hex Launcher
 
 [English](README.md) · **Français** · [日本語](README.ja.md)
 
-> **Projet non affilié à Riot Games.** hex-launcher a été créé dans le cadre de la politique [« Legal Jibber Jabber »](https://www.riotgames.com/en/legal) de Riot Games. Riot Games ne soutient ni ne sponsorise ce projet. League of Legends et Riot Games sont des marques ou marques déposées de Riot Games, Inc. Ce projet n'embarque aucun visuel Riot : ses icônes sont originales.
+> **Projet non affilié à Riot Games.** Hex Launcher a été créé dans le cadre de la politique [« Legal Jibber Jabber »](https://www.riotgames.com/en/legal) de Riot Games. Riot Games ne soutient ni ne sponsorise ce projet. League of Legends et Riot Games sont des marques ou marques déposées de Riot Games, Inc. Ce projet n'embarque aucun visuel Riot : ses icônes sont originales.
 
 **Windows uniquement, pour l'instant** (Windows 10/11, PowerShell 5.1 inclus — macOS non pris en charge).
 
@@ -20,7 +20,7 @@ installe, et on obtient un raccourci par langue × appli compagnon
 | `LISEZMOI.txt` | Démarrage rapide en trois lignes (FR/EN) |
 | `app/` | Le moteur — rien à y modifier |
 | `app/setup.ps1` | L'assistant de configuration (fenêtre unique au thème LoL) |
-| `app/config.json` | Chemins Riot + liste des applis compagnon. Généré par `setup.bat`, éditable à la main si la détection ne suffit pas |
+| `app/config.json` | Chemins Riot + liste des applis compagnon. Généré par `setup.bat` ; les chemins Riot se corrigent sur sa page *Bienvenue* (saisie ou *Parcourir…*), jamais à la main |
 | `app/locales.json` | Catalogue des langues proposées à l'install (code Riot + libellé affiché) |
 | `app/companion-apps.json` | Catalogue des applis compagnon : comment détecter, installer, désinstaller et lancer chacune, et qui signe ses binaires |
 | `app/launch-lol.ps1` | Le lanceur : ferme le client Riot, force la langue, relance le jeu (+ l'appli compagnon donnée par `-Companion`) |
@@ -41,10 +41,12 @@ installe, et on obtient un raccourci par langue × appli compagnon
 0. **[Télécharger la dernière version](https://github.com/jeanchristoph/hex-launcher/releases/latest)** (`hex-launcher-x.y.z.zip`) et la décompresser — ou cloner le dépôt.
 1. Copier ce dossier où on veut (ex. `Documents\hex-launcher`) — **sans** `config.json` s'il vient
    d'une autre machine, pour que la détection se fasse.
-2. Double-cliquer sur **`setup.bat`** (jamais « Exécuter en tant qu'administrateur » : l'outil refuse, volontairement). Une fenêtre, trois étapes :
+2. Double-cliquer sur **Hex Launcher** (le raccourci livré à la racine, ou `setup.bat` — même chose ; jamais « Exécuter en tant qu'administrateur » : l'outil refuse, volontairement). Une fenêtre, trois étapes :
    - **[1/3] Détection** — trouve le Riot Client (via `RiotClientInstalls.json`, le fichier officiel de Riot) et toutes
      les applis compagnon du catalogue déjà installées, puis écrit `config.json` (jamais écrasé s'il existe déjà :
-     les réglages manuels sont conservés) ;
+     les réglages manuels sont conservés). Les deux chemins Riot sont affichés dans des champs modifiables avec un
+     bouton *Parcourir…* : un chemin faux se corrige sur place, est enregistré sur *Suivant*, et reste signalé en
+     rouge tant qu'il ne mène pas à un vrai fichier ;
    - **[2/3] Applis compagnon** — une boîte de dialogue liste chaque appli du catalogue avec une case à cocher,
      pré-cochée d'après le choix précédent (sinon d'après ce qui est installé). Les applis cochées absentes sont
      installées. Une case à part, **décochée par défaut**, permet aussi de désinstaller les applis décochées
@@ -53,18 +55,20 @@ installe, et on obtient un raccourci par langue × appli compagnon
      les applis compagnon à combiner. Un raccourci par langue × appli est créé sur le Bureau
      (`League of Legends JP - Blitz`) ; sans compagnon coché, simplement `League of Legends JP`. Les raccourcis
      obsolètes de ce lanceur sont retirés. Si le Bureau est inaccessible (dossier protégé, OneDrive…), ils sont
-     créés dans ce dossier à la place.
+     créés dans ce dossier à la place. Un raccourci **Hex Launcher** (icône engrenage) est posé
+     au même endroit : il rouvre cet assistant.
 3. Double-cliquer sur le raccourci de la langue et du compagnon voulus.
 
-Pour ajouter ou retirer des langues ou des applis compagnon plus tard : relancer `setup.bat`.
+Pour ajouter ou retirer des langues ou des applis compagnon plus tard : double-cliquer sur **Hex Launcher**
+(ou relancer `setup.bat`).
 
 L'assistant lui-même parle **français, anglais et japonais** : il s'ouvre dans la langue d'affichage de Windows
 (anglais pour toute autre langue) et le sélecteur en bas de la colonne de gauche bascule à tout moment sans
 perdre ce qui est coché. Pour forcer une langue : `powershell -File app\setup.ps1 -Language ja`
 (même paramètre `-Language fr|en|ja` sur `detect-config.ps1`, `manage-companion-app.ps1` et `create-shortcuts.ps1`).
 
-Si la détection s'est trompée : éditer `app\config.json` (voir ci-dessous) puis relancer `setup.bat`.
-Pour forcer une nouvelle détection : supprimer `app\config.json` puis relancer.
+Si la détection s'est trompée : relancer `setup.bat` et corriger le chemin sur la page *Bienvenue* — il n'y a
+jamais besoin d'ouvrir `config.json`. Pour forcer une nouvelle détection : supprimer `app\config.json` puis relancer.
 
 Au premier lancement dans une nouvelle langue, le Riot Client télécharge le pack de textes + voix
 (quelques centaines de Mo). C'est normal.
@@ -222,14 +226,15 @@ Le lanceur fait donc, dans l'ordre :
    (écrire ce fichier dans son dos ne tient pas : il le réécrit depuis sa mémoire en quelques secondes).
 3. Lui demander le jeu par la même API — l'équivalent du clic sur **Play** — puis vérifier que le client de
    jeu apparaît vraiment avant de considérer que c'est gagné.
-4. À défaut : le chemin historique reprend la main — tout Riot fermé, `settings.locale` réécrit
-   (`default_locale`, géré par Riot, n'est jamais touché), relance avec `--launch-product`. En dernier ressort,
-   le bouton Play reste actif : le lanceur n'échoue jamais. `-NoLocalApi` force ce chemin historique.
+4. À défaut : le démarrage manuel reprend la main — tout Riot fermé, `settings.locale` réécrit
+   (`default_locale`, géré par Riot, n'est jamais touché), relance avec `--launch-product`, et c'est à vous
+   d'appuyer sur **Jouer** dans le Riot Client : le lanceur n'échoue jamais. `-NoLocalApi` force ce démarrage manuel.
+   Si l'attente s'éternise (plus de 15 s), le splash propose **Forcer en démarrage manuel** : un clic passe en
+   démarrage manuel pour ce lancement seulement — rien n'est mémorisé.
 5. Fermer les autres applis compagnon de `config.json`, puis lancer celle nommée par `-Companion`, s'il y en a une.
 
-Le lanceur retient ce qui marche sur votre poste, dans `app\launch-state.json` : après deux échecs consécutifs
-du lancement direct, il passe d'emblée au lancement classique — et le retente automatiquement dès que le Riot
-Client change de version. Rien à régler.
+Le lanceur n'a pas de mémoire : le lancement direct est tenté à chaque fois. S'il échoue régulièrement sur votre
+poste, cochez « Démarrage manuel — appuyer sur Jouer dans Riot » dans `setup.bat` — le lanceur y passe alors d'emblée.
 
 ## Développer
 

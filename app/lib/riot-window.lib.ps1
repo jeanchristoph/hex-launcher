@@ -15,7 +15,7 @@
     l'interface Chromium reste chargée — pas un mégaoctet rendu, 0,4 % d'un cœur économisé. Sans intérêt.
 
     ⚠ Ne jamais fermer cette fenêtre tant que le jeu n'est pas lancé : sans partie en cours, le Riot Client
-    quitterait pour de bon, et sur le chemin classique elle sert encore à cliquer sur Play.
+    quitterait pour de bon, et en démarrage manuel elle sert encore à cliquer sur Jouer.
 
     Le Riot Client offre à chacun de choisir ce que fait sa croix : quitter, ou se réduire dans la zone de
     notification. Les deux réglages nous conviennent ici, puisqu'une partie est en cours au moment où l'on ferme.

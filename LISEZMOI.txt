@@ -1,4 +1,4 @@
-hex-launcher — lanceur League of Legends multi-langue + applis compagnon (Windows)
+Hex Launcher — lanceur League of Legends multi-langue + applis compagnon (Windows)
 =================================================================================
 
   1. Double-cliquez sur  setup.bat  (jamais « en tant qu'administrateur »).

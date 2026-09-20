@@ -122,8 +122,9 @@ Describe 'Invoke-RiotClientRequest' {
 }
 
 Describe 'Test-RiotClientRetryableStatus' {
-    It 'considère comme passagers le défaut de connexion, la session verrouillée, sa libération et son éveil' {
+    It 'considère comme passagers le défaut de connexion, un conflit, la session verrouillée, sa libération et son éveil' {
         Test-RiotClientRetryableStatus 0   | Should Be $true
+        Test-RiotClientRetryableStatus 409 | Should Be $true
         Test-RiotClientRetryableStatus 423 | Should Be $true
         Test-RiotClientRetryableStatus 424 | Should Be $true
         Test-RiotClientRetryableStatus 464 | Should Be $true
@@ -134,6 +135,19 @@ Describe 'Test-RiotClientRetryableStatus' {
         Test-RiotClientRetryableStatus 401 | Should Be $false
         Test-RiotClientRetryableStatus 403 | Should Be $false
         Test-RiotClientRetryableStatus 500 | Should Be $false
+    }
+}
+
+Describe 'Test-RiotClientReady' {
+    It 'rend vrai quand la route de lecture répond 200' {
+        Mock Invoke-RiotClientRequest { return [pscustomobject]@{ Success = $true; StatusCode = 200 } }
+        Test-RiotClientReady ([pscustomobject]@{ Port = 1; Password = 'x' }) | Should Be $true
+        Assert-MockCalled Invoke-RiotClientRequest -Scope It -Exactly 1 -ParameterFilter { $Method -eq 'GET' -and $Path -eq '/riotclient/region-locale' }
+    }
+
+    It 'rend faux sur un 404 : l''API n''est pas encore rechargée' {
+        Mock Invoke-RiotClientRequest { return [pscustomobject]@{ Success = $false; StatusCode = 404 } }
+        Test-RiotClientReady ([pscustomobject]@{ Port = 1; Password = 'x' }) | Should Be $false
     }
 }
 
@@ -255,6 +269,33 @@ Describe 'Wait-RiotClientOperation' {
         $result.Kind | Should BeNullOrEmpty
     }
 
+    It 's''arrête sans rien tenter quand l''appelant le demande — un clic pendant l''attente prend effet tout de suite' {
+        $path = New-TempLockfile
+        $script:attempts = 0
+        $result = Wait-RiotClientOperation -Operation { param($Lockfile) $script:attempts++; [pscustomobject]@{ Success = $false; StatusCode = 464 } } `
+            -FailureMessage 'essai' -LockfilePath $path -TimeoutSeconds 30 -OnTick { } -ShouldStop { $true }
+        $result.Success  | Should Be $false
+        $result.Kind     | Should Be 'cancelled'
+        $script:attempts | Should Be 0
+    }
+
+    It 's''arrête au tour suivant quand la demande arrive pendant l''attente, en gardant le dernier code vu' {
+        $path = New-TempLockfile
+        $script:attempts = 0
+        $script:stop = $false
+        $result = Wait-RiotClientOperation -Operation { param($Lockfile) $script:attempts++; [pscustomobject]@{ Success = $false; StatusCode = 464 } } `
+            -FailureMessage 'essai' -LockfilePath $path -TimeoutSeconds 30 -OnTick { $script:stop = $true } -ShouldStop { $script:stop }
+        $result.Kind       | Should Be 'cancelled'
+        $result.StatusCode | Should Be 464
+        $script:attempts   | Should Be 1
+    }
+
+    It 'continue comme avant sans demande d''arrêt' {
+        $path = New-TempLockfile
+        Wait-RiotClientOperation -Operation { param($Lockfile) [pscustomobject]@{ Success = $true; StatusCode = 200 } } `
+            -FailureMessage 'essai' -LockfilePath $path -TimeoutSeconds 5 -OnTick { } -ShouldStop { $false } | Select-Object -ExpandProperty Success | Should Be $true
+    }
+
     It 'ne divulgue jamais le mot de passe du lockfile dans un avertissement' {
         $path = New-TempLockfile
         $script:captured = @()
@@ -280,6 +321,12 @@ Describe 'Wait-RiotProductLocale' {
         Mock Write-Warning {}
         Mock Set-RiotProductLocale { return [pscustomobject]@{ Success = $false; StatusCode = 404 } }
         Wait-RiotProductLocale -ProductId 'league_of_legends' -PatchlineId 'live' -Locale 'ja_JP' -LockfilePath $path -TimeoutSeconds 5 -OnTick { } | Select-Object -ExpandProperty Success | Should Be $false
+    }
+
+    It 's''arrête sur demande de l''appelant' {
+        $path = New-TempLockfile
+        Mock Set-RiotProductLocale { return [pscustomobject]@{ Success = $false; StatusCode = 464 } }
+        (Wait-RiotProductLocale -ProductId 'league_of_legends' -PatchlineId 'live' -Locale 'ja_JP' -LockfilePath $path -TimeoutSeconds 30 -OnTick { } -ShouldStop { $true }).Kind | Should Be 'cancelled'
     }
 }
 
@@ -310,5 +357,11 @@ Describe 'Wait-RiotProductLaunch' {
         Mock Write-Warning {}
         Mock Start-RiotProduct { return [pscustomobject]@{ Success = $false; StatusCode = 404 } }
         Wait-RiotProductLaunch -ProductId 'league_of_legends' -PatchlineId 'live' -LockfilePath $path -TimeoutSeconds 30 -OnTick { } | Select-Object -ExpandProperty Success | Should Be $false
+    }
+
+    It 's''arrête sur demande de l''appelant' {
+        $path = New-TempLockfile
+        Mock Start-RiotProduct { return [pscustomobject]@{ Success = $false; StatusCode = 464 } }
+        (Wait-RiotProductLaunch -ProductId 'league_of_legends' -PatchlineId 'live' -LockfilePath $path -TimeoutSeconds 30 -OnTick { } -ShouldStop { $true }).Kind | Should Be 'cancelled'
     }
 }

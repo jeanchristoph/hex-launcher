@@ -183,6 +183,14 @@ function New-ThemedField([string]$Text, [int]$Left, [int]$Top, [int]$Width, [int
     return $field
 }
 
+# Champ de saisie encadré (chemin à corriger) : même habillage que le champ en lecture seule, texte modifiable.
+# Entrée ne saute pas de ligne (AcceptsReturn faux par défaut) : elle déclenche le bouton principal de la fenêtre.
+function New-ThemedInputField([string]$Text, [int]$Left, [int]$Top, [int]$Width, [int]$Height = 48) {
+    $field          = New-ThemedField $Text $Left $Top $Width $Height
+    $field.ReadOnly = $false
+    return $field
+}
+
 # Journal en lecture seule (progression, résumé)
 function New-ThemedLog([int]$Left, [int]$Top, [int]$Width, [int]$Height) {
     $log             = New-Object System.Windows.Forms.TextBox

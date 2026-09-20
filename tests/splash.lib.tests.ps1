@@ -22,12 +22,32 @@ Describe 'New-SplashLabel' {
     }
 }
 
-Describe 'New-SplashProgressBar' {
-    It 'produit une barre marquee fine ancrée en haut' {
-        $bar = New-SplashProgressBar
-        $bar.Style | Should Be 'Marquee'
-        $bar.Height | Should Be 6
-        $bar.Dock | Should Be 'Top'
+Describe 'New-SplashRule' {
+    It 'produit un filet doré de deux pixels ancré en haut' {
+        $rule = New-SplashRule
+        $rule.Height    | Should Be 2
+        $rule.Dock      | Should Be 'Top'
+        $rule.BackColor | Should Be (Get-ThemeColor 'Gold')
+    }
+}
+
+Describe 'Add-SplashControls' {
+    It 'pose le titre, le sous-titre, la barre et la ligne de statut — tous des contrôles réels, pas des textes' {
+        $form = New-Object System.Windows.Forms.Form
+        Add-SplashControls $form '日本語' 'LEAGUE OF LEGENDS'
+        $labels = @($form.Controls | Where-Object { $_ -is [System.Windows.Forms.Label] })
+        $labels.Count | Should Be 3
+        @($form.Controls | Where-Object { $_ -is [System.Windows.Forms.Panel] }).Count | Should Be 1
+        ($labels | Where-Object { $_.Text -eq 'LEAGUE OF LEGENDS' }).Dock | Should Be 'Top'
+        ($labels | Where-Object { $_.Text -eq '日本語' }).Dock          | Should Be 'Top'
+    }
+
+    It 'range la ligne de statut dans Tag, vide au départ' {
+        $form = New-Object System.Windows.Forms.Form
+        Add-SplashControls $form 'x' 'y'
+        $form.Tag -is [System.Windows.Forms.Label] | Should Be $true
+        $form.Tag.Text | Should Be ''
+        $form.Tag.Dock | Should Be 'Fill'
     }
 }
 
@@ -72,6 +92,62 @@ Describe 'Set-SplashTopMost' {
 
     It 'ignore un splash absent' {
         { Set-SplashTopMost $null $false } | Should Not Throw
+    }
+}
+
+Describe 'Add-SplashAction' {
+    Mock Invoke-SplashTick {}
+
+    function New-HiddenForm { $f = New-Object System.Windows.Forms.Form; $f.Size = New-Object System.Drawing.Size(420, 170); return $f }
+
+    It 'pose un bouton caché, ancré en bas, avec le texte demandé' {
+        $form = New-HiddenForm
+        $button = Add-SplashAction $form 'Forcer en démarrage manuel' { }
+        Test-SplashActionShown $form | Should Be $false
+        $button.Dock | Should Be 'Bottom'
+        $button.Text | Should Be 'Forcer en démarrage manuel'
+        (Get-SplashAction $form) | Should Be $button
+    }
+
+    It 'ignore un splash absent' {
+        Add-SplashAction $null 'x' { } | Should BeNullOrEmpty
+        Get-SplashAction $null        | Should BeNullOrEmpty
+    }
+}
+
+Describe 'Show-SplashAction et Hide-SplashAction' {
+    Mock Invoke-SplashTick {}
+
+    function New-FormWithAction { $f = New-Object System.Windows.Forms.Form; $f.Size = New-Object System.Drawing.Size(420, 170); Add-SplashAction $f 'x' { } | Out-Null; return $f }
+
+    It 'fait apparaître le bouton et agrandit la fenêtre d''autant' {
+        $form = New-FormWithAction
+        Show-SplashAction $form | Should Be $true
+        Test-SplashActionShown $form | Should Be $true
+        $form.Height | Should Be (170 + $SplashActionHeight)
+    }
+
+    It 'n''agrandit qu''une fois, même demandé à chaque tick' {
+        $form = New-FormWithAction
+        Show-SplashAction $form | Out-Null
+        Show-SplashAction $form | Should Be $false
+        $form.Height | Should Be (170 + $SplashActionHeight)
+    }
+
+    It 'cache le bouton et rend à la fenêtre sa taille' {
+        $form = New-FormWithAction
+        Show-SplashAction $form | Out-Null
+        Hide-SplashAction $form | Should Be $true
+        Test-SplashActionShown $form | Should Be $false
+        $form.Height | Should Be 170
+    }
+
+    It 'ne fait rien sans bouton, ni sur un bouton déjà caché' {
+        $form = New-Object System.Windows.Forms.Form
+        Show-SplashAction $form | Should Be $false
+        Test-SplashActionShown $form | Should Be $false
+        Hide-SplashAction (New-FormWithAction) | Should Be $false
+        { Show-SplashAction $null } | Should Not Throw
     }
 }
 

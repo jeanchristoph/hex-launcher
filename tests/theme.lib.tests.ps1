@@ -102,6 +102,18 @@ Describe 'New-ThemedField' {
     }
 }
 
+Describe 'New-ThemedInputField' {
+    It 'est un encadré modifiable, même habillage que le champ en lecture seule' {
+        $field = New-ThemedInputField 'C:\chemin' 0 0 300
+        $field.ReadOnly | Should Be $false
+        $field.Multiline | Should Be $true
+        $field.WordWrap | Should Be $true
+        $field.AcceptsReturn | Should Be $false
+        $field.Text | Should Be 'C:\chemin'
+        $field.BackColor | Should Be (New-ThemedField 'x' 0 0 300).BackColor
+    }
+}
+
 Describe 'New-ThemedForm' {
     It 'produit une fenêtre fixe au fond nuit avec l''icône du projet' {
         $form = New-ThemedForm 'Test' 300 200

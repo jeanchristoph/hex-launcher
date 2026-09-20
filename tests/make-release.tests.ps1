@@ -46,17 +46,41 @@ Describe 'New-ReleaseStaging et New-ReleaseArchive' {
     $staging = New-ReleaseStaging $ProjectRoot '0.0.1' $parent
 
     It 'livre la racine épurée et le moteur, sans fichiers de développement' {
-        (Get-ChildItem $staging -Name | Sort-Object { $_.ToLowerInvariant() }) -join ',' | Should Be 'app,LICENSE,LISEZMOI.txt,README.fr.md,README.ja.md,README.md,setup.bat'
+        (Get-ChildItem $staging -Name | Sort-Object { $_.ToLowerInvariant() }) -join ',' | Should Be 'app,Hex Launcher.lnk,LICENSE,LISEZMOI.txt,README.fr.md,README.ja.md,README.md,setup.bat'
         Test-Path (Join-Path $staging 'app\setup.ps1') | Should Be $true
         Test-Path (Join-Path $staging 'app\lib\theme.lib.ps1') | Should Be $true
         Test-Path (Join-Path $staging 'app\config.json') | Should Be $false
         Test-Path (Join-Path $staging 'tests') | Should Be $false
     }
 
+    It 'pose un raccourci « Hex Launcher » relatif vers setup.bat, fenêtre réduite, icône engrenage relative' {
+        $lnk = Join-Path $staging 'Hex Launcher.lnk'
+        $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk)
+        $shortcut.TargetPath | Should Be (Join-Path $staging 'setup.bat')
+        $shortcut.IconLocation | Should Be 'app\ico\hex-launcher-setup.ico,0'
+        $shortcut.WindowStyle | Should Be 7
+        # MS-SHLLINK : LinkFlags à l'offset 20 — bit 3 HasRelativePath, bit 6 HasIconLocation
+        $flags = [BitConverter]::ToUInt32([IO.File]::ReadAllBytes($lnk), 20)
+        [bool]($flags -band 0x08) | Should Be $true
+        [bool]($flags -band 0x40) | Should Be $true
+    }
+
     It 'produit une archive zip nommée par la version' {
         $zip = New-ReleaseArchive $staging '0.0.1' (Join-Path $parent 'dist')
         (Split-Path $zip -Leaf) | Should Be 'hex-launcher-0.0.1.zip'
         (Get-Item $zip).Length | Should BeGreaterThan 100000
+    }
+
+    # La cible absolue ne doit plus exister : c'est la situation d'une archive décompressée sur un autre poste
+    It 'garde un raccourci qui mène à setup.bat une fois le dossier déplacé (archive décompressée ailleurs)' {
+        $moved = Join-Path $parent 'moved'
+        Move-Item $staging $moved
+        try {
+            $link = (New-Object -ComObject Shell.Application).NameSpace($moved).ParseName('Hex Launcher.lnk').GetLink
+            $link.Resolve(1)   # SLR_NO_UI
+            $link.Path | Should Be (Join-Path $moved 'setup.bat')
+        }
+        finally { Move-Item $moved $staging }
     }
 
     Remove-Item $parent -Recurse -Force -ErrorAction SilentlyContinue

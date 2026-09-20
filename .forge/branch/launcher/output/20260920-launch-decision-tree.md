@@ -32,11 +32,6 @@ Raccourci .lnk → powershell -WindowStyle Hidden -File launch-lol.ps1
                  -Locale xx_XX [-Companion id] [-ConfigPath p] [-YamlPath p]
                  [-NoLocalApi] [-DryRun]
 
-⓪ Mémoire de lancement (launch-state.json) — ce que le poste a appris
-   ├── moins de 2 échecs consécutifs ────────► le chemin rapide sera tenté
-   ├── 2 échecs, même version de Riot ───────► chemin rapide écarté d'office, aucune attente
-   └── 2 échecs, version de Riot différente ─► on retente : une mise à jour peut réparer l'API
-
 ① -Locale présent et au format xx_XX ?
    ├── absent ──────► throw "-Locale est requis (ex. ja_JP)"   ⛔ FIN, rien touché
    ├── mal formé ───► erreur de validation du paramètre        ⛔ FIN, rien touché
@@ -57,7 +52,7 @@ Raccourci .lnk → powershell -WindowStyle Hidden -File launch-lol.ps1
    │           ──────────────────────────────────────────────►  ⑩ puis FIN (mode test)
    └── non
 
-⑤ -NoLocalApi demandé, OU chemin rapide écarté par la mémoire (⓪) ?
+⑤ -NoLocalApi demandé, OU case « Mode de secours » cochée dans setup.bat (useLocalApi = false) ?
    ├── oui ─────────────────────────────────────────────────────────────────────┐
    └── non                                                                       │
                                                                                  │
@@ -72,6 +67,11 @@ Raccourci .lnk → powershell -WindowStyle Hidden -File launch-lol.ps1
     ├── non ──► Start-RiotClient : RiotClientServices.exe, sans argument         │
     │           de produit (son API suffira)                                     │
     └── oui ──► session en cours réutilisée, rien n'est redémarré                │
+                                                                                 │
+    ⏱ Passé 15 s depuis le clic sur le raccourci, le splash montre le bouton      │
+    « Forcer le démarrage » : un clic lève un drapeau que chaque boucle ci-dessous │
+    lit en tête de tour (ShouldStop) → abandon immédiat, cause 'cancelled' ──────► │
+    Rien n'est mémorisé : le lancement suivant retente le chemin rapide.           │
                                                                                  │
 6.3 Wait-RiotProductLocale — boucle, 1 tentative/s, échéance 30 s                │
     à chaque tour : Read-RiotClientLockfile (Config\lockfile, lu en partage)     │
@@ -91,8 +91,9 @@ Raccourci .lnk → powershell -WindowStyle Hidden -File launch-lol.ps1
     └── refus définitif ──► avertissement ─────────────────────────────────────► │
     échéance atteinte sans succès ──► avertissement ─────────────────────────────┤
                                                                                  │
-6.5 Wait-GameClientStart — 15 s : un LeagueClient* apparaît-il ?                 │
+6.5 Wait-GameClientStart — 30 s : un LeagueClient* apparaît-il ?                 │
     ├── oui ──► ✅ SUCCÈS PAR L'API                                    ──► ⑩    │
+    ├── « Forcer le démarrage » cliqué ──► cause 'cancelled' ─────────────────►  │
     └── non ──► l'API a dit oui sans rien faire (cas de l'endpoint                │
                 déprécié) ────────────────────────────────────────────────────►  │
                                                                                  ▼
@@ -108,7 +109,7 @@ Raccourci .lnk → powershell -WindowStyle Hidden -File launch-lol.ps1
 
 9.3 Start-Process RiotClientServices.exe
     --launch-product=league_of_legends --launch-patchline=live --locale=xx_XX
-    ├── Riot honore l'intention ──────────► ✅ SUCCÈS CLASSIQUE          ──► ⑩
+    ├── Riot honore l'intention ──────────► ✅ SUCCÈS EN SECOURS           ──► ⑩
     └── Riot l'annule tout seul :
         willAutoLaunch=true → game:play isGranted=0 'UNAUTHORIZED' → willAutoLaunch=false
         (la permission arrive 400 ms trop tard, l'intention n'est jamais rejouée)
@@ -132,39 +133,25 @@ Raccourci .lnk → powershell -WindowStyle Hidden -File launch-lol.ps1
      │              ──► "absente de config.json — ignorée (relancer setup.bat)"
      └── aucun -Companion ──► rien à lancer
 
-⑪ Mémoire mise à jour — seulement si le chemin rapide a été tenté
-   ├── réussi ──► compteur d'échecs remis à zéro, version de Riot enregistrée
-   └── échoué ─► compteur incrémenté ; au 2ᵉ, le chemin rapide ne sera plus tenté
-   (un lancement écarté d'office ou forcé par -NoLocalApi n'apprend rien : on n'a rien tenté)
-
 ⑫ finally → Close-SplashWindow        toujours exécuté, y compris sur throw
 ```
 
-## La mémoire de lancement
+## Pas de mémoire de lancement
 
-`app/launch-state.json` (à côté de `config.json`, gitignoré, hors release) garde ce que le poste a observé :
-
-```json
-{ "localApi": { "failureCount": 0, "riotClientVersion": "139.0.5.4957",
-                "lastOutcome": "success", "lastCheck": "2026-09-20T02:10:00" } }
-```
-
-Deux champs seulement décident : le compteur d'échecs consécutifs et la version du Riot Client au dernier verdict.
-Le fichier est séparé de `config.json` à dessein — celui-ci porte les intentions de l'utilisateur et n'est réécrit
-qu'à l'installation, celui-là des observations mises à jour à chaque lancement.
-
-Sans cette mémoire, une API cassée par une mise à jour de Riot coûterait le délai d'attente **à chaque partie**.
-Avec elle, l'utilisateur le paie deux fois, puis plus jamais — et le chemin rapide revient tout seul dès que Riot
-change de version. Rien à cocher, rien à comprendre : l'échec d'hier ne se répète pas.
-
-Une écriture impossible (dossier en lecture seule) coûte la mémoire, jamais le lancement.
+Le lanceur est sans état : chaque lancement tente le chemin rapide, sauf `-NoLocalApi` ou la case « Mode de
+secours » de l'assistant. Une mémoire des échecs (`launch-state.json`) a existé en 0.2.0 et a été retirée le
+2026-09-20 : un `404` ponctuel — Riot resté sans interface après une partie — la faisait basculer en mode de
+secours pour tous les lancements suivants, sans rien montrer. Une panne visible (attente longue, puis la case)
+vaut mieux qu'une décision cachée. La cause de l'échec (`route` / `silent` / `timeout`, code, étape) reste
+journalisée pour le support, sans effet sur les lancements suivants.
 
 ## Issues possibles, et ce que voit l'utilisateur
 
 | Issue | Jeu lancé | Langue appliquée | Ce qui s'affiche |
 |---|---|---|---|
 | Succès par l'API (6.5) | oui | oui, posée par l'API | splash, puis le client de jeu |
-| Succès classique (9.3) | oui | oui, via le yaml | splash, fenêtre Riot, puis le client de jeu |
+| Succès en mode de secours (9.3) | oui | oui, via le yaml | splash, fenêtre Riot, puis le client de jeu |
+| Démarrage forcé (bouton du splash, puis 9.3) | oui | oui, via le yaml | « Démarrage forcé : fermeture de Riot puis redémarrage… », fenêtre Riot, puis le client de jeu |
 | Repli 2 (9.3 annulé) | non | oui, via le yaml | fenêtre Riot, bouton **Play** à cliquer |
 | `-Locale` absent ou invalide | non | non | erreur, aucun process touché |
 | `config.json` absent | non | non | erreur, aucun process touché |
@@ -248,7 +235,7 @@ Ces durées viennent d'un poste rapide : elles décrivent ce qui a été mesuré
 et l'acceptation du lancement (plutôt que deux compteurs qui se cumuleraient), et 30 s sont laissées au client de
 jeu pour apparaître, l'étape la plus sensible à un disque lent ou à Vanguard.
 
-Et ce pire cas ne se paie pas deux fois : au deuxième échec, la mémoire de lancement écarte le chemin rapide.
+Si ce pire cas se répète, la case « Mode de secours » de l'assistant écarte le chemin rapide.
 
 ## Ce qui ne peut pas faire échouer un lancement
 
@@ -261,7 +248,6 @@ Audit du 2026-09-20, chaque point vérifié par un test :
 | Client de jeu apparu juste après l'échéance | reconnu comme un succès — le repli ne le tue plus pour le relancer |
 | `%LOCALAPPDATA%` non défini | lockfile considéré absent, pas d'exception |
 | Horloge système qui recule pendant l'attente | sans effet : les boucles mesurent un écoulement (`Stopwatch`), pas une heure |
-| Mémoire non enregistrable (disque en lecture seule) | avertissement, le lancement se poursuit |
 
 ## Pourquoi l'étape 6.5 existe
 
@@ -285,8 +271,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File launch-lol.ps1 -Locale ja_JP
 ```
 
 Réservé au dépannage : les raccourcis du Bureau ne passent pas ce paramètre — `Get-LauncherArguments` ne produit
-que `-Locale` et `-Companion`. Pour l'utiliser en permanence il faudrait éditer la cible de chaque raccourci, ce
-qui n'a plus lieu d'être : la mémoire de lancement (⓪) écarte le chemin rapide toute seule après deux échecs.
+que `-Locale` et `-Companion`. Pour l'utiliser en permanence, cocher « Mode de secours » dans setup.bat
+(`useLocalApi = false` dans `config.json`), que le lanceur lit à chaque démarrage.
 
 Vérifié le 2026-09-20 : tous les process Riot fermés, yaml réécrit, `RiotClientServices` relancé avec
 `--launch-product`, bouton Play en attente.

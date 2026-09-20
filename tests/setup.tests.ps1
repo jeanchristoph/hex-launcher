@@ -37,6 +37,7 @@ function Reset-SetupTestState([hashtable]$Overrides = @{}) {
     $script:InstallState.Installed         = @()
     $script:InstallState.ExistingShortcuts = @()
     $script:InstallState.ShortcutPaths     = @()
+    $script:InstallState.SetupShortcutPath = ''
     $script:InstallState.IconSets          = @()
     $script:InstallState.PendingSelection  = $null
     $script:InstallState.Controls          = @{}
@@ -310,7 +311,7 @@ Describe 'Get-DetectionItems' {
         Mock Test-Path { $false } -ParameterFilter { $Path -eq 'C:\absent\RiotClientServices.exe' }
         $items = @(Get-DetectionItems (New-TestLaunchConfig -RiotPath 'C:\absent\RiotClientServices.exe'))
         $items[0].Color | Should Be 'Danger'
-        $items[0].Status | Should Match 'config.json'
+        $items[0].Status | Should Match 'Parcourir'
     }
 
     It 'ne donne pas de statut à la ligne des applis compagnon' {
@@ -322,10 +323,94 @@ Describe 'Get-DetectionItems' {
         Mock Test-Path { $false } -ParameterFilter { $Path -eq 'C:\absent\RiotClientServices.exe' }
         $items = @(Get-DetectionItems (New-TestLaunchConfig -RiotPath 'C:\absent\RiotClientServices.exe'))
         $items[0].IsFound | Should Be $false
-        $items[0].MissingReason | Should Be 'corrigez riotClientPath dans config.json'
+        $items[0].MissingReason | Should Be 'cherchez RiotClientServices.exe avec « Parcourir… », habituellement dans C:\Riot Games\Riot Client'
         $items[1].IsFound | Should Be $true
-        $items[1].MissingReason | Should Be 'League of Legends est-il installé ?'
+        $items[1].MissingReason | Should Be "League of Legends est-il installé ? Cherchez league_of_legends.live.product_settings.yaml, habituellement dans $env:ProgramData\Riot Games\Metadata\league_of_legends.live"
         $items[2].IsFound | Should Be $true
+    }
+}
+
+Describe 'Chemins Riot corrigeables sur la page de détection' {
+    Mock Test-Path { $true }
+
+    It 'rend les deux chemins Riot modifiables, avec leur clé de config.json et leur filtre de fichier' {
+        $items = @(Get-DetectionItems (New-TestLaunchConfig))
+        Test-DetectionItemEditable $items[0] | Should Be $true
+        $items[0].Key | Should Be 'RiotClientPath'
+        $items[0].FileFilter | Should Match 'RiotClientServices\.exe'
+        Test-DetectionItemEditable $items[1] | Should Be $true
+        $items[1].Key | Should Be 'ProductSettingsPath'
+        $items[1].FileFilter | Should Match '\*\.yaml'
+    }
+
+    It 'laisse la ligne des applis compagnon en lecture seule' {
+        $items = @(Get-DetectionItems (New-TestLaunchConfig))
+        Test-DetectionItemEditable $items[2] | Should Be $false
+    }
+
+    It 'retrouve un élément par sa clé et rien pour une clé inconnue' {
+        $items = @(Get-DetectionItems (New-TestLaunchConfig))
+        (Find-DetectionItem $items 'ProductSettingsPath').Label | Should Be 'Fichier de langue de LoL'
+        Find-DetectionItem $items 'inconnue' | Should BeNullOrEmpty
+    }
+
+    It 'juge un chemin collé entre guillemets comme le chemin nu' {
+        Mock Test-Path { $false } -ParameterFilter { $Path -ne 'C:\Riot\RiotClientServices.exe' }
+        $status = Get-DetectionPathStatus ' "C:\Riot\RiotClientServices.exe" ' 'raison'
+        $status.IsFound | Should Be $true
+        $status.Text | Should Be 'Trouvé'
+        $status.Color | Should Be 'Accent'
+    }
+
+    It 'donne la raison du manque quand le chemin ne mène nulle part' {
+        Mock Test-Path { $false } -ParameterFilter { $Path -eq 'C:\absent.exe' }
+        $status = Get-DetectionPathStatus 'C:\absent.exe' 'raison'
+        $status.IsFound | Should Be $false
+        $status.Text | Should Be 'Introuvable — raison'
+        $status.Color | Should Be 'Danger'
+    }
+}
+
+Describe 'Get-SetupBrowseStartFolder' {
+    It 'ouvre « Parcourir… » dans le dossier du chemin courant quand il existe' {
+        Mock Test-Path { $true } -ParameterFilter { $Path -eq 'D:\Jeux\Riot Client' }
+        Get-SetupBrowseStartFolder 'D:\Jeux\Riot Client\RiotClientServices.exe' | Should Be 'D:\Jeux\Riot Client'
+    }
+
+    It 'replie sur C:\Riot Games quand le dossier du chemin courant manque' {
+        Mock Test-Path { $false } -ParameterFilter { $Path -eq 'D:\absent' }
+        Mock Test-Path { $true } -ParameterFilter { $Path -eq $SetupRiotGamesFolder }
+        Get-SetupBrowseStartFolder 'D:\absent\RiotClientServices.exe' | Should Be 'C:\Riot Games'
+        Get-SetupBrowseStartFolder '' | Should Be 'C:\Riot Games'
+    }
+
+    # Rappel Pester 3 : le mock filtré sur C:\Riot Games du It précédent survit — le redéclarer à faux
+    It 'laisse Windows choisir quand ni l''un ni l''autre n''existe' {
+        Mock Test-Path { $false }
+        Mock Test-Path { $false } -ParameterFilter { $Path -eq $SetupRiotGamesFolder }
+        Get-SetupBrowseStartFolder 'D:\absent\RiotClientServices.exe' | Should Be ''
+        Get-SetupBrowseStartFolder $null | Should Be ''
+    }
+
+    It 'ne plante pas sur un chemin mal formé' {
+        Mock Test-Path { $false }
+        Mock Test-Path { $false } -ParameterFilter { $Path -eq $SetupRiotGamesFolder }
+        Get-SetupBrowseStartFolder 'C:\a|b<c>' | Should Be ''
+    }
+}
+
+Describe 'Get-MissingRiotPathLines' {
+    It 'ne rappelle rien quand les deux chemins Riot existent' {
+        Mock Test-Path { $true }
+        @(Get-MissingRiotPathLines (New-TestLaunchConfig)).Count | Should Be 0
+    }
+
+    It 'rappelle chaque chemin Riot introuvable avec son libellé et sa valeur' {
+        Mock Test-Path { $false }
+        $lines = @(Get-MissingRiotPathLines (New-TestLaunchConfig -RiotPath 'C:\absent\r.exe' -YamlPath 'C:\absent\lol.yaml'))
+        $lines.Count | Should Be 2
+        $lines[0] | Should Be 'Attention — Riot Client introuvable : C:\absent\r.exe. Relancez setup.bat pour corriger le chemin.'
+        $lines[1] | Should Match 'Fichier de langue de LoL introuvable : C:\\absent\\lol\.yaml'
     }
 }
 
@@ -423,6 +508,13 @@ Describe 'Get-CompletionSummaryLines' {
         $lines[0] | Should Be 'Configuration : C:\lol\config.json'
         $lines[1] | Should Be 'Applis compagnon retenues : Blitz'
         $lines[2] | Should Be 'Raccourcis : 1 créé dans C:\Bureau'
+        $lines.Count | Should Be 3
+    }
+
+    It 'cite le raccourci de configuration quand il a été posé' {
+        $lines = @(Get-CompletionSummaryLines (New-TestLaunchConfig) 'C:\lol\config.json' @() 'C:\Bureau\Hex Launcher.lnk')
+        $lines.Count | Should Be 4
+        $lines[3] | Should Be 'Raccourci de configuration : C:\Bureau\Hex Launcher.lnk'
     }
 
     It 'indique « aucune » appli et aucun raccourci sur une installation minimale' {
@@ -587,6 +679,7 @@ Describe 'Invoke-SetupCompanionActions' {
 Describe 'Invoke-SetupShortcutsStep' {
     $config = New-TestLaunchConfig @(New-TestCompanionEntry 'blitz' 'Blitz')
     Mock Write-SetupLog {}
+    Mock New-SetupShortcutWithFallback { 'C:\Bureau\Hex Launcher.lnk' }
     Mock New-SetupShortcuts { @('C:\Bureau\League of Legends JP - Blitz.lnk') }
     Mock Remove-ObsoleteShortcuts { 'Retiré : C:\Bureau\League of Legends FR.lnk' }
     Mock Select-IconSetForConfig { @{ Name = 'classic'; Path = 'C:\x\classic' } }
@@ -611,11 +704,38 @@ Describe 'Invoke-SetupShortcutsStep' {
         Assert-MockCalled -Scope It Write-SetupLog -Exactly -Times 1 -ParameterFilter { $Text -match '^Retiré' }
     }
 
+    It 'pose le raccourci de configuration après les raccourcis de langue et le retient pour le résumé' {
+        Reset-SetupTestState @{ Config = $config }
+        Mock Get-SetupShortcutSelection { @{ Codes = @('ja_JP'); CompanionIds = @() } }
+        Invoke-SetupShortcutsStep | Should Be $true
+        $script:InstallState.SetupShortcutPath | Should Be 'C:\Bureau\Hex Launcher.lnk'
+        Assert-MockCalled -Scope It New-SetupShortcutWithFallback -Exactly -Times 1
+        Assert-MockCalled -Scope It Write-SetupLog -Exactly -Times 1 -ParameterFilter { $Text -eq 'Créé : C:\Bureau\Hex Launcher.lnk' }
+    }
+
+    It 'ne pose pas le raccourci de configuration tant qu''aucune langue n''est cochée' {
+        Reset-SetupTestState @{ Config = $config }
+        Mock Get-SetupShortcutSelection { @{ Codes = @(); CompanionIds = @() } }
+        Invoke-SetupShortcutsStep | Should Be $false
+        Assert-MockCalled -Scope It New-SetupShortcutWithFallback -Exactly -Times 0
+    }
+
     It 'crée un raccourci sans compagnon par langue quand aucune appli n''est cochée' {
         Reset-SetupTestState @{ Config = $config }
         Mock Get-SetupShortcutSelection { @{ Codes = @('ja_JP', 'fr_FR'); CompanionIds = @() } }
         Invoke-SetupShortcutsStep | Should Be $true
         Assert-MockCalled -Scope It New-SetupShortcuts -Exactly -Times 1 -ParameterFilter { $Combinations.Count -eq 2 -and $Combinations[1].Name -eq 'League of Legends FR' }
+    }
+}
+
+Describe 'New-SetupConfigurationShortcut' {
+    Mock Write-SetupLog {}
+
+    It 'rend une chaîne vide et journalise l''avertissement quand la création échoue partout : l''étape continue' {
+        Reset-SetupTestState
+        Mock New-SetupShortcutWithFallback { throw 'Bureau et dossier du lanceur en lecture seule' }
+        New-SetupConfigurationShortcut | Should Be ''
+        Assert-MockCalled -Scope It Write-SetupLog -Exactly -Times 1 -ParameterFilter { $Text -match 'lecture seule' }
     }
 }
 
@@ -641,8 +761,10 @@ Describe 'Invoke-SetupStepAction' {
     Mock Invoke-SetupAppsStep { $false }
     Mock Invoke-SetupShortcutsStep { $true }
 
-    It 'laisse passer la détection sans action' {
+    It 'délègue à la page de détection, qui enregistre les chemins corrigés' {
+        Mock Invoke-SetupDetectStep { $true }
         Invoke-SetupStepAction 'detect' | Should Be $true
+        Assert-MockCalled -Scope It Invoke-SetupDetectStep -Exactly -Times 1
         Assert-MockCalled -Scope It Invoke-SetupAppsStep -Exactly -Times 0
         Assert-MockCalled -Scope It Invoke-SetupShortcutsStep -Exactly -Times 0
     }
@@ -736,7 +858,7 @@ Describe 'Set-SetupLanguage' {
         $script:InstallState.Controls.AppList = New-SetupCheckedList $appItems @('opgg') 0 0 200 100
         Set-SetupLanguage 'en' | Should Be $true
         Get-UiLanguage | Should Be 'en'
-        $form.Text | Should Be 'hex-launcher — setup'
+        $form.Text | Should Be 'Hex Launcher — setup'
         $script:InstallState.PendingSelection.AppList -join ',' | Should Be 'opgg'
         Assert-MockCalled -Scope It Show-SetupPage -Exactly -Times 1 -ParameterFilter { $StepId -eq 'apps' }
     }
@@ -815,7 +937,7 @@ Describe 'New-SetupLegacyLaunchBox' {
         $box.Checked | Should Be $false
     }
 
-    It 'apparaît cochée quand le poste a déjà choisi le lancement classique' {
+    It 'apparaît cochée quand le poste a déjà choisi le démarrage manuel' {
         $config = New-TestLaunchConfig
         Set-LaunchUseLocalApi $config $false
         Reset-SetupTestState @{ Config = $config }
@@ -831,5 +953,95 @@ Describe 'New-SetupLegacyLaunchBox' {
     It 'retrouve la saisie en attente après un redessin de la page' {
         Reset-SetupTestState @{ Config = (New-TestLaunchConfig); PendingSelection = @{ LegacyLaunchBox = @('True') } }
         (New-SetupLegacyLaunchBox $script:InstallState 0 0 300).Checked | Should Be $true
+    }
+}
+
+Describe 'Page de détection : saisie des chemins Riot' {
+    Mock Test-Path { $true }
+    $riotItem = (Get-DetectionItems (New-TestLaunchConfig))[0]
+
+    function New-RiotPathTestState([hashtable]$Overrides = @{}) {
+        Reset-SetupTestState (@{ Config = (New-TestLaunchConfig); Layout = (Get-SetupLayout 784 521) } + $Overrides)
+        $script:InstallState.DetectionItems           = @(Get-DetectionItems $script:InstallState.Config)
+        $script:InstallState.Controls.RiotPathBoxes    = @{}
+        $script:InstallState.Controls.RiotPathStatuses = @{}
+    }
+
+    It 'construit un champ pré-rempli avec le chemin de config.json, un bouton Parcourir… et le statut « Trouvé »' {
+        New-RiotPathTestState
+        $built = New-RiotPathItemControls $riotItem 0 520
+        $box   = $script:InstallState.Controls.RiotPathBoxes.RiotClientPath
+        $box.Text | Should Be 'C:\Riot\RiotClientServices.exe'
+        $box.ReadOnly | Should Be $false
+        $box.Tag | Should Be 'RiotClientPath'
+        $script:InstallState.Controls.RiotPathStatuses.RiotClientPath.Text | Should Be 'Trouvé'
+        @($built.Inputs).Count | Should Be 2
+        @($built.Controls | Where-Object { $_ -is [System.Windows.Forms.Button] })[0].Text | Should Be 'Parcourir…'
+    }
+
+    It 'recalcule le statut à chaque modification du champ' {
+        New-RiotPathTestState
+        Mock Test-Path { $false } -ParameterFilter { $Path -eq 'C:\absent.exe' }
+        New-RiotPathItemControls $riotItem 0 520 | Out-Null
+        $script:InstallState.Controls.RiotPathBoxes.RiotClientPath.Text = 'C:\absent.exe'
+        $status = $script:InstallState.Controls.RiotPathStatuses.RiotClientPath
+        $status.Text | Should Match '^Introuvable'
+        $status.ForeColor | Should Be (Get-ThemeColor 'Danger')
+        $script:InstallState.Controls.RiotPathBoxes.RiotClientPath.Text = 'C:\Riot\RiotClientServices.exe'
+        $status.Text | Should Be 'Trouvé'
+        $status.ForeColor | Should Be (Get-ThemeColor 'Accent')
+    }
+
+    It 'reprend la saisie en attente plutôt que config.json après un redessin de la page' {
+        New-RiotPathTestState @{ PendingSelection = @{ RiotPaths = @{ RiotClientPath = 'D:\saisi.exe' } } }
+        New-RiotPathItemControls $riotItem 0 520 | Out-Null
+        $script:InstallState.Controls.RiotPathBoxes.RiotClientPath.Text | Should Be 'D:\saisi.exe'
+        Get-SetupPendingRiotPath 'ProductSettingsPath' 'C:\defaut.yaml' | Should Be 'C:\defaut.yaml'
+    }
+
+    It 'relève les chemins saisis dans la saisie de page, sous les clés de config.json' {
+        New-RiotPathTestState
+        foreach ($item in @($script:InstallState.DetectionItems | Where-Object { Test-DetectionItemEditable $_ })) { New-RiotPathItemControls $item 0 520 | Out-Null }
+        $script:InstallState.Controls.RiotPathBoxes.ProductSettingsPath.Text = 'D:\autre.yaml'
+        $selection = Get-SetupPageSelection
+        $selection.RiotPaths.RiotClientPath | Should Be 'C:\Riot\RiotClientServices.exe'
+        $selection.RiotPaths.ProductSettingsPath | Should Be 'D:\autre.yaml'
+    }
+
+    It 'remplit le champ avec le fichier choisi dans Parcourir… et ne touche à rien sur Annuler' {
+        New-RiotPathTestState
+        New-RiotPathItemControls $riotItem 0 520 | Out-Null
+        Mock Show-SetupFileDialog { 'D:\Jeux\Riot Client\RiotClientServices.exe' }
+        Invoke-SetupBrowseRiotPath 'RiotClientPath'
+        $script:InstallState.Controls.RiotPathBoxes.RiotClientPath.Text | Should Be 'D:\Jeux\Riot Client\RiotClientServices.exe'
+        Assert-MockCalled -Scope It Show-SetupFileDialog -Exactly -Times 1 -ParameterFilter { $CurrentPath -eq 'C:\Riot\RiotClientServices.exe' -and $Filter -match 'exe' -and $Title -eq 'Riot Client' }
+        Mock Show-SetupFileDialog { $null }
+        Invoke-SetupBrowseRiotPath 'RiotClientPath'
+        $script:InstallState.Controls.RiotPathBoxes.RiotClientPath.Text | Should Be 'D:\Jeux\Riot Client\RiotClientServices.exe'
+    }
+}
+
+Describe 'Invoke-SetupDetectStep' {
+    Mock Test-Path { $true }
+    Mock Save-LaunchRiotPaths { $true }
+
+    It 'enregistre les chemins saisis et avance, même si l''un reste introuvable' {
+        Reset-SetupTestState @{ Config = (New-TestLaunchConfig); Layout = (Get-SetupLayout 784 521) }
+        $script:InstallState.DetectionItems           = @(Get-DetectionItems $script:InstallState.Config)
+        $script:InstallState.Controls.RiotPathBoxes    = @{}
+        $script:InstallState.Controls.RiotPathStatuses = @{}
+        foreach ($item in @($script:InstallState.DetectionItems | Where-Object { Test-DetectionItemEditable $_ })) { New-RiotPathItemControls $item 0 520 | Out-Null }
+        Mock Test-Path { $false } -ParameterFilter { $Path -eq 'D:\absent.exe' }
+        $script:InstallState.Controls.RiotPathBoxes.RiotClientPath.Text = 'D:\absent.exe'
+        Invoke-SetupDetectStep | Should Be $true
+        Assert-MockCalled -Scope It Save-LaunchRiotPaths -Exactly -Times 1 -ParameterFilter {
+            $ConfigPath -eq $SetupConfigPath -and $Paths.RiotClientPath -eq 'D:\absent.exe' -and $Paths.ProductSettingsPath -eq 'C:\ProgramData\lol.yaml'
+        }
+    }
+
+    It 'avance sans rien écrire quand la page n''a pas de champ de chemin' {
+        Reset-SetupTestState @{ Config = (New-TestLaunchConfig) }
+        Invoke-SetupDetectStep | Should Be $true
+        Assert-MockCalled -Scope It Save-LaunchRiotPaths -Exactly -Times 0
     }
 }
