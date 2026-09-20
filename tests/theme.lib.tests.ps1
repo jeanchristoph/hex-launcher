@@ -122,4 +122,14 @@ Describe 'New-ThemedForm' {
         $form.Icon | Should Not BeNullOrEmpty
         $form.Dispose()
     }
+
+    It 'prend l''icône demandée, et se contente de celle de Windows si son fichier manque' {
+        $gear = Join-Path (Split-Path $here -Parent) 'app\ico\hex-launcher-setup.ico'
+        $form = New-ThemedForm 'Test' 300 200 $gear
+        $form.Icon.Width | Should Be ((New-Object System.Drawing.Icon($gear)).Width)
+        $form.Dispose()
+        $bare = $null
+        { $script:bare = New-ThemedForm 'Test' 300 200 (Join-Path $TestDrive 'absent.ico') } | Should Not Throw
+        $script:bare.Dispose()
+    }
 }

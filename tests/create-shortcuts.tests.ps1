@@ -110,20 +110,148 @@ Describe 'Remove-StaleCompanionIcons' {
     $companionIconFolder = Join-Path $TestDrive 'stale'
     New-Item -ItemType Directory -Path $companionIconFolder -Force | Out-Null
     $blitz = [pscustomobject]@{ id = 'blitz' }
-    $keep = Join-Path $companionIconFolder 'hex-launcher-jp-blitz-e4103f.ico'
-    foreach ($name in 'hex-launcher-jp-blitz-e4103f.ico', 'hex-launcher-jp-blitz-7a3fc9.ico', 'hex-launcher-jp-opgg-5383e8.ico', 'hex-launcher-fr-blitz-7a3fc9.ico') {
+    $keep = Join-Path $companionIconFolder 'hex-launcher-jp-blitz-e4103f00.ico'
+    foreach ($name in 'hex-launcher-jp-blitz-e4103f00.ico', 'hex-launcher-jp-blitz-7a3fc900.ico', 'hex-launcher-jp-opgg-5383e800.ico', 'hex-launcher-fr-blitz-7a3fc900.ico') {
         Set-Content (Join-Path $companionIconFolder $name) 'x'
     }
     Remove-StaleCompanionIcons 'ja_JP' $blitz $keep
 
     It 'supprime les anciennes couleurs de la même combinaison langue × compagnon' {
-        Test-Path (Join-Path $companionIconFolder 'hex-launcher-jp-blitz-7a3fc9.ico') | Should Be $false
+        Test-Path (Join-Path $companionIconFolder 'hex-launcher-jp-blitz-7a3fc900.ico') | Should Be $false
     }
 
     It 'garde la variante courante et les autres combinaisons' {
         Test-Path $keep | Should Be $true
-        Test-Path (Join-Path $companionIconFolder 'hex-launcher-jp-opgg-5383e8.ico') | Should Be $true
-        Test-Path (Join-Path $companionIconFolder 'hex-launcher-fr-blitz-7a3fc9.ico') | Should Be $true
+        Test-Path (Join-Path $companionIconFolder 'hex-launcher-jp-opgg-5383e800.ico') | Should Be $true
+        Test-Path (Join-Path $companionIconFolder 'hex-launcher-fr-blitz-7a3fc900.ico') | Should Be $true
+    }
+}
+
+Describe 'Remove-StaleIconVariants' {
+    $companionIconFolder = Join-Path $TestDrive 'stale-stacked'
+    New-Item -ItemType Directory -Path $companionIconFolder -Force | Out-Null
+    $keep = Join-Path $companionIconFolder 'hex-launcher-jp-0123abcd.ico'
+    foreach ($name in 'hex-launcher-jp-0123abcd.ico', 'hex-launcher-jp-89ab4567.ico', 'hex-launcher-jp-blitz-89ab4567.ico', 'hex-launcher-jp-notes.ico') {
+        Set-Content (Join-Path $companionIconFolder $name) 'x'
+    }
+    Remove-StaleIconVariants 'hex-launcher-jp' $keep
+
+    It 'supprime les autres empreintes de la même tige' {
+        Test-Path (Join-Path $companionIconFolder 'hex-launcher-jp-89ab4567.ico') | Should Be $false
+    }
+
+    It 'garde la variante courante, les tiges plus longues (compagnon) et les fichiers étrangers au motif' {
+        Test-Path $keep | Should Be $true
+        Test-Path (Join-Path $companionIconFolder 'hex-launcher-jp-blitz-89ab4567.ico') | Should Be $true
+        Test-Path (Join-Path $companionIconFolder 'hex-launcher-jp-notes.ico') | Should Be $true
+    }
+}
+
+Describe 'Get-StackedIconStem' {
+    It 'nomme par le pays, puis l''identifiant du compagnon s''il y en a un' {
+        Get-StackedIconStem (New-ShortcutCombination 'ja_JP' $null) | Should Be 'hex-launcher-jp'
+        Get-StackedIconStem (New-ShortcutCombination 'ja_JP' ([pscustomobject]@{ id = 'blitz'; name = 'Blitz' })) | Should Be 'hex-launcher-jp-blitz'
+    }
+}
+
+Describe 'Resolve-ShortcutIconPath sur un jeu externe' {
+    $blitz = [pscustomobject]@{ id = 'blitz'; name = 'Blitz' }
+    $badge = [pscustomobject]@{ glyph = 'B'; color = '#E0432B' }
+    $exe   = 'C:\Riot Games\League of Legends\LeagueClient.exe'
+
+    Context 'original : icône nue référencée depuis le binaire' {
+        Set-ActiveIconSet 'original' | Out-Null
+        $script:LeagueClientPath = $exe
+        $script:CompanionBadges = @{ blitz = $badge }
+        Mock Add-StackedBadgesToExecutableIcon { throw 'ne doit pas être appelé' }
+        Mock Add-CompanionBadge { throw 'ne doit pas être appelé' }
+
+        It 'rend le binaire lui-même, avec ou sans compagnon, sans rien composer' {
+            try {
+                Resolve-ShortcutIconPath (New-ShortcutCombination 'ja_JP' $null) | Should Be $exe
+                Resolve-ShortcutIconPath (New-ShortcutCombination 'ja_JP' $blitz) | Should Be $exe
+                Assert-MockCalled Add-StackedBadgesToExecutableIcon -Scope It -Exactly 0
+                Assert-MockCalled Add-CompanionBadge -Scope It -Exactly 0
+            } finally { Set-ActiveIconSet '' | Out-Null; $script:LeagueClientPath = $null }
+        }
+    }
+
+    Context 'original-badges : pastilles composées sur l''icône du binaire' {
+        Set-ActiveIconSet 'original-badges' | Out-Null
+        $script:LeagueClientPath = $exe
+        $script:CompanionBadges = @{ blitz = $badge }
+        Mock New-Item {}
+        Mock Add-StackedBadgesToExecutableIcon { param($ExecutablePath, $Code, $Badge, $DestinationIco, $Style) $DestinationIco }
+
+        It 'compose pays + compagnon dans ico\original-badges\companion' {
+            try {
+                $combination = New-ShortcutCombination 'ja_JP' $blitz
+                Resolve-ShortcutIconPath $combination | Should Be (Get-StackedIconPath $combination $badge)
+                Get-StackedIconPath $combination $badge | Should Match 'ico\\original-badges\\companion\\hex-launcher-jp-blitz-[0-9a-f]{8}\.ico$'
+                Assert-MockCalled Add-StackedBadgesToExecutableIcon -Scope It -Exactly 1 -ParameterFilter { $ExecutablePath -eq $exe -and $Code -eq 'ja_JP' -and $Badge.glyph -eq 'B' }
+            } finally { Set-ActiveIconSet '' | Out-Null; $script:LeagueClientPath = $null }
+        }
+
+        It 'compose le pays seul sans compagnon' {
+            Set-ActiveIconSet 'original-badges' | Out-Null; $script:LeagueClientPath = $exe
+            try {
+                $combination = New-ShortcutCombination 'fr_FR' $null
+                Resolve-ShortcutIconPath $combination | Should Match 'ico\\original-badges\\companion\\hex-launcher-fr-[0-9a-f]{8}\.ico$'
+                Assert-MockCalled Add-StackedBadgesToExecutableIcon -Scope It -Exactly 1 -ParameterFilter { $Code -eq 'fr_FR' -and $null -eq $Badge }
+            } finally { Set-ActiveIconSet '' | Out-Null; $script:LeagueClientPath = $null }
+        }
+    }
+
+    Context 'échec de composition' {
+        Set-ActiveIconSet 'original-badges' | Out-Null
+        $script:LeagueClientPath = $exe
+        $script:CompanionBadges = @{ blitz = $badge }
+        Mock New-Item {}
+        Mock Add-StackedBadgesToExecutableIcon { throw 'GDI+ indisponible' }
+        Mock Write-Warning {}
+
+        It 'replie sur l''icône officielle nue avec un avertissement, sans interrompre l''installation' {
+            try {
+                Resolve-ShortcutIconPath (New-ShortcutCombination 'ja_JP' $blitz) | Should Be $exe
+                Assert-MockCalled Write-Warning -Scope It -Exactly 1
+            } finally { Set-ActiveIconSet '' | Out-Null; $script:LeagueClientPath = $null }
+        }
+    }
+
+    Context 'binaire introuvable' {
+        Set-ActiveIconSet 'original' | Out-Null
+        $script:LeagueClientPath = $null
+        $script:CompanionBadges = @{}
+        Mock Find-LeagueClientPath { $null }
+        Mock Write-Warning {}
+
+        It 'replie sur les icônes du jeu par défaut, avec un seul avertissement pour toute l''exécution' {
+            try {
+                Resolve-ShortcutIconPath (New-ShortcutCombination 'ja_JP' $null) | Should Match 'ico\\flat\\hex-launcher-jp\.ico$'
+                Resolve-ShortcutIconPath (New-ShortcutCombination 'fr_FR' $null) | Should Match 'ico\\flat\\hex-launcher-fr\.ico$'
+                Assert-MockCalled Write-Warning -Scope It -Exactly 1
+                Assert-MockCalled Find-LeagueClientPath -Scope It -Exactly 1
+            } finally { Set-ActiveIconSet '' | Out-Null; $script:LeagueClientPath = $null }
+        }
+    }
+}
+
+Describe 'New-LaunchShortcut sur le jeu original-badges' {
+    Set-ActiveIconSet 'original-badges' | Out-Null
+    $companionIconFolder = Join-Path $TestDrive 'stacked'
+    $script:LeagueClientPath = $powershell   # n'importe quel binaire à icône tient lieu de LeagueClient.exe
+    $script:CompanionBadges = Read-CompanionBadges (Join-Path $here '..\app\companion-apps.json')
+    $blitz = [pscustomobject]@{ id = 'blitz'; name = 'Blitz' }
+
+    It 'écrit un .lnk dont l''icône est l''icône du binaire composée avec les deux pastilles, en six tailles' {
+        try {
+            $lnk = New-LaunchShortcut (New-ShortcutCombination 'ja_JP' $blitz) $TestDrive
+            $icon = $shell.CreateShortcut($lnk).IconLocation
+            $icon | Should Match 'stacked\\hex-launcher-jp-blitz-[0-9a-f]{8}\.ico,0$'
+            $entries = Read-IcoEntries ($icon -replace ',0$')
+            @($entries).Count | Should Be 6
+            $entries | ForEach-Object { $_.Bitmap.Dispose() }
+        } finally { Set-ActiveIconSet '' | Out-Null; $script:LeagueClientPath = $null }
     }
 }
 

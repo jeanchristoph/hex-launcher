@@ -130,7 +130,7 @@
 ### T20 — Identité : `hex-launcher` + mention de non-affiliation
 **Effort:** S
 **Files:** `README.md`, `README.fr.md`, `README.ja.md`, `.forge/project.md`, `install.ps1` (titres), `lib/splash.lib.ps1` (titre du splash), dépôt GitHub
-**Description:** Renommage en `hex-launcher` (GitHub `gh repo rename`, remote, README, titres d'interface). Mention de non-affiliation en évidence dans les 3 README (politique « Legal Jibber Jabber » de Riot Games, non-affiliation, marques).
+**Description:** Renommage en `hex-launcher` (GitHub `gh repo rename`, remote, README, titres d'interface). Mention de non-affiliation en évidence dans les 3 README (non-affiliation, marques).
 [x] gh repo rename (redirection conservée), remote, README ×3, install.ps1/bat, project.md
 
 ### T21 — Jeu d'icônes original (H monogramme)

@@ -119,6 +119,18 @@ Describe 'Machine à états de l''assistant' {
     }
 }
 
+Describe 'Get-SetupWindowIconPath' {
+    It 'donne à la fenêtre l''engrenage du raccourci Hex Launcher' {
+        Get-SetupWindowIconPath | Should Be (Join-Path (Split-Path $here -Parent) 'app\ico\hex-launcher-setup.ico')
+        Get-SetupWindowIconPath | Should Exist
+    }
+
+    It 'replie sur l''icône du projet quand l''engrenage manque' {
+        Mock Test-Path { $false } -ParameterFilter { $Path -like '*hex-launcher-setup.ico' }
+        Get-SetupWindowIconPath | Should Be (Get-ThemeIconPath)
+    }
+}
+
 Describe 'Get-SetupLayout' {
     $layout = Get-SetupLayout 784 521
 
@@ -200,24 +212,48 @@ Describe 'Éléments des listes' {
         $items[0].Label | Should Be 'OP.GG'
     }
 
-    It 'nomme un jeu d''icônes par son dossier' {
-        $items = @(Get-IconSetListItems @(@{ Name = 'classic'; Path = 'C:\x\classic' }))
+    It 'nomme un jeu d''icônes livré par son libellé traduit, la clé restant le dossier' {
+        $items = @(Get-IconSetListItems @(@{ Name = 'classic'; Path = 'C:\x\classic' }, @{ Name = 'original-badges'; Path = 'C:\x\ob' }))
         $items[0].Key | Should Be 'classic'
-        $items[0].Label | Should Be 'classic'
+        $items[0].Label | Should Be 'Classique (relief)'
+        $items[1].Label | Should Be 'LoL officielle + pastilles'
+    }
+
+    It 'nomme un jeu d''icônes inconnu par son dossier' {
+        (Get-IconSetListItems @(@{ Name = 'retro'; Path = 'C:\x\retro' }))[0].Label | Should Be 'retro'
+    }
+
+    It 'dérive la clé de traduction du dossier en camelCase, convention des dictionnaires' {
+        ConvertTo-IconSetLabelKey 'original-badges' | Should Be 'iconSet.originalBadges'
+        ConvertTo-IconSetLabelKey 'flat' | Should Be 'iconSet.flat'
+        ConvertTo-IconSetLabelKey 'my-own-set' | Should Be 'iconSet.myOwnSet'
+    }
+
+    It 'traduit le libellé d''un jeu dans la langue active' {
+        try {
+            Initialize-Translation 'en' | Out-Null
+            Get-IconSetLabel @{ Name = 'flat'; Path = 'C:\x\flat' } | Should Be 'Flat flag + HL logo'
+        }
+        finally { Initialize-Translation 'fr' | Out-Null }
     }
 }
 
 Describe 'Jeu d''icônes de la page Raccourcis' {
     $sets = @(@{ Name = 'classic'; Path = 'C:\x\classic' }, @{ Name = 'flat'; Path = 'C:\x\flat' })
+    $allSets = @(@{ Name = 'original-badges'; Path = 'C:\x\ob' }) + $sets
 
     It 'présélectionne le jeu mémorisé dans config.json' {
         $config = New-TestLaunchConfig; Set-LaunchIconSetName $config 'classic'
         Get-PreselectedIconSetName $config $sets | Should Be 'classic'
     }
 
-    It 'replie sur le jeu par défaut quand config.json cite un jeu disparu ou aucun' {
+    It 'présélectionne original-badges quand config.json cite un jeu disparu ou aucun' {
         $config = New-TestLaunchConfig; Set-LaunchIconSetName $config 'disparu'
-        Get-PreselectedIconSetName $config $sets | Should Be 'flat'
+        Get-PreselectedIconSetName $config $allSets | Should Be 'original-badges'
+        Get-PreselectedIconSetName (New-TestLaunchConfig) $allSets | Should Be 'original-badges'
+    }
+
+    It 'replie sur flat quand original-badges n''est pas livré' {
         Get-PreselectedIconSetName (New-TestLaunchConfig) $sets | Should Be 'flat'
     }
 
@@ -245,6 +281,29 @@ Describe 'Jeu d''icônes de la page Raccourcis' {
     It 'rend null sans jeu ou avec une icône illisible' {
         New-IconSetPreviewImage $null 64 | Should BeNullOrEmpty
         New-IconSetPreviewImage @{ Name = 'x'; Path = (Join-Path $TestDrive 'absent') } 64 | Should BeNullOrEmpty
+    }
+
+    Context 'jeu externe (icône du binaire installé)' {
+        $original = Find-IconSet @(Get-IconSets (Join-Path $here '..\app\ico')) 'original'
+        $originalBadges = Find-IconSet @(Get-IconSets (Join-Path $here '..\app\ico')) 'original-badges'
+
+        It 'donne en aperçu l''icône du binaire, lue en mémoire à 64 px' {
+            Mock Find-LeagueClientPath { Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe' }
+            $image = New-IconSetPreviewImage $original 64
+            try { $image.Width | Should Be 64 } finally { if ($image) { $image.Dispose() } }
+        }
+
+        It 'laisse l''aperçu vide quand le binaire est introuvable' {
+            Mock Find-LeagueClientPath { $null }
+            New-IconSetPreviewImage $original 64 | Should BeNullOrEmpty
+        }
+
+        It 'explique le jeu nu (raccourcis distingués par leur nom) et le jeu à pastilles ; rien pour un jeu de fichiers' {
+            Get-IconSetNoteText $original | Should Be (Get-Text 'setup.shortcuts.iconSetNote.bare')
+            Get-IconSetNoteText $originalBadges | Should Be (Get-Text 'setup.shortcuts.iconSetNote.badges')
+            Get-IconSetNoteText @{ Name = 'flat'; Path = 'C:\x\flat' } | Should Be ''
+            Get-IconSetNoteText $null | Should Be ''
+        }
     }
 }
 
@@ -698,7 +757,7 @@ Describe 'Invoke-SetupShortcutsStep' {
         Invoke-SetupShortcutsStep | Should Be $true
         $script:InstallState.ShortcutPaths.Count | Should Be 1
         Assert-MockCalled -Scope It Select-IconSetForConfig -Exactly -Times 1 -ParameterFilter { $RequestedName -eq 'classic' -and $ConfigPath -eq $SetupConfigPath }
-        Assert-MockCalled -Scope It Write-SetupLog -Exactly -Times 1 -ParameterFilter { $Text -eq (Get-Text 'setup.shortcuts.iconSetChosen' 'classic') }
+        Assert-MockCalled -Scope It Write-SetupLog -Exactly -Times 1 -ParameterFilter { $Text -eq (Get-Text 'setup.shortcuts.iconSetChosen' 'Classique (relief)') }
         Assert-MockCalled -Scope It New-SetupShortcuts -Exactly -Times 1 -ParameterFilter { $Combinations.Count -eq 1 -and $Combinations[0].Name -eq 'League of Legends JP - Blitz' }
         Assert-MockCalled -Scope It Remove-ObsoleteShortcuts -Exactly -Times 1
         Assert-MockCalled -Scope It Write-SetupLog -Exactly -Times 1 -ParameterFilter { $Text -match '^Retiré' }

@@ -10,9 +10,18 @@ Pour changer de langue ou d'appli compagnon plus tard : relancez setup.bat.
 L'assistant s'affiche en français, anglais ou japonais selon Windows — sélecteur en bas à gauche.
 Documentation complète : README.fr.md (français), README.md (English), README.ja.md (日本語).
 
+Confiance : setup.bat tient en une ligne (ouvrez-le dans le Bloc-notes), tout le code est en clair dans app\.
+Aucune donnée collectée, aucune télémétrie, aucun compte : l'outil ne parle qu'au Riot Client de votre PC et ne
+va sur Internet que pour installer une appli compagnon que vous avez cochée. Jamais administrateur, registre
+jamais écrit, rien d'installé sans votre clic sur Appliquer. Empreinte SHA-256 du zip publiée avec chaque release.
+
 Projet non affilié à Riot Games — voir la mention légale dans les README.
 
 -----------------------------------------------------------------------------------
 EN — Double-click setup.bat (never as administrator), follow the wizard, then use the
 "League of Legends XX" desktop shortcuts. The app\ folder is the engine: nothing to edit there.
 The wizard follows the Windows language (FR / EN / JA) — selector at the bottom left.
+Trust: setup.bat is one line (open it in Notepad), all code is plain text in app\. No data collected, no
+telemetry, no account; it only talks to the Riot Client on your PC and only goes online to install a companion
+app you ticked. Never as administrator, registry never written, nothing installed without your click on Apply.
+The SHA-256 of the zip is published with every release.

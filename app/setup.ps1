@@ -45,6 +45,13 @@ function Get-SetupWindowTitle {
     return Get-Text 'setup.windowTitle'
 }
 
+# Même icône que le raccourci « Hex Launcher » : l'engrenage ; repli sur l'icône du projet s'il manque
+function Get-SetupWindowIconPath {
+    $gear = Join-Path $PSScriptRoot 'ico\hex-launcher-setup.ico'
+    if (Test-Path $gear) { return $gear }
+    return Get-ThemeIconPath
+}
+
 # État partagé par les pages et les gestionnaires d'événements (les variables locales d'une page ne survivent pas au clic)
 $script:InstallState = @{
     StepId           = 'detect'
@@ -180,31 +187,66 @@ function Get-LocaleListItems([object[]]$Locales) {
     return @($Locales | ForEach-Object { New-SetupListItem $_.code "$($_.code)   $($_.label)" })
 }
 
-# Un jeu d'icônes par sous-dossier de ico\ ; le nom du dossier est le libellé
-function Get-IconSetListItems([object[]]$Sets) {
-    return @($Sets | ForEach-Object { New-SetupListItem $_.Name $_.Name })
+# Clé de traduction d'un jeu : le dossier en camelCase, convention des dictionnaires (original-badges → originalBadges)
+function ConvertTo-IconSetLabelKey([string]$Name) {
+    $parts = @($Name -split '-' | Where-Object { $_ })
+    $tail  = @($parts | Select-Object -Skip 1 | ForEach-Object { $_.Substring(0, 1).ToUpperInvariant() + $_.Substring(1) })
+    return 'iconSet.' + ((@($parts | Select-Object -First 1) + $tail) -join '')
 }
 
-# Jeu présélectionné : celui de config.json s'il existe encore, sinon le jeu par défaut
+# Libellé d'un jeu d'icônes : traduit s'il est connu du dictionnaire, sinon le nom du dossier
+function Get-IconSetLabel($Set) {
+    $key   = ConvertTo-IconSetLabelKey $Set.Name
+    $label = Get-Text $key
+    if ($label -eq $key) { return $Set.Name }
+    return $label
+}
+
+# Un jeu d'icônes par sous-dossier de ico\ ; clé = dossier (ce que config.json mémorise), libellé lisible
+function Get-IconSetListItems([object[]]$Sets) {
+    return @($Sets | ForEach-Object { New-SetupListItem $_.Name (Get-IconSetLabel $_) })
+}
+
+# Jeu présélectionné : celui de config.json s'il existe encore, sinon le jeu préféré
 function Get-PreselectedIconSetName($Config, [object[]]$Sets) {
     $wanted = Find-IconSet $Sets (Get-LaunchIconSetName $Config)
     if ($wanted) { return $wanted.Name }
-    $default = Get-DefaultIconSet $Sets
-    if ($default) { return $default.Name }
+    $preferred = Get-PreferredIconSet $Sets
+    if ($preferred) { return $preferred.Name }
     return ''
 }
 
-# Image d'aperçu d'un jeu : l'entrée de hex-launcher.ico de la taille demandée (ou la plus grande en dessous) ; $null si illisible
+# Entrées d'aperçu d'un jeu : hex-launcher.ico pour un jeu de fichiers, l'icône du binaire installé (lue en mémoire,
+# jamais copiée) pour un jeu externe ; binaire introuvable → throw, l'aperçu reste vide
+function Read-IconSetPreviewEntries($Set, [int]$Size) {
+    if (Test-IconSetExternal $Set) {
+        $exe = Find-LeagueClientPath
+        if (-not $exe) { throw 'LeagueClient.exe introuvable' }
+        return @(Read-ExecutableIconEntries $exe @($Size))
+    }
+    return @(Read-IcoEntries (Get-IconSetFilePath $Set $IconSetBaseIcon))
+}
+
+# Image d'aperçu d'un jeu : l'entrée de la taille demandée (ou la plus grande en dessous) ; $null si illisible
 function New-IconSetPreviewImage($Set, [int]$Size) {
     if (-not $Set) { return $null }
     try {
-        $entries = @(Read-IcoEntries (Get-IconSetFilePath $Set $IconSetBaseIcon))
+        $entries = @(Read-IconSetPreviewEntries $Set $Size)
         $chosen  = @($entries | Where-Object { $_.Size -le $Size } | Sort-Object Size -Descending | Select-Object -First 1)
         if ($chosen.Count -eq 0) { $chosen = @($entries | Sort-Object Size | Select-Object -First 1) }
         $image = $chosen[0].Bitmap.Clone()
         $entries | ForEach-Object { $_.Bitmap.Dispose() }
         return $image
     } catch { return $null }
+}
+
+# Note sous la liste des jeux : ce qu'implique un jeu externe (icône nue → raccourcis distingués par leur nom seul ;
+# pastilles → fichier composé sur ce poste) ; vide pour un jeu de fichiers
+function Get-IconSetNoteText($Set) {
+    $source = Get-IconSetSource $Set
+    if (-not $source) { return '' }
+    if ($source.Badges) { return Get-Text 'setup.shortcuts.iconSetNote.badges' }
+    return Get-Text 'setup.shortcuts.iconSetNote.bare'
 }
 
 function Get-ShortcutCompanionListItems([object[]]$CompanionApps) {
@@ -427,7 +469,7 @@ function New-SetupFooter($Layout) {
 
 function New-SetupWindow {
     $state    = $script:InstallState
-    $form     = New-ThemedForm (Get-SetupWindowTitle) 800 620
+    $form     = New-ThemedForm (Get-SetupWindowTitle) 800 620 (Get-SetupWindowIconPath)
     $layout   = Get-SetupLayout $form.ClientSize.Width $form.ClientSize.Height
     $controls = $state.Controls
     $controls.PageTitle = New-ThemedTitle '' $layout.ContentLeft 24 $layout.ContentWidth
@@ -749,30 +791,37 @@ function New-SetupShortcutsControls {
     $rightColumn   = $columnWidth + 20
     $companionRows = [Math]::Max(1, $companionApps.Count)
     $companionHeight = [Math]::Min(110, 24 * $companionRows + 8)
-    $iconSetsTop     = 72 + $companionHeight + 12
+    # L'intro tient sur 3 lignes (le chemin du Bureau est long) ; les deux colonnes commencent dessous
+    $columnsTop      = 94
+    $iconSetsTop     = $columnsTop + $companionHeight + 12
     $previewSize     = 64
-    $controls.LocaleList    = New-SetupCheckedList (Get-LocaleListItems $state.Locales) (Get-SetupPreselection 'LocaleList' (Get-PreselectedCodes $state.Locales $state.ExistingShortcuts)) 0 72 $columnWidth 230
-    $controls.CompanionList = New-SetupCheckedList (Get-ShortcutCompanionListItems $companionApps) (Get-SetupPreselection 'CompanionList' (Get-PreselectedShortcutCompanionIds $companionApps $state.ExistingShortcuts)) $rightColumn 72 $columnWidth $companionHeight
-    $controls.IconSetList   = New-SetupIconSetList $state.IconSets (Get-SetupPreselectedIconSetName $state) $rightColumn ($iconSetsTop + 24) ($columnWidth - $previewSize - 12) $previewSize
+    $iconListHeight  = 4 * 17 + 4   # les quatre jeux livrés visibles sans défilement
+    $controls.LocaleList    = New-SetupCheckedList (Get-LocaleListItems $state.Locales) (Get-SetupPreselection 'LocaleList' (Get-PreselectedCodes $state.Locales $state.ExistingShortcuts)) 0 $columnsTop $columnWidth 230
+    $controls.CompanionList = New-SetupCheckedList (Get-ShortcutCompanionListItems $companionApps) (Get-SetupPreselection 'CompanionList' (Get-PreselectedShortcutCompanionIds $companionApps $state.ExistingShortcuts)) $rightColumn $columnsTop $columnWidth $companionHeight
+    $controls.IconSetList   = New-SetupIconSetList $state.IconSets (Get-SetupPreselectedIconSetName $state) $rightColumn ($iconSetsTop + 24) ($columnWidth - $previewSize - 12) $iconListHeight
     $controls.IconSetPreview = New-ThemedPicture ($rightColumn + $columnWidth - $previewSize) ($iconSetsTop + 24) $previewSize
     # Pleine largeur sous les deux colonnes : le libellé dit quand cocher la case, et cette explication ne tient
     # pas dans une demi-colonne — la tronquer priverait la case de ce qui la rend utilisable
-    $legacyTop      = 306
+    $legacyTop      = 350
     $logTop         = $legacyTop + 34
+    # Note sous la liste des jeux (jeux externes), dans l'espace qui reste au-dessus de la case
+    $noteTop        = $iconSetsTop + 24 + $iconListHeight + 2
+    $controls.IconSetNote   = New-ThemedLabel '' $rightColumn $noteTop $columnWidth ([Math]::Max(28, $legacyTop - $noteTop)) 'Muted' 8.25
     $controls.LegacyLaunchBox = New-SetupLegacyLaunchBox $state 0 $legacyTop $layout.ContentWidth
     $controls.Log           = New-ThemedLog 0 $logTop $layout.ContentWidth ($layout.ContentHeight - $logTop)
     $controls.Inputs        = @($controls.LocaleList, $controls.CompanionList, $controls.IconSetList)
     $controls.IconSetList.Add_SelectedIndexChanged({ Invoke-SetupSafely { Update-SetupIconSetPreview } })
     Update-SetupIconSetPreview
     return @(
-        (New-ThemedLabel (Get-Text 'setup.shortcuts.intro' $Destination) 0 0 $layout.ContentWidth 44 'Muted')
-        (New-ThemedLabel (Get-Text 'shortcuts.languages') 0 48 $columnWidth 22 'Gold' 10 'Bold')
-        (New-ThemedLabel (Get-Text 'setup.shortcuts.companions') $rightColumn 48 $columnWidth 22 'Gold' 10 'Bold')
+        (New-ThemedLabel (Get-Text 'setup.shortcuts.intro' $Destination) 0 0 $layout.ContentWidth 66 'Muted')
+        (New-ThemedLabel (Get-Text 'shortcuts.languages') 0 ($columnsTop - 24) $columnWidth 22 'Gold' 10 'Bold')
+        (New-ThemedLabel (Get-Text 'setup.shortcuts.companions') $rightColumn ($columnsTop - 24) $columnWidth 22 'Gold' 10 'Bold')
         (New-ThemedLabel (Get-Text 'setup.shortcuts.iconSet') $rightColumn $iconSetsTop $columnWidth 22 'Gold' 10 'Bold')
         $controls.LocaleList
         $controls.CompanionList
         $controls.IconSetList
         $controls.IconSetPreview
+        $controls.IconSetNote
         $controls.LegacyLaunchBox
         $controls.Log
     )
@@ -822,6 +871,7 @@ function Update-SetupIconSetPreview {
     $previous = $controls.IconSetPreview.Image
     $controls.IconSetPreview.Image = New-IconSetPreviewImage $set $controls.IconSetPreview.Width
     if ($previous) { $previous.Dispose() }
+    if ($null -ne $controls.IconSetNote) { $controls.IconSetNote.Text = Get-IconSetNoteText $set }
 }
 
 function Show-SetupShortcutsPage {
@@ -860,7 +910,7 @@ function Invoke-SetupShortcutsStep {
         return $false
     }
     $iconSet = Select-IconSetForConfig $state.Config $SetupConfigPath $selection.IconSet
-    if ($iconSet) { Write-SetupLog (Get-Text 'setup.shortcuts.iconSetChosen' $iconSet.Name) }
+    if ($iconSet) { Write-SetupLog (Get-Text 'setup.shortcuts.iconSetChosen' (Get-IconSetLabel $iconSet)) }
     if ($null -ne $selection.UseLocalApi) {
         Save-LaunchUseLocalApi $state.Config $SetupConfigPath ([bool]$selection.UseLocalApi) | Out-Null
         Write-SetupLog (Get-Text $(if ($selection.UseLocalApi) { 'setup.shortcuts.directLaunchChosen' } else { 'setup.shortcuts.legacyLaunchChosen' }))

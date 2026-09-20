@@ -17,6 +17,10 @@
     déclarées dans companion-apps.json), composée dans ico\<jeu>\companion\ à chaque exécution. Sans pastille ou en
     cas d'échec de composition, le raccourci garde l'icône drapeau seule.
 
+    Jeux externes (ico\<jeu>\icon-source.json) : l'icône officielle du jeu, référencée depuis LeagueClient.exe installé
+    (jamais copiée dans le projet) — nue (« original »), ou surmontée de la pastille pays puis de la pastille compagnon,
+    composées dans ico\<jeu>\companion\ (« original-badges »). Binaire introuvable → icônes du jeu par défaut.
+
     L'assistant (setup.ps1) pose en plus « Hex Launcher », un raccourci vers setup.bat avec l'icône
     engrenage ico\hex-launcher-setup.ico (repli sur l'icône de base du jeu) : toujours recréé, jamais retiré.
 
@@ -51,6 +55,7 @@ Add-Type -AssemblyName System.Drawing
 . (Join-Path $PSScriptRoot 'lib\companion-app.lib.ps1')
 . (Join-Path $PSScriptRoot 'lib\icon-badge.lib.ps1')
 . (Join-Path $PSScriptRoot 'lib\icon-set.lib.ps1')
+. (Join-Path $PSScriptRoot 'lib\riot-install.lib.ps1')
 
 $folder      = $PSScriptRoot
 $launcher    = Join-Path $folder 'launch-lol.ps1'
@@ -62,6 +67,7 @@ $icoRoot     = Join-Path $folder 'ico'
 $setupIcon   = Join-Path $icoRoot 'hex-launcher-setup.ico'   # engrenage du raccourci vers setup.bat, commun à tous les jeux
 $catalogPath = Join-Path $folder 'companion-apps.json'
 $CompanionBadges     = $null   # pastilles par identifiant, lues du catalogue à la première demande
+$LeagueClientPath    = $null   # LeagueClient.exe installé, cherché à la première demande ('' = introuvable, déjà signalé)
 $ActiveIconSet       = $null   # jeu d'icônes courant et son dossier ico\<jeu>\companion, posés par Set-ActiveIconSet (ci-dessous, après les fonctions)
 $companionIconFolder = $null
 $shell       = New-Object -ComObject WScript.Shell
@@ -166,11 +172,18 @@ function Get-ActiveBadgeStyle {
     return Get-IconSetBadgeStyle (Get-ActiveIconSet)
 }
 
+# Retire les variantes d'une autre empreinte de la même tige : motif exact <tige>-<8 hex>.ico, car « hex-launcher-jp-* »
+# engloberait les icônes de « hex-launcher-jp-blitz »
+function Remove-StaleIconVariants([string]$Stem, [string]$Keep) {
+    $pattern = "^$([regex]::Escape($Stem))-[0-9a-f]{8}\.ico$"
+    $stale = Get-ChildItem -Path $companionIconFolder -Filter "$Stem-*.ico" -File -ErrorAction SilentlyContinue |
+             Where-Object { $_.Name -match $pattern -and $_.FullName -ne $Keep }
+    foreach ($file in $stale) { Remove-Item -Path $file.FullName -Force -ErrorAction SilentlyContinue }
+}
+
 # Retire les variantes d'une autre couleur de la même combinaison
 function Remove-StaleCompanionIcons([string]$Code, $Companion, [string]$Keep) {
-    $stale = Get-ChildItem -Path $companionIconFolder -Filter "$(Get-CompanionIconStem $Code $Companion)-*.ico" -File -ErrorAction SilentlyContinue |
-             Where-Object { $_.FullName -ne $Keep }
-    foreach ($file in $stale) { Remove-Item -Path $file.FullName -Force -ErrorAction SilentlyContinue }
+    Remove-StaleIconVariants (Get-CompanionIconStem $Code $Companion) $Keep
 }
 
 # Drapeau + pastille, recomposée à chaque exécution pour suivre le catalogue ; sans pastille ou sur échec → drapeau seul
@@ -189,9 +202,71 @@ function Resolve-CompanionIconPath([string]$Code, $Companion) {
     }
 }
 
-function Resolve-ShortcutIconPath($Combination) {
+# Icône d'un jeu de fichiers .ico : drapeau + pastille avec compagnon, drapeau seul sans
+function Resolve-FileIconPath($Combination) {
     if ($Combination.Companion) { return Resolve-CompanionIconPath $Combination.Code $Combination.Companion }
     return Resolve-IconPath $Combination.Code
+}
+
+# Jeu externe → icône installée de League of Legends, nue ou surmontée des pastilles ; jeu de fichiers → ses .ico
+function Resolve-ShortcutIconPath($Combination) {
+    $source = Get-IconSetSource (Get-ActiveIconSet)
+    if ($source) { return Resolve-ExternalIconPath $Combination $source }
+    return Resolve-FileIconPath $Combination
+}
+
+# ---------------------------------------------------------------- Icône officielle (jeux externes)
+
+# LeagueClient.exe déclaré par Riot, cherché une fois par exécution ; introuvable → un seul avertissement, chaîne vide
+function Get-LeagueClientPath {
+    if ($null -eq $script:LeagueClientPath) {
+        $found = Find-LeagueClientPath
+        if (-not $found) { Write-Warning (Get-Text 'shortcuts.leagueClientMissing'); $found = '' }
+        $script:LeagueClientPath = $found
+    }
+    return $script:LeagueClientPath
+}
+
+# Binaire introuvable → icônes du jeu par défaut, l'installation aboutit toujours ; « original » référence l'icône
+# du binaire telle quelle (IconLocation = <exe>,0) ; « original-badges » compose les pastilles dessus
+function Resolve-ExternalIconPath($Combination, $Source) {
+    $exe = Get-LeagueClientPath
+    if (-not $exe) { return Resolve-FileIconPath $Combination }
+    if (-not $Source.Badges) { return $exe }
+    return Resolve-StackedIconPath $Combination $exe
+}
+
+# ja_JP → hex-launcher-jp ; ja_JP + blitz → hex-launcher-jp-blitz : tige des variantes d'une combinaison
+function Get-StackedIconStem($Combination) {
+    $stem = "hex-launcher-$($Combination.Code.Split('_')[1].ToLower())"
+    if ($Combination.Companion) { $stem += "-$($Combination.Companion.id)" }
+    return $stem
+}
+
+# ico\<jeu>\companion\hex-launcher-jp-blitz-<empreinte>.ico : l'empreinte (pays, dessin du drapeau, pastille, style)
+# change le chemin dès que le rendu change, pour contourner le cache d'icônes d'Explorer
+function Get-StackedIconPath($Combination, $Badge) {
+    return Join-Path $companionIconFolder "$(Get-StackedIconStem $Combination)-$(Get-StackedBadgeSignature $Combination.Code $Badge (Get-ActiveBadgeStyle)).ico"
+}
+
+# Pastille du compagnon de la combinaison, $null sans compagnon ou sans pastille au catalogue
+function Get-CombinationBadge($Combination) {
+    if (-not $Combination.Companion) { return $null }
+    return (Get-CompanionBadges)[$Combination.Companion.id]
+}
+
+# Icône du binaire + pastille pays + pastille compagnon éventuelle, recomposée à chaque exécution ; échec → icône nue
+function Resolve-StackedIconPath($Combination, [string]$Exe) {
+    $badge = Get-CombinationBadge $Combination
+    try {
+        New-Item -ItemType Directory -Path $companionIconFolder -Force | Out-Null
+        $target = Get-StackedIconPath $Combination $badge
+        Remove-StaleIconVariants (Get-StackedIconStem $Combination) $target
+        return Add-StackedBadgesToExecutableIcon $Exe $Combination.Code $badge $target (Get-ActiveBadgeStyle)
+    } catch {
+        Write-Warning (Get-Text 'shortcuts.iconNotStacked' $Combination.Name, $_.Exception.Message)
+        return $Exe
+    }
 }
 
 # Une combinaison = une langue et, optionnellement, une appli compagnon
