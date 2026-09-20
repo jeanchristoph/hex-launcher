@@ -7,7 +7,8 @@
         . (Join-Path $PSScriptRoot 'lib\launch-config.lib.ps1')
 
     config.json :
-        riotClientPath, productSettingsPath, companionApps = [ { id, name, path, arguments }, … ],
+        riotClientPath, productSettingsPath (détectés, corrigeables dans setup.bat),
+        companionApps = [ { id, name, path, arguments }, … ],
         iconSet = nom du jeu d'icônes choisi dans setup.bat (dossier de app\ico ; absent → jeu par défaut),
         useLocalApi = chemin de lancement choisi dans setup.bat (absent → vrai : API locale du Riot Client)
 
@@ -66,7 +67,7 @@ function Read-LaunchConfig([string]$Path) {
 
 # Nom du jeu d'icônes retenu ('' si jamais choisi)
 # Chemin de lancement voulu par l'utilisateur (case de setup.bat) : vrai = API locale du Riot Client d'abord,
-# faux = lancement classique directement. Absent d'un config.json antérieur → vrai, le comportement par défaut.
+# faux = démarrage manuel directement. Absent d'un config.json antérieur → vrai, le comportement par défaut.
 function Get-LaunchUseLocalApi($Config) {
     if ($null -ne $Config.useLocalApi) { return [bool]$Config.useLocalApi }
     return $true
@@ -80,6 +81,40 @@ function Set-LaunchUseLocalApi($Config, [bool]$UseLocalApi) {
 function Save-LaunchUseLocalApi($Config, [string]$ConfigPath, [bool]$UseLocalApi) {
     if ((Get-LaunchUseLocalApi $Config) -eq $UseLocalApi) { return $false }
     Set-LaunchUseLocalApi $Config $UseLocalApi
+    Write-LaunchConfig $Config $ConfigPath
+    return $true
+}
+
+# Chemins Riot tels qu'ils seront lus par le lanceur : un chemin collé depuis l'Explorateur (« Copier en tant
+# que chemin d'accès ») arrive entre guillemets, un chemin saisi peut traîner des espaces — ni l'un ni l'autre
+# ne désigne un fichier
+function ConvertTo-LaunchPathValue([string]$Path) {
+    if ($null -eq $Path) { return '' }
+    return $Path.Trim().Trim('"').Trim()
+}
+
+function Get-LaunchRiotPaths($Config) {
+    return @{
+        RiotClientPath      = [string]$Config.riotClientPath
+        ProductSettingsPath = [string]$Config.productSettingsPath
+    }
+}
+
+# $Paths : @{ RiotClientPath ; ProductSettingsPath } — mêmes clés que Get-LaunchRiotPaths
+function Set-LaunchRiotPaths($Config, [hashtable]$Paths) {
+    $Config | Add-Member -NotePropertyName riotClientPath      -NotePropertyValue (ConvertTo-LaunchPathValue $Paths.RiotClientPath) -Force
+    $Config | Add-Member -NotePropertyName productSettingsPath -NotePropertyValue (ConvertTo-LaunchPathValue $Paths.ProductSettingsPath) -Force
+}
+
+function Test-LaunchRiotPathsEqual([hashtable]$Left, [hashtable]$Right) {
+    return ((ConvertTo-LaunchPathValue $Left.RiotClientPath) -eq (ConvertTo-LaunchPathValue $Right.RiotClientPath) -and
+            (ConvertTo-LaunchPathValue $Left.ProductSettingsPath) -eq (ConvertTo-LaunchPathValue $Right.ProductSettingsPath))
+}
+
+# N'écrit config.json que si un chemin a changé ; rend vrai dans ce cas
+function Save-LaunchRiotPaths($Config, [string]$ConfigPath, [hashtable]$Paths) {
+    if (Test-LaunchRiotPathsEqual (Get-LaunchRiotPaths $Config) $Paths) { return $false }
+    Set-LaunchRiotPaths $Config $Paths
     Write-LaunchConfig $Config $ConfigPath
     return $true
 }

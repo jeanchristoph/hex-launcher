@@ -323,6 +323,61 @@ Describe 'New-LaunchShortcut avec compagnon' {
     }
 }
 
+Describe 'Resolve-SetupIconPath' {
+    It 'rend l''engrenage livré à la racine de ico\, commun à tous les jeux' {
+        Resolve-SetupIconPath | Should Be (Join-Path $icoRoot 'hex-launcher-setup.ico')
+        Resolve-SetupIconPath | Should Exist
+    }
+
+    It 'livre l''engrenage en plusieurs tailles, dont 16, 32, 48 et 256' {
+        $entries = @(Read-IcoEntries (Resolve-SetupIconPath))
+        try { foreach ($size in 16, 32, 48, 256) { @($entries | Where-Object { $_.Bitmap.Width -eq $size }).Count | Should Be 1 } }
+        finally { $entries | ForEach-Object { $_.Bitmap.Dispose() } }
+    }
+
+    Context 'engrenage absent' {
+        Mock Test-Path { $Path -match 'flat\\hex-launcher\.ico$' }
+        It 'replie sur l''icône de base du jeu : le raccourci a toujours une icône' {
+            Resolve-SetupIconPath | Should Match 'ico\\flat\\hex-launcher\.ico$'
+        }
+    }
+}
+
+Describe 'New-SetupShortcut' {
+    It 'écrit un .lnk vers setup.bat, dossier de travail à la racine du lanceur, fenêtre réduite' {
+        $lnk = New-SetupShortcut $TestDrive
+        $lnk | Should Be (Join-Path $TestDrive 'Hex Launcher.lnk')
+        $lnk | Should Exist
+        $shortcut = $shell.CreateShortcut($lnk)
+        $shortcut.TargetPath | Should Be (Join-Path (Split-Path $folder -Parent) 'setup.bat')
+        $shortcut.WorkingDirectory | Should Be (Split-Path $folder -Parent)
+        $shortcut.WindowStyle | Should Be 7
+        $shortcut.Description | Should Be 'Ouvre l''assistant de configuration de Hex Launcher'
+        $shortcut.IconLocation | Should Be "$(Join-Path $icoRoot 'hex-launcher-setup.ico'),0"
+    }
+
+    It 'recrée le raccourci existant sans erreur' {
+        New-SetupShortcut $TestDrive | Out-Null
+        { New-SetupShortcut $TestDrive } | Should Not Throw
+    }
+}
+
+Describe 'New-ShortcutWithFallback' {
+    Mock Write-Warning {}
+
+    It 'crée dans la destination quand elle accepte l''écriture' {
+        $result = New-ShortcutWithFallback { param([string]$Directory) "créé dans $Directory" }
+        $result | Should Be "créé dans $Destination"
+        Assert-MockCalled Write-Warning -Scope It -Exactly 0
+    }
+
+    It 'replie dans le dossier du lanceur avec un avertissement quand la destination refuse' {
+        $result = New-ShortcutWithFallback { param([string]$Directory) if ($Directory -eq $Destination) { throw 'accès refusé' }; "créé dans $Directory" }
+        $result | Should Be "créé dans $folder"
+        Assert-MockCalled Write-Warning -Scope It -Exactly 1
+    }
+}
+
 Describe 'Get-ShortcutName' {
     It 'nomme le raccourci par le pays de la langue' {
         Get-ShortcutName 'ja_JP' $null | Should Be 'League of Legends JP'

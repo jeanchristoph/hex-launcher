@@ -21,6 +21,9 @@
     (jamais copiée dans le projet) — nue (« original »), ou surmontée de la pastille pays puis de la pastille compagnon,
     composées dans ico\<jeu>\companion\ (« original-badges »). Binaire introuvable → icônes du jeu par défaut.
 
+    L'assistant (setup.ps1) pose en plus « Hex Launcher », un raccourci vers setup.bat avec l'icône
+    engrenage ico\hex-launcher-setup.ico (repli sur l'icône de base du jeu) : toujours recréé, jamais retiré.
+
 .EXAMPLE
     powershell -NoProfile -ExecutionPolicy Bypass -File create-shortcuts.ps1
     powershell -NoProfile -ExecutionPolicy Bypass -File create-shortcuts.ps1 -Locales ja_JP,ko_KR
@@ -56,10 +59,12 @@ Add-Type -AssemblyName System.Drawing
 
 $folder      = $PSScriptRoot
 $launcher    = Join-Path $folder 'launch-lol.ps1'
+$setupBatch  = Join-Path (Split-Path $folder -Parent) 'setup.bat'
 $configPath  = Join-Path $folder 'config.json'
 $localesPath = Join-Path $folder 'locales.json'
 $powershell  = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 $icoRoot     = Join-Path $folder 'ico'
+$setupIcon   = Join-Path $icoRoot 'hex-launcher-setup.ico'   # engrenage du raccourci vers setup.bat, commun à tous les jeux
 $catalogPath = Join-Path $folder 'companion-apps.json'
 $CompanionBadges     = $null   # pastilles par identifiant, lues du catalogue à la première demande
 $LeagueClientPath    = $null   # LeagueClient.exe installé, cherché à la première demande ('' = introuvable, déjà signalé)
@@ -108,13 +113,24 @@ function Get-IconSetFolder($Set) {
     return (Get-IconSetFolderOrDefault $Set $icoRoot).Path
 }
 
-# Drapeau du jeu courant, sinon sa base, sinon le drapeau puis la base du jeu par défaut : l'installation aboutit toujours
-function Resolve-IconPath([string]$Code) {
-    $fileName = Get-FlagIconFileName $Code
+# Fichier demandé dans le jeu courant, sinon sa base, sinon le fichier puis la base du jeu par défaut :
+# l'installation aboutit toujours
+function Resolve-IconSetFile([string]$FileName) {
     $folders  = @((Get-IconSetFolder (Get-ActiveIconSet)), (Get-IconSetFolder (Get-DefaultIconSet @(Get-IconSets $icoRoot))))
-    $candidates = @(foreach ($dir in $folders) { (Join-Path $dir $fileName); (Join-Path $dir $IconSetBaseIcon) })
+    $candidates = @(foreach ($dir in $folders) { (Join-Path $dir $FileName); (Join-Path $dir $IconSetBaseIcon) })
     foreach ($candidate in $candidates) { if (Test-Path $candidate) { return $candidate } }
     return $candidates[-1]
+}
+
+# Drapeau de la langue, avec la même échelle de repli
+function Resolve-IconPath([string]$Code) {
+    return Resolve-IconSetFile (Get-FlagIconFileName $Code)
+}
+
+# Engrenage commun à tous les jeux ; s'il manque, l'icône de base du jeu courant prend le relais
+function Resolve-SetupIconPath {
+    if (Test-Path $setupIcon) { return $setupIcon }
+    return Resolve-IconSetFile $IconSetBaseIcon
 }
 
 Set-ActiveIconSet $IconSet | Out-Null
@@ -417,14 +433,40 @@ function Get-ShortcutDescription($Combination) {
 }
 
 # Bureau en priorité ; si l'écriture y échoue (dossier protégé, OneDrive verrouillé, chemin absent),
-# repli dans le dossier du script pour que l'installation aboutisse quand même
-function New-LaunchShortcutWithFallback($Combination) {
+# repli dans le dossier du script pour que l'installation aboutisse quand même. $Create reçoit le dossier.
+function New-ShortcutWithFallback([scriptblock]$Create) {
     try {
-        return New-LaunchShortcut $Combination $Destination
+        return & $Create $Destination
     } catch {
         Write-Warning (Get-Text 'shortcuts.destinationFallback' $Destination, $_.Exception.Message, $folder)
-        return New-LaunchShortcut $Combination $folder
+        return & $Create $folder
     }
+}
+
+function New-LaunchShortcutWithFallback($Combination) {
+    return New-ShortcutWithFallback { param([string]$Directory) New-LaunchShortcut $Combination $Directory }
+}
+
+# ---------------------------------------------------------------- Raccourci de l'assistant
+
+# Nom fixe quelle que soit la langue : le raccourci se retrouve d'une installation à l'autre
+$SetupShortcutName = 'Hex Launcher'
+
+# Vers setup.bat, à la racine du lanceur ; icône engrenage du jeu courant
+function New-SetupShortcut([string]$Directory) {
+    $path = [IO.Path]::Combine($Directory, "$SetupShortcutName.lnk")
+    $shortcut                  = $shell.CreateShortcut($path)
+    $shortcut.TargetPath       = $setupBatch
+    $shortcut.WorkingDirectory = Split-Path $setupBatch -Parent
+    $shortcut.IconLocation     = "$(Resolve-SetupIconPath),0"
+    $shortcut.WindowStyle      = 7   # Réduite : setup.bat n'a rien à montrer, la fenêtre de l'assistant suffit
+    $shortcut.Description      = Get-Text 'shortcuts.setupDescription'
+    $shortcut.Save()
+    return $path
+}
+
+function New-SetupShortcutWithFallback {
+    return New-ShortcutWithFallback { param([string]$Directory) New-SetupShortcut $Directory }
 }
 
 # Retire les raccourcis de notre lanceur dont la combinaison n'est plus retenue

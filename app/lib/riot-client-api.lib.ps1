@@ -14,7 +14,7 @@
     INVARIANT : le mot de passe du lockfile ne sort jamais dans un message, un avertissement ou une exception —
     ni dans le journal, qui ne reçoit que la méthode, le chemin et le code.
 
-    Suppose lib\launch-log.lib.ps1 déjà dot-sourcé par l'appelant (comme launch-state suppose launch-config).
+    Suppose lib\launch-log.lib.ps1 déjà dot-sourcé par l'appelant.
 #>
 
 # ---------------------------------------------------------------- Config
@@ -27,6 +27,9 @@ $LockfileFieldCount = 5
 # Chemins de l'API locale, relevés sur swagger/v3/openapi.json du Riot Client — jamais supposés
 $RiotClientProductLaunchPath = '/product-launcher/v1/products/{0}/patchlines/{1}'
 $RiotClientProductLocalePath = '/riotclient/product-locales/products/{0}/patchlines/{1}'
+
+# Route de lecture sans effet, présente dès que l'API du Riot Client est chargée : sert à savoir si elle répond
+$RiotClientReadinessPath = '/riotclient/region-locale'
 
 # ---------------------------------------------------------------- Lockfile
 
@@ -140,6 +143,13 @@ function Invoke-RiotClientRequest {
     return $result
 }
 
+# L'API est-elle chargée ? Vrai sur un 200 à une route de lecture ; un 404 ici ne dit pas « route disparue » mais
+# « pas encore rechargée » — le Riot Client décharge toute son API quand le jeu se termine fenêtre fermée, et la
+# recharge en quelques secondes quand on le relance sans argument (mesuré le 2026-09-20)
+function Test-RiotClientReady($Lockfile) {
+    return (Invoke-RiotClientRequest -Method GET -Path $RiotClientReadinessPath -Lockfile $Lockfile).Success
+}
+
 function Test-HttpSuccessStatus([int]$StatusCode) {
     return ($StatusCode -ge 200) -and ($StatusCode -lt 300)
 }
@@ -148,13 +158,15 @@ function Test-HttpSuccessStatus([int]$StatusCode) {
 
 # Codes qui signifient « pas encore », et eux seuls (relevés sur le Riot Client 139.0.5, le 2026-09-20) :
 #   0   — la connexion n'est pas établie, le serveur local démarre encore
+#   409 — conflit : vu une fois (2026-09-20) juste après le réveil d'un Riot Client replié, lancement demandé
+#         3 s après le retour de son API ; un conflit décrit un état occupé, pas une route disparue
 #   423 — session verrouillée : un client de jeu tourne toujours
 #   424 — session en cours de libération : de 3 s si le jeu tournait depuis un moment à près d'une minute s'il
 #         venait d'être lancé, le temps que son heartbeat expire
 #   464 — session pas prête : authentification RSO en cours
 # Tout autre échec — route disparue après une mise à jour de Riot, autorisation refusée — ne s'arrangera pas en
 # insistant : on rend la main au repli.
-$RiotClientRetryStatusCodes = @(0, 423, 424, 464)
+$RiotClientRetryStatusCodes = @(0, 409, 423, 424, 464)
 
 function Test-RiotClientRetryableStatus([int]$StatusCode) {
     return $RiotClientRetryStatusCodes -contains $StatusCode
@@ -193,7 +205,8 @@ function Start-RiotProduct {
 #
 # Rend { Success; Kind; StatusCode }. Kind distingue ce que l'appelant ne pourrait pas deviner d'un simple faux :
 # 'route' quand l'API refuse (la situation ne s'arrangera pas), 'timeout' quand rien n'a été accepté dans le
-# budget (une machine lente n'est pas une API cassée).
+# budget (une machine lente n'est pas une API cassée), 'cancelled' quand l'appelant a demandé d'arrêter
+# (-ShouldStop, vérifié en tête de chaque tour : un clic pendant le tick prend effet avant toute nouvelle requête).
 #
 # L'écoulement est mesuré par un Stopwatch, jamais par l'heure système : une horloge qui recule (synchronisation
 # NTP, changement d'heure) rendrait une échéance calculée sur (Get-Date) inatteignable pendant tout le décalage.
@@ -204,12 +217,14 @@ function Wait-RiotClientOperation {
         [Parameter(Mandatory)][string]$FailureMessage,
         [string]$LockfilePath = $RiotClientLockfilePath,
         [int]$TimeoutSeconds = 30,
-        [scriptblock]$OnTick
+        [scriptblock]$OnTick,
+        [scriptblock]$ShouldStop
     )
 
     $chrono = [Diagnostics.Stopwatch]::StartNew()
     $lastStatus = 0
     while ($chrono.Elapsed.TotalSeconds -lt $TimeoutSeconds) {
+        if (Test-StopRequested $ShouldStop) { return New-RiotClientOperationResult $false 'cancelled' $lastStatus }
         $lockfile = Read-RiotClientLockfile $LockfilePath -Quiet
         if (-not $lockfile) {
             # Sans cette trace, un budget épuisé sans aucune tentative reste inexplicable après coup
@@ -232,6 +247,11 @@ function Wait-RiotClientOperation {
     return New-RiotClientOperationResult $false 'timeout' $lastStatus
 }
 
+function Test-StopRequested([scriptblock]$ShouldStop) {
+    if (-not $ShouldStop) { return $false }
+    return [bool](& $ShouldStop)
+}
+
 function New-RiotClientOperationResult([bool]$Success, [string]$Kind, [int]$StatusCode) {
     return [pscustomobject]@{ Success = $Success; Kind = $Kind; StatusCode = $StatusCode }
 }
@@ -243,12 +263,13 @@ function Wait-RiotProductLocale {
         [Parameter(Mandatory)][string]$Locale,
         [string]$LockfilePath = $RiotClientLockfilePath,
         [int]$TimeoutSeconds = 30,
-        [scriptblock]$OnTick
+        [scriptblock]$OnTick,
+        [scriptblock]$ShouldStop
     )
 
     $message = 'Riot Client : langue {0} refusée par l''API locale' -f $Locale
     return Wait-RiotClientOperation -Operation { param($Lockfile) Set-RiotProductLocale -ProductId $ProductId -PatchlineId $PatchlineId -Locale $Locale -Lockfile $Lockfile } `
-        -FailureMessage $message -LockfilePath $LockfilePath -TimeoutSeconds $TimeoutSeconds -OnTick $OnTick
+        -FailureMessage $message -LockfilePath $LockfilePath -TimeoutSeconds $TimeoutSeconds -OnTick $OnTick -ShouldStop $ShouldStop
 }
 
 function Wait-RiotProductLaunch {
@@ -257,10 +278,11 @@ function Wait-RiotProductLaunch {
         [Parameter(Mandatory)][string]$PatchlineId,
         [string]$LockfilePath = $RiotClientLockfilePath,
         [int]$TimeoutSeconds = 30,
-        [scriptblock]$OnTick
+        [scriptblock]$OnTick,
+        [scriptblock]$ShouldStop
     )
 
     $message = 'Riot Client : lancement de {0} refusé par l''API locale' -f $ProductId
     return Wait-RiotClientOperation -Operation { param($Lockfile) Start-RiotProduct -ProductId $ProductId -PatchlineId $PatchlineId -Lockfile $Lockfile } `
-        -FailureMessage $message -LockfilePath $LockfilePath -TimeoutSeconds $TimeoutSeconds -OnTick $OnTick
+        -FailureMessage $message -LockfilePath $LockfilePath -TimeoutSeconds $TimeoutSeconds -OnTick $OnTick -ShouldStop $ShouldStop
 }

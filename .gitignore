@@ -1,9 +1,6 @@
 # Configuration propre à chaque machine (générée par install.bat / detect-config.ps1)
 config.json
 
-# Mémoire de lancement du poste (ce que le lanceur a appris de l'API locale du Riot Client)
-launch-state.json
-
 # Journal du lanceur (trace horodatée de chaque lancement, pour le support)
 launch.log
 

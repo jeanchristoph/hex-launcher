@@ -1,4 +1,4 @@
-# Brief — launcher
+﻿# Brief — launcher
 
 ## Objective
 
@@ -26,6 +26,23 @@ mot de passe, endpoint de lancement de produit). Le bouton Play reste un repli f
 - Le chemin historique — fermeture complète de Riot, écriture du yaml, `--launch-product` — reste présent,
   testé pour lui-même, déclenché dès que l'API ne répond pas et forçable par `-NoLocalApi`.
 - Un code HTTP de succès ne suffit pas à conclure : le client de jeu doit apparaître.
-- Le poste retient ce qu'il a appris de l'API locale (`launch-state.json`) : deux échecs consécutifs l'écartent,
-  un changement de version du Riot Client la fait retenter. L'utilisateur n'a jamais à diagnostiquer lui-même.
-- Aucune écriture de mémoire, aucun chemin périmé, aucun recul d'horloge ne doit faire échouer un lancement.
+- Aucune mémoire sur disque ne décide du chemin de lancement : seuls `-NoLocalApi` (ligne de commande,
+  dépannage — jamais posé par les raccourcis) et la case « Démarrage manuel » de l'assistant écartent l'API
+  durablement ; le bouton du splash ne vaut que pour le lancement en cours. Le lanceur n'écrit jamais
+  `config.json`. La règle « le poste retient ce qu'il a appris » (`launch-state.json`) est retirée le
+  2026-09-20 : elle a rendu un 404 ponctuel permanent et invisible.
+- Riot Client réglé par l'utilisateur pour se réduire dans la zone de notification à la fermeture de sa fenêtre,
+  et non quitter : après une partie, `RiotClientServices` reste seul, sans interface — c'est l'état où la route
+  de la langue répond 404.
+- Vocabulaire utilisateur : le chemin de repli s'appelle « démarrage manuel » partout (splash, journal, README) —
+  ce qui reste à faire, c'est appuyer sur Jouer dans le Riot Client. Case de l'assistant : « Démarrage manuel —
+  appuyer sur Jouer dans Riot » ; bouton du splash : « Forcer en démarrage manuel ». Jamais « mode de secours »,
+  « lancement classique » ni « chemin historique » (règle utilisateur, 2026-09-20, révisée le même jour). `legacy`
+  reste l'identifiant de code.
+- Nom de produit : « Hex Launcher » (deux mots, L majuscule) dans tout texte lu par l'utilisateur — README, LISEZMOI, titres de fenêtre, infobulles, release. `hex-launcher` reste le nom du dépôt, de l'archive, des dossiers et des fichiers (règle utilisateur, 2026-09-20).
+- L'utilisateur ne doit jamais avoir à ouvrir `config.json` : tout réglage qu'il peut avoir à corriger se corrige
+  dans l'assistant (règle utilisateur, 2026-09-20).
+- Jamais de lancement réel du jeu ni de kill de process Riot en série par Claude : un essai réel = une demande
+  explicite de l'utilisateur, un seul à la fois. Vanguard a signalé une erreur après une quinzaine de cycles
+  lancement/kill enchaînés le 2026-09-20 (règle utilisateur). Les tests restent unitaires, tout est moqué.
+- Aucune écriture de journal, aucun chemin périmé, aucun recul d'horloge ne doit faire échouer un lancement.
