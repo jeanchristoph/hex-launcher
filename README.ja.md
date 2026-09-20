@@ -2,7 +2,7 @@
 
 [English](README.md) · [Français](README.fr.md) · **日本語**
 
-> **Riot Games とは無関係のプロジェクトです。** Hex Launcher は Riot Games の[「Legal Jibber Jabber」](https://www.riotgames.com/en/legal)ポリシーのもとで作成されました。Riot Games はこのプロジェクトを支持・後援していません。League of Legends および Riot Games は Riot Games, Inc. の商標または登録商標です。
+> **Riot Games とは無関係のプロジェクトです。**Riot Games はこのプロジェクトを支持・後援していません。League of Legends および Riot Games は Riot Games, Inc. の商標または登録商標です。
 
 **現時点では Windows 専用です**（Windows 10/11、PowerShell 5.1 同梱 — macOS は非対応）。
 
@@ -259,6 +259,13 @@ Riot Client の「言語」設定はランチャーの言語を変えるだけ�
 
 ランチャーは何も記憶しません。直接起動は毎回試みられます。この PC で失敗が続く場合は、`setup.bat` で
 「手動起動 — Riot でプレイを押す」にチェックを入れてください。以後ランチャーは最初から手動起動を使います。
+
+## claude_forge で開発
+
+このランチャーは [Claude Code](https://claude.com/claude-code) とスキル
+**[claude_forge](https://github.com/jeanchristoph/claude_forge)** で開発しました。ブランチ単位の開発ワークフローで、
+最初の 1 行を書く前にブリーフを承認し、構造化した計画を立て、決定の記録をリアルタイムで残し、コードと同時にテストを書きます。
+追跡ファイルは `.forge/` にあり、各ブランチのブリーフ・計画・記録を誰でも読めます。
 
 ## 開発するには
 

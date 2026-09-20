@@ -2,7 +2,7 @@
 
 [English](README.md) · **Français** · [日本語](README.ja.md)
 
-> **Projet non affilié à Riot Games.** Hex Launcher a été créé dans le cadre de la politique [« Legal Jibber Jabber »](https://www.riotgames.com/en/legal) de Riot Games. Riot Games ne soutient ni ne sponsorise ce projet. League of Legends et Riot Games sont des marques ou marques déposées de Riot Games, Inc.
+> **Projet non affilié à Riot Games.** Riot Games ne soutient ni ne sponsorise ce projet. League of Legends et Riot Games sont des marques ou marques déposées de Riot Games, Inc.
 
 **Windows uniquement, pour l'instant** (Windows 10/11, PowerShell 5.1 inclus — macOS non pris en charge).
 
@@ -272,6 +272,14 @@ Le lanceur fait donc, dans l'ordre :
 
 Le lanceur n'a pas de mémoire : le lancement direct est tenté à chaque fois. S'il échoue régulièrement sur votre
 poste, cochez « Démarrage manuel — appuyer sur Jouer dans Riot » dans `setup.bat` — le lanceur y passe alors d'emblée.
+
+## Fabriqué avec claude_forge
+
+Ce lanceur a été développé avec [Claude Code](https://claude.com/claude-code) et le skill
+**[claude_forge](https://github.com/jeanchristoph/claude_forge)** : un workflow de développement par branche —
+brief validé avant la première ligne de code, plan structuré, journal des décisions tenu en temps réel, tests écrits
+en même temps que le code. Les fichiers de suivi sont dans `.forge/` : chaque branche y garde son brief, son plan et son
+journal, lisibles par n'importe qui.
 
 ## Développer
 
