@@ -1,5 +1,6 @@
 ﻿# Log — launcher
 
+- [2026-09-21 09:15] Plan de diffusion (recherche > réseaux, confiance avant notoriété, LinkedIn = post technique seulement) écrit dans output/20260921-promotion-plan.md, déplacé ensuite dans branch/outreach/output/ ; six tâches candidates T35–T40 listées, non ajoutées au plan.
 - [2026-09-20 21:40] Notes de la release v0.2.0 tronquées à 558 caractères (guillemet double dans un argument natif, PowerShell 5.1) — réparées par `gh release edit --notes-file` (5 904 car.). T34 : make-release passe par `--notes-file` + `-NotesFile`, 4 tests. Non gravé.
 - [2026-09-20 21:20] Message d'annonce 0.2.0 pour les amis (FR, ton décontracté, texte validé) écrit dans output/20260920-release-announcement-friends.md. includeIf gitdir:D:/www/perso/ → ~/.gitconfig-perso posé dans le global, vérifié sur un dépôt neuf.
 - [2026-09-20 21:00] Adresse git de ce dépôt passée en perso (jeanchristophe.malaval@gmail.com, .git/config seul ; global pro inchangé) : le second « contributeur » GitHub venait des 37 commits signés malaval@topdata.fr, non vérifiée sur le compte. Historique non réécrit (tags/releases).
