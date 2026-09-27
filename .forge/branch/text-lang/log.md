@@ -1,5 +1,11 @@
 # Log — text-lang
 
+- [2026-09-27 14:22] JP normal sous FileSystemWatcher (14:20:42, parti avant la consigne « à faire plus tard ») : 0 écriture sur les .wad.client, empreintes inchangées, aucune ligne TEXT. Test complet JP×3 noté en T11.8.
+- [2026-09-27 14:30] T11 ajouté (validé) : essais réels restants T11.1–T11.7.
+- [2026-09-27 14:25] Observation utilisateur : VAN 216 de 14:09:45 levée sans redémarrage de Windows (lancement de 14:14:44 normal). À confirmer avant de modifier README / avertissement du splash.
+- [2026-09-27 14:18] Dernier essai JP normal (14:14:44, 5 min après le précédent) : aucune ligne TEXT, retour ja_JP (mise à jour ~5 s, fichiers texte FR retirés par Riot), vérification « up to date », pas de VAN 216. Installation revenue à l'état de départ.
+- [2026-09-27 14:15] Essai changement de voix JP-FR (14:07) → FR (14:09) : restauration avant le changement de langue OK, marqueur supprimé, aucune pose ; Riot télécharge le français (6 244 chunks, 182 fichiers) SANS retirer le japonais (0 files to remove). VAN 216 au 4ᵉ démarrage en 8 min (faute de rythme de Claude) → redémarrage de Windows requis, essais arrêtés. État : locale fr_FR, JA+FR installés, fichiers JA d'origine, sans marqueur.
+- [2026-09-27 14:06] Essais réels autorisés (compte de test) : raccourcis JP-FR / FR en dossier temporaire OK ; JP-FR 13:59 (restauration puis pose à +11,5 s, stable à +1 min 26) ; JP normal 14:01 (restauration, marqueur supprimé, vérification « up to date ») ; JP normal 14:04 (aucune ligne TEXT, aucune copie). Pose précédente survivante à une partie et au repli du client. Installation laissée d'origine (8e3f…/24f9…), sans marqueur.
 - [2026-09-27 14:50] README ×3 : pose « après la vérification des fichiers du client (~15 s) » + limite « poser plus tôt est inutile », FR validé puis EN/JA.
 - [2026-09-27 14:45] Essai réel réussi (13:41) : Login complete +11,5 s, « Install is up to date » +12,2 s, pose +12,7 s, partie lancée +44 s sans réparation ; texte français en jeu, client LoL en japonais comme prévu.
 - [2026-09-27 14:35] Essai T10 (13:32) : aucune pose (restauration faite, attente en cours) et pourtant ID_TOKEN_INVALID_FORMAT à +8,2 s, avant toute vérification → l'erreur de connexion vient du jeton RSO / session Riot, pas des fichiers. Journal d'abandon corrigé (durée réelle au lieu de « 180 s »).

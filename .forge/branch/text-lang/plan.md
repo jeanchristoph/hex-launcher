@@ -67,7 +67,20 @@
 **Effort:** M
 **Files:** `app/lib/league-client-log.lib.ps1`, `app/launch-lol.ps1`, `tests/league-client-log.lib.tests.ps1`, `tests/launch-lol.tests.ps1`
 **Description:** Le client LoL vérifie l'installation une seule fois (~11 s après son démarrage, après la connexion vers 9 s) et répare tout fichier modifié ; aucune vérification au lancement d'une partie. Le lanceur lit en lecture seule le journal de la session courante (`Logs\LeagueClient Logs\<session>_LeagueClient.log`) et pose dès qu'il y trouve la fin de la vérification (« Patcher Install is up to date » ou « Patcher Game update successful ») et « Login complete. ». Au-delà de 3 min ou format inconnu : renoncement, partie dans la langue des voix. Restauration inchangée. Inconnues tranchées par un nouvel essai réel : contrôle des fichiers par le jeu, lien entre la modification et l'erreur de connexion.
-[x] `app/lib/league-client-log.lib.ps1` + `Wait-ForcedTextWindow` dans le lanceur ; critère validé sur les 10 journaux réels (lecture seule : 8 vrais, 13:18 et 21/09 réparation échouée → faux) ; 15 tests, suite 868/868. **Essai réel réussi (2026-09-27 13:41)** : vérification à +12,2 s, pose à +12,7 s, aucune réparation, partie avec voix japonaises et texte français.
+[x] `app/lib/league-client-log.lib.ps1` + `Wait-ForcedTextWindow` dans le lanceur ; critère validé sur les 10 journaux réels (lecture seule : 8 vrais, 13:18 et 21/09 réparation échouée → faux) ; 15 tests, suite 868/868. **Essai réel réussi (2026-09-27 13:41)** : vérification à +12,2 s, pose à +12,7 s, aucune réparation, partie avec voix japonaises et texte français. Essais du 14:00 : JP-FR → JP → JP conformes (pose, restauration, aucune copie en lancement normal) ; JP-FR → FR : restauration avant le changement de langue conforme (Riot garde les fichiers de l'ancienne langue) ; FR → JP : aucune copie, retour conforme.
+
+### T11 — Essais réels restants
+**Effort:** M
+**Files:** aucun code prévu — résultats dans `log.md`, corrections éventuelles en tâches à part
+**Description:** Un lancement toutes les 5 min, arrêt au premier avertissement Vanguard ; installation remise d'origine à la fin (fichiers ja_JP d'origine, sans marqueur).
+[ ] T11.1 — Setup de bout en bout (par l'utilisateur) : cocher « Forcer le texte en », créer les raccourcis sur le Bureau, vérifier `forcedTextLocale` dans `config.json`.
+[ ] T11.2 — Démarrage manuel avec texte forcé : attente du clic sur Jouer, puis de la vérification, puis pose.
+[ ] T11.3 — Texte CJK sur voix latine : voix FR + texte JA, police japonaise en partie (~3,5 Go de voix FR téléchargés par Riot).
+[ ] T11.4 — Icônes flat et classic sur de vrais raccourcis.
+[ ] T11.5 — JP-FR avec appli compagnon (Porofessor lancé après la pose).
+[ ] T11.6 — Si l'occasion se présente : patch Riot entre pose et restauration (retéléchargement, purge du cache) ; restauration pendant une partie en cours (fichier verrouillé, marqueur conservé).
+[ ] T11.7 — Confirmer que VAN 216 se lève sans redémarrage de Windows, avant de corriger le README et l'avertissement du splash.
+[ ] T11.8 — Trois lancements JP normaux consécutifs (sans marqueur), un toutes les 5 min, sous surveillance `FileSystemWatcher` des `.wad.client` (script : scratchpad `watch-launch.ps1`, à versionner dans `tools/` si retenu) : zéro écriture, empreintes inchangées, aucune ligne `TEXT` ; comparer le déroulé de `launch.log` à un lancement d'avant la branche (ex. 2026-09-23 23:16). Déjà fait une fois le 2026-09-27 à 14:20 : 0 écriture.
 
 ## Risks
 - Vanguard / ToS (§7.1) : fichier Riot signé mais échange de .wad non autorisé — avertissement rouge + clause README.
@@ -97,4 +110,5 @@ None
 | T8 — Setup case + liste | M | [x] |
 | T9 — Documentation | S | [x] |
 | T10 — Pose après la vérification du client | M | [x] |
+| T11 — Essais réels restants | M | [ ] |
 | **Total** | **≈ 4–6 j** | |
