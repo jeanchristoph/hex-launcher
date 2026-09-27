@@ -1074,6 +1074,7 @@ Describe 'Install-ForcedTextAtLaunch' {
 
 Describe 'Complete-ForcedTextLaunch' {
     Mock Write-LaunchLogLine { $true }
+    Mock Wait-ForcedTextWindow { $true }
 
     function New-ForcedTextContext([string]$Outcome) {
         $script:statuses = New-Object Collections.Generic.List[string]
@@ -1119,11 +1120,52 @@ Describe 'Complete-ForcedTextLaunch' {
         }
     }
 
+    Context 'vérification du client LoL non constatée' {
+        It 'renonce sans poser et annonce que le jeu reste dans la langue des voix' {
+            Mock Wait-ForcedTextWindow { $false }
+            Mock Install-ForcedTextAtLaunch { $true }
+            Complete-ForcedTextLaunch (New-ForcedTextContext 'api') | Should Be 'failed'
+            Assert-MockCalled Install-ForcedTextAtLaunch -Scope It -Exactly 0
+            $script:statuses -join ' | ' | Should Be 'Texte du jeu en Français… | Texte forcé indisponible — jeu dans la langue des voix'
+        }
+    }
+
     Context 'pose en échec' {
         It 'annonce que le jeu reste dans la langue des voix' {
             Mock Install-ForcedTextAtLaunch { $false }
             Complete-ForcedTextLaunch (New-ForcedTextContext 'api') | Should Be 'failed'
             $script:statuses -join ' | ' | Should Be 'Texte du jeu en Français… | Texte forcé indisponible — jeu dans la langue des voix'
+        }
+    }
+}
+
+Describe 'Wait-ForcedTextWindow' {
+    Mock Write-LaunchLogLine { $true }
+
+    Context 'vérification constatée' {
+        It 'attend la vérification de la session ouverte depuis la demande de lancement' {
+            $since = Get-Date '2026-09-27 13:18:00'
+            Mock Get-LeagueFolder { 'C:\Riot Games\League of Legends' }
+            Mock Wait-LeagueClientVerification { $true }
+            Wait-ForcedTextWindow ([pscustomobject]@{ Since = $since; OnTick = $null; ShouldStop = $null }) | Should Be $true
+            Assert-MockCalled Wait-LeagueClientVerification -Scope It -Exactly 1 -ParameterFilter { $Wait.LeagueFolder -eq 'C:\Riot Games\League of Legends' -and $Wait.Since -eq $since }
+        }
+    }
+
+    Context 'vérification non constatée' {
+        It 'rend faux et journalise l''abandon' {
+            Mock Get-LeagueFolder { 'C:\Riot Games\League of Legends' }
+            Mock Wait-LeagueClientVerification { $false }
+            Wait-ForcedTextWindow ([pscustomobject]@{ Since = (Get-Date); OnTick = $null; ShouldStop = $null }) | Should Be $false
+            Assert-MockCalled Write-LaunchLogLine -Scope It -Exactly 1 -ParameterFilter { $Detail -like 'abandon — vérification du client LoL non constatée*' }
+        }
+    }
+
+    Context 'League of Legends introuvable' {
+        It 'laisse la pose journaliser l''abandon, sans attendre' {
+            Mock Get-LeagueFolder { $null }
+            Mock Wait-LeagueClientVerification { throw 'ne doit pas être appelé' }
+            Wait-ForcedTextWindow ([pscustomobject]@{ Since = (Get-Date); OnTick = $null; ShouldStop = $null }) | Should Be $true
         }
     }
 }

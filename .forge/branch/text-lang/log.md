@@ -1,5 +1,12 @@
 # Log — text-lang
 
+- [2026-09-27 14:50] README ×3 : pose « après la vérification des fichiers du client (~15 s) » + limite « poser plus tôt est inutile », FR validé puis EN/JA.
+- [2026-09-27 14:45] Essai réel réussi (13:41) : Login complete +11,5 s, « Install is up to date » +12,2 s, pose +12,7 s, partie lancée +44 s sans réparation ; texte français en jeu, client LoL en japonais comme prévu.
+- [2026-09-27 14:35] Essai T10 (13:32) : aucune pose (restauration faite, attente en cours) et pourtant ID_TOKEN_INVALID_FORMAT à +8,2 s, avant toute vérification → l'erreur de connexion vient du jeton RSO / session Riot, pas des fichiers. Journal d'abandon corrigé (durée réelle au lieu de « 180 s »).
+- [2026-09-27 14:20] T10 codé : pose après « Login complete. » + fin de vérification dans le journal de session du client (3 min max) ; aucun essai réel par Claude (lecture seule des journaux).
+- [2026-09-27 14:05] T10 réécrit (validé) : critère = journal du client (fin de vérification + « Login complete. »), l'API du client ne prouvant pas la vérification (connexion ~9 s avant vérification ~11 s).
+- [2026-09-27 13:55] Journaux LoL : une seule vérification d'installation par session du client (+11 s), aucune au lancement d'une partie → autre moyen : poser après vérification + connexion (API du client LoL). Analyse dans output/20260927-forced-text-real-test-analysis.md.
+- [2026-09-27 13:40] Essai réel utilisateur : pose fr_FR à 13:18:17, Riot réécrit Global/UI.ja_JP à 13:18:27 (Game.db 13:18:28, Game.ok 13:19:05) + erreur de connexion LoL. Le Riot Client surveille et répare les fichiers pendant que le client tourne → mécanisme non viable tel quel. Installation revenue à l'identique (SHA-256 = sauvegarde).
 - [2026-09-27 13:20] T9 : doc FR validée, EN/JA traduits (agent) ; suite complète 851/851. Plan entièrement coché — essai réel par l'utilisateur à faire.
 - [2026-09-27 13:05] T8 : case et liste empilées (demi-colonne de 250 px trop étroite pour les deux) ; textes validés FR puis EN/JA ; contrôles ajoutés à $SetupPageControlNames (IconSetList et LegacyLaunchBox n'y sont pas — préexistant).
 - [2026-09-27 12:40] T7 : lib dédiée icon-split.lib.ps1 ; tige des icônes renommée Get-CombinationIconStem (voix-texte-compagnon) ; avertissement « Icône coupée … non composée » validé FR puis EN/JA. Drapeaux à emblème centré (JP, KR) moins lisibles une fois coupés.

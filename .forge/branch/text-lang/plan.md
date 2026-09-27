@@ -36,6 +36,7 @@
 **Effort:** S
 **Files:** `app/launch-lol.ps1`, `tests/launch-lol.tests.ps1`
 **Description:** `-Locale` inchangé (locale Riot = voix), nouveau `-TextLocale`. Téléchargement/cache (T3) puis pose (T4) après la pose de la langue et avant le lancement, sur les deux chemins (API et repli). Dossier du jeu via `Find-LeagueClientPath`. `launch.log` : téléchargement, pose, restauration. `-DryRun` n'écrit rien. Pas d'avertissement dans le splash.
+[!] Essai réel 2026-09-27 : pose trop tôt (avant la vérification du client à +11 s), réparée par Riot + erreur de connexion — voir Risks.
 [x] Restauration au début de chaque lancement ; pose après l'apparition du client LoL ; démarrage manuel : attente du client 600 s. C# compilé à la demande (pas de coût sans texte forcé). 12 tests.
 
 ### T6 — Raccourcis : combinaison voix × texte
@@ -62,6 +63,12 @@
 **Description:** Section « Texte forcé » : fonctionnement, téléchargement CDN Riot (~4 Mo par langue et par patch), dépendance `libzstd.dll` dans « Confiance », limites (client LoL dans la langue des voix, polices CJK), risques. Mise à jour de `project.md`.
 [x] Section « Texte forcé » + Confiance (CDN, libzstd.dll) + config.json + Comment ça marche + Dépannage, FR validé puis EN/JA ; LISEZMOI FR/EN ; project.md.
 
+### T10 — Poser le texte après la vérification du client LoL
+**Effort:** M
+**Files:** `app/lib/league-client-log.lib.ps1`, `app/launch-lol.ps1`, `tests/league-client-log.lib.tests.ps1`, `tests/launch-lol.tests.ps1`
+**Description:** Le client LoL vérifie l'installation une seule fois (~11 s après son démarrage, après la connexion vers 9 s) et répare tout fichier modifié ; aucune vérification au lancement d'une partie. Le lanceur lit en lecture seule le journal de la session courante (`Logs\LeagueClient Logs\<session>_LeagueClient.log`) et pose dès qu'il y trouve la fin de la vérification (« Patcher Install is up to date » ou « Patcher Game update successful ») et « Login complete. ». Au-delà de 3 min ou format inconnu : renoncement, partie dans la langue des voix. Restauration inchangée. Inconnues tranchées par un nouvel essai réel : contrôle des fichiers par le jeu, lien entre la modification et l'erreur de connexion.
+[x] `app/lib/league-client-log.lib.ps1` + `Wait-ForcedTextWindow` dans le lanceur ; critère validé sur les 10 journaux réels (lecture seule : 8 vrais, 13:18 et 21/09 réparation échouée → faux) ; 15 tests, suite 868/868. **Essai réel réussi (2026-09-27 13:41)** : vérification à +12,2 s, pose à +12,7 s, aucune réparation, partie avec voix japonaises et texte français.
+
 ## Risks
 - Vanguard / ToS (§7.1) : fichier Riot signé mais échange de .wad non autorisé — avertissement rouge + clause README.
 - Riot Client pouvant restaurer le fichier avant le démarrage du jeu — à vérifier par l'essai réel de l'utilisateur.
@@ -71,6 +78,8 @@
 - Première dépendance réseau du lanceur — hors ligne → lancement normal.
 - Polices CJK avec voix latine (ou inverse) — à tester.
 - Aucun essai réel par Claude : validation en conditions réelles par l'utilisateur.
+- **Essai réel du 2026-09-27 : ÉCHEC.** Pose à +3 s de l'ouverture du client ; la vérification unique du client LoL (`rcp-be-lol-patch`, +11 s) a signalé « 2 inconsistent files » et réparé ; erreur de connexion `ID_TOKEN_INVALID_FORMAT` à +14 s (corrélée, cause non prouvée). Installation revenue à l'identique. Analyse : `output/20260927-forced-text-real-test-analysis.md`.
+- **Essai réel du 2026-09-27 13:41 (T10) : RÉUSSI** — pose après la vérification du client, texte français en partie, client LoL en japonais (limite prévue). L'erreur de connexion `ID_TOKEN_INVALID_FORMAT` venait de la session Riot, pas des fichiers (reproduite à 13:32 sans pose).
 
 ## Deployment
 None
@@ -87,4 +96,5 @@ None
 | T7 — Icône diagonale | M | [x] |
 | T8 — Setup case + liste | M | [x] |
 | T9 — Documentation | S | [x] |
+| T10 — Pose après la vérification du client | M | [x] |
 | **Total** | **≈ 4–6 j** | |

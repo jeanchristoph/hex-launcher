@@ -17,9 +17,10 @@
     passe en démarrage manuel (Riot relancé, Jouer à cliquer) pour ce lancement seulement — rien n'est mémorisé.
     La croix en haut à droite du splash arrête le lanceur sans rien faire d'autre : rien n'est tué, Riot et le jeu
     restent en l'état, pour réessayer plus tard.
-    Texte forcé (-TextLocale) : -Locale reste la langue des voix ; une fois le client LoL apparu (patch Riot
-    terminé, aucune partie commencée), les fichiers texte de -TextLocale, téléchargés du CDN Riot, remplacent ceux
-    de -Locale (lib\forced-text.lib.ps1). Tout lancement commence par restaurer une pose précédente, avant que la
+    Texte forcé (-TextLocale) : -Locale reste la langue des voix ; une fois le client LoL apparu ET sa vérification
+    d'installation passée (lue dans son journal, lib\league-client-log.lib.ps1 — une pose faite avant est réparée par
+    Riot), les fichiers texte de -TextLocale, téléchargés du CDN Riot, remplacent ceux de -Locale
+    (lib\forced-text.lib.ps1). Tout lancement commence par restaurer une pose précédente, avant que la
     langue ne change. Tout échec du texte forcé laisse le jeu dans la langue des voix.
     Chaque étape est tracée dans launch.log, une ligne horodatée par événement, appels d'API compris.
     Le lanceur n'a pas de mémoire : l'API est tentée à chaque lancement, sauf -NoLocalApi ou la case
@@ -76,6 +77,7 @@ param(
 . (Join-Path $PSScriptRoot 'lib\riot-cdn.lib.ps1')
 . (Join-Path $PSScriptRoot 'lib\riot-text-files.lib.ps1')
 . (Join-Path $PSScriptRoot 'lib\forced-text.lib.ps1')
+. (Join-Path $PSScriptRoot 'lib\league-client-log.lib.ps1')
 
 # Client de jeu seul : ce que le chemin rapide ferme, en laissant la session du Riot Client vivante
 $GameClientProcessNames = @('LeagueClientUxRender', 'LeagueClientUx', 'LeagueClient')
@@ -584,7 +586,8 @@ function Install-ForcedTextAtLaunch([string]$VoiceLocale, [string]$TextLocale) {
 <#
     Après le lancement : pose le texte forcé une fois le client LoL en marche. En démarrage manuel, le lanceur n'a
     pas attendu le client — il l'attend ici, le temps que le joueur clique sur Jouer.
-    $Context = { Outcome, VoiceLocale, TextLocale, TextLabel, OnTick, OnStatus, ShouldStop }.
+    $Context = { Outcome, VoiceLocale, TextLocale, TextLabel, Since, OnTick, OnStatus, ShouldStop } — Since : heure
+    d'avant la demande de lancement, pour reconnaître le journal de la session du client qu'elle a ouverte.
     Rend 'installed', 'failed' (pose tentée, échouée) ou 'skipped' (pas de client LoL : rien tenté).
 #>
 function Complete-ForcedTextLaunch($Context) {
@@ -594,9 +597,22 @@ function Complete-ForcedTextLaunch($Context) {
         return 'skipped'
     }
     Write-LaunchStatus $Context.OnStatus ('Texte du jeu en {0}…' -f $Context.TextLabel)
-    if (Install-ForcedTextAtLaunch $Context.VoiceLocale $Context.TextLocale) { return 'installed' }
+    if ((Wait-ForcedTextWindow $Context) -and (Install-ForcedTextAtLaunch $Context.VoiceLocale $Context.TextLocale)) { return 'installed' }
     Write-LaunchStatus $Context.OnStatus 'Texte forcé indisponible — jeu dans la langue des voix'
     return 'failed'
+}
+
+# BUSINESS_RULE : le client LoL vérifie l'installation une fois par session (~11 s après son démarrage) et répare
+# tout fichier modifié — une pose faite avant est annulée (essai réel du 2026-09-27). On attend donc que son journal
+# montre la vérification passée et la connexion faite ; sans dossier du jeu, Install-ForcedTextAtLaunch journalise l'abandon
+function Wait-ForcedTextWindow($Context) {
+    $leagueFolder = Get-LeagueFolder
+    if (-not $leagueFolder) { return $true }
+    $chrono = [Diagnostics.Stopwatch]::StartNew()
+    if (Wait-LeagueClientVerification ([pscustomobject]@{ LeagueFolder = $leagueFolder; Since = $Context.Since; OnTick = $Context.OnTick; ShouldStop = $Context.ShouldStop })) { return $true }
+    # Échéance, croix du splash ou connexion du client en échec : la durée réelle dit lequel
+    Write-LaunchLogLine 'TEXT' ('abandon — vérification du client LoL non constatée après {0}' -f (Format-LaunchLogDuration $chrono)) | Out-Null
+    return $false
 }
 
 # Une seule appli compagnon active : celle du raccourci (laissée en place si elle tourne déjà), les autres sont fermées
@@ -693,6 +709,7 @@ if ($MyInvocation.InvocationName -ne '.') {
             }
 
             Restore-ForcedTextAtLaunch
+            $launchRequestedAt = Get-Date
             $launch = Start-LeagueClient -Path $config.riotClientPath -YamlPath $YamlPath -Value $Locale -NoLocalApi:(-not $tryLocalApi) -OnTick $onTick -OnStatus $onStatus -ShouldStop $shouldStop -ShouldAbort $shouldAbort
             Hide-SplashAction $splash | Out-Null
             if ($launch.Outcome -eq 'legacy') { Update-SplashStatus $splash (Get-FallbackStatusMessage $launch.Failure) }
@@ -703,7 +720,7 @@ if ($MyInvocation.InvocationName -ne '.') {
                 $statusTick = { Update-SplashStatus $splash (Format-WaitingStatus $script:CurrentStatus $stepChrono); Wait-WithAnimation 1 }
                 $forcedText = Complete-ForcedTextLaunch ([pscustomobject]@{
                     Outcome = $launch.Outcome; VoiceLocale = $Locale; TextLocale = $TextLocale
-                    TextLabel = (Get-LocaleLabel $TextLocale (Join-Path $PSScriptRoot 'locales.json'))
+                    TextLabel = (Get-LocaleLabel $TextLocale (Join-Path $PSScriptRoot 'locales.json')); Since = $launchRequestedAt
                     OnTick = $statusTick; OnStatus = $onStatus; ShouldStop = $shouldAbort
                 })
                 if ($forcedText -eq 'failed') { Wait-WithAnimation $ForcedTextFailedSplashSeconds }

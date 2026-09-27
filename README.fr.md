@@ -262,7 +262,8 @@ s'appelle `League of Legends JP-FR` et son icône est coupée en diagonale (voix
 > ⚠️ Ce mode remplace des fichiers du jeu. Riot n'autorise pas les modifications de fichiers : le compte peut être
 > sanctionné, jusqu'au bannissement. À vos risques.
 
-Comment : aucun réglage Riot ne sépare texte et voix. Une fois le client LoL ouvert, le lanceur remplace les deux
+Comment : aucun réglage Riot ne sépare texte et voix. Une fois le client LoL ouvert et sa vérification des fichiers passée (une
+quinzaine de secondes, le splash affiche « Texte du jeu en … »), le lanceur remplace les deux
 fichiers texte de la langue des voix (`Global`, `UI`) par ceux de la langue choisie, téléchargés depuis le CDN officiel
 de Riot pour la version exacte installée (~4 Mo par langue et par patch, en cache dans `%LOCALAPPDATA%\hex-launcher\text\`).
 Ce sont les fichiers originaux signés par Riot, identiques à ceux d'un joueur dans cette langue. Les fichiers d'origine
@@ -270,6 +271,7 @@ sont remis en place au lancement suivant.
 
 Limites :
 - le client LoL (menus, boutique) reste dans la langue des voix : seul le jeu en partie change ;
+- poser plus tôt est inutile : le client répare tout fichier modifié lors de sa vérification ;
 - LoL lancé sans raccourci Hex Launcher garde le texte forcé jusqu'au prochain lancement par un raccourci ou jusqu'au
   prochain patch ;
 - hors ligne ou en cas d'erreur, la partie se joue dans la langue des voix (ligne `TEXT` dans `launch.log`) ;

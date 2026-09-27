@@ -259,7 +259,8 @@ is named `League of Legends JP-FR` and its icon is split diagonally (voice at th
 > ⚠️ This mode replaces game files. Riot does not allow file modifications: the account can be
 > sanctioned, up to a ban. At your own risk.
 
-How: no Riot setting separates text and voice. Once the LoL client is open, the launcher replaces the two
+How: no Riot setting separates text and voice. Once the LoL client is open and its file check has passed (about fifteen
+seconds, the splash shows "Texte du jeu en …"), the launcher replaces the two
 text files of the voice language (`Global`, `UI`) with those of the chosen language, downloaded from Riot's official
 CDN for the exact installed version (~4 MB per language and per patch, cached in `%LOCALAPPDATA%\hex-launcher\text\`).
 These are the original files signed by Riot, identical to those of a player in that language. The original files
@@ -267,6 +268,7 @@ are put back at the next launch.
 
 Limits:
 - the LoL client (menus, store) stays in the voice language: only the in-match game changes;
+- placing the files earlier is useless: the client repairs any modified file during its check;
 - LoL started without a Hex Launcher shortcut keeps the forced text until the next launch through a shortcut or until
   the next patch;
 - offline or on error, the match is played in the voice language (`TEXT` line in `launch.log`);
