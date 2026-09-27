@@ -1,0 +1,10 @@
+🔧 **Hex Launcher 0.3.1 est dispo !**
+
+Petite mise à jour du mode texte forcé : quand tu forces le texte dans une autre langue, ton raccourci normal est maintenant **gardé**. Tu as donc les deux sur le Bureau : « League of Legends JP » (tout en japonais) et « League of Legends JP-FR » (voix japonaises, texte en français).
+
+Déjà en 0.3.0 ? Relance le setup et clique sur **Appliquer** pour retrouver tes raccourcis normaux.
+
+⚠️ Rappel : le mode texte forcé modifie des fichiers du jeu, Riot ne l'autorise pas (risque de sanction, jusqu'au ban). À tes risques.
+
+Gratuit, open source, Windows. Projet perso, non affilié à Riot Games.
+👉 https://github.com/jeanchristoph/hex-launcher/releases/tag/v0.3.1
