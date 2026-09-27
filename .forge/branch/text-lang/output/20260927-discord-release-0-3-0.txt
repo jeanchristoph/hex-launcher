@@ -1,0 +1,12 @@
+🎌 **Hex Launcher 0.3.0 est sorti !**
+
+Nouveau : **voix et texte dans deux langues.** Voix japonaises avec le texte en français (ou l'inverse), depuis un simple raccourci sur le Bureau. Le lanceur remplace les deux fichiers texte du jeu par les originaux de Riot, téléchargés pour ta version exacte, et remet tout en place au lancement suivant.
+
+Aussi dans cette version :
+• un nouveau jeu d'icônes « Logo HL + pastilles » (drapeau de la langue + pastille de l'appli compagnon)
+• un avertissement « MODIFIED GAME FILES » à l'écran quand le texte est forcé
+
+⚠️ Le mode texte forcé modifie des fichiers du jeu : Riot ne l'autorise pas, le compte peut être sanctionné, jusqu'au ban. À tes risques. Le mode classique (voix et texte dans la même langue) ne modifie aucun fichier du jeu.
+
+Gratuit, open source, Windows. Projet perso, non affilié à Riot Games.
+👉 https://github.com/jeanchristoph/hex-launcher/releases/tag/v0.3.0
