@@ -1135,3 +1135,128 @@ Describe 'Invoke-SetupDetectStep' {
         Assert-MockCalled -Scope It Save-LaunchRiotPaths -Exactly -Times 0
     }
 }
+
+Describe 'Texte forcé de la page Raccourcis : mise en page' {
+    $forced = Get-SetupForcedTextLayout 94 $SetupRiotCompatibilityTop
+
+    It 'empile case, liste et avertissement sous la liste des langues' {
+        $forced.BoxTop     | Should BeGreaterThan (94 + $forced.LocaleListHeight - 1)
+        $forced.ListTop    | Should BeGreaterThan ($forced.BoxTop + 25)
+        $forced.WarningTop | Should BeGreaterThan ($forced.ListTop + 27)
+    }
+
+    It 'laisse à l''avertissement rouge quatre lignes au moins, sans empiéter sur la section Compatibilité Riot' {
+        $forced.WarningHeight | Should BeGreaterThan 51
+        ($forced.WarningTop + $forced.WarningHeight) | Should BeLessThan ($SetupRiotCompatibilityTop + 1)
+    }
+}
+
+Describe 'Texte forcé de la page Raccourcis : présélection' {
+    $locales = @([pscustomobject]@{ code = 'ja_JP'; label = 'Japonais' }, [pscustomobject]@{ code = 'fr_FR'; label = 'Français' })
+
+    It 'laisse la case décochée sans choix enregistré ni raccourci mixte' {
+        Reset-SetupTestState @{ Config = (New-TestLaunchConfig); Locales = $locales }
+        Get-SetupPreselectedForcedText $script:InstallState | Should Be ''
+        Get-SetupPreselectedForcedTextList $script:InstallState | Should Be 'ja_JP'
+    }
+
+    It 'reprend la langue enregistrée dans config.json' {
+        $config = New-TestLaunchConfig
+        Set-LaunchForcedTextLocale $config 'fr_FR'
+        Reset-SetupTestState @{ Config = $config; Locales = $locales }
+        Get-SetupPreselectedForcedText $script:InstallState | Should Be 'fr_FR'
+        Get-SetupPreselectedForcedTextList $script:InstallState | Should Be 'fr_FR'
+    }
+
+    It 'reprend la langue d''un raccourci mixte déjà posé quand config.json l''ignore' {
+        Reset-SetupTestState @{ Config = (New-TestLaunchConfig); Locales = $locales
+                                ExistingShortcuts = @([pscustomobject]@{ Code = 'ja_JP'; TextCode = 'fr_FR'; CompanionId = '' }) }
+        Get-SetupPreselectedForcedText $script:InstallState | Should Be 'fr_FR'
+    }
+
+    It 'fait primer la saisie en attente (redessin après changement de langue de l''assistant)' {
+        $config = New-TestLaunchConfig
+        Set-LaunchForcedTextLocale $config 'fr_FR'
+        Reset-SetupTestState @{ Config = $config; Locales = $locales; PendingSelection = @{ ForcedTextBox = @('False'); ForcedTextList = @('ja_JP') } }
+        Get-SetupPreselectedForcedText $script:InstallState | Should Be ''
+        Get-SetupPreselectedForcedTextList $script:InstallState | Should Be 'ja_JP'
+        Reset-SetupTestState @{ Config = (New-TestLaunchConfig); Locales = $locales; PendingSelection = @{ ForcedTextBox = @('True'); ForcedTextList = @('ja_JP') } }
+        Get-SetupPreselectedForcedText $script:InstallState | Should Be 'ja_JP'
+    }
+
+    It 'coche la case quand une langue est présélectionnée' {
+        (New-SetupForcedTextBox 'fr_FR' 0 0 250).Checked | Should Be $true
+        (New-SetupForcedTextBox '' 0 0 250).Checked | Should Be $false
+        (New-SetupForcedTextBox '' 0 0 250).Text | Should Be 'Forcer le texte en :'
+    }
+}
+
+Describe 'Texte forcé de la page Raccourcis : saisie' {
+    It 'retient la langue de la liste seulement case cochée' {
+        Get-SetupForcedTextCode $true 'fr_FR' | Should Be 'fr_FR'
+        Get-SetupForcedTextCode $false 'fr_FR' | Should Be ''
+        Get-SetupForcedTextCode $true '' | Should Be ''
+    }
+
+    It 'active la liste et montre l''avertissement rouge seulement case cochée' {
+        Reset-SetupTestState
+        $script:InstallState.Controls.ForcedTextBox     = New-SetupForcedTextBox '' 0 0 250
+        $script:InstallState.Controls.ForcedTextList    = New-ThemedComboBox @(@{ Key = 'fr_FR'; Label = 'Français' }) 'fr_FR' 0 0 250
+        $script:InstallState.Controls.ForcedTextWarning = New-ThemedLabel 'x' 0 0 250 40 'Danger' 8.25
+        Update-SetupForcedTextControls
+        $script:InstallState.Controls.ForcedTextList.Enabled | Should Be $false
+        $script:InstallState.Controls.ForcedTextWarning.Visible | Should Be $false
+        $script:InstallState.Controls.ForcedTextBox.Checked = $true
+        Update-SetupForcedTextControls
+        $script:InstallState.Controls.ForcedTextList.Enabled | Should Be $true
+    }
+
+    It 'relève la case et la langue pour le redessin de la page' {
+        Reset-SetupTestState
+        $script:InstallState.Controls.ForcedTextBox  = New-SetupForcedTextBox 'fr_FR' 0 0 250
+        $script:InstallState.Controls.ForcedTextList = New-ThemedComboBox @(@{ Key = 'ja_JP'; Label = 'Japonais' }, @{ Key = 'fr_FR'; Label = 'Français' }) 'fr_FR' 0 0 250
+        $selection = Get-SetupPageSelection
+        $selection.ForcedTextBox -join ',' | Should Be 'True'
+        $selection.ForcedTextList -join ',' | Should Be 'fr_FR'
+    }
+
+    It 'a un avertissement traduit qui parle du risque de ban' {
+        try {
+            foreach ($pair in @(@('fr', 'bannissement'), @('en', 'ban'), @('ja', 'BAN'))) {
+                Initialize-Translation $pair[0] | Out-Null
+                (Get-Text 'setup.shortcuts.forcedTextWarning') -match $pair[1] | Should Be $true
+            }
+        }
+        finally { Initialize-Translation 'fr' | Out-Null }
+    }
+}
+
+Describe 'Invoke-SetupShortcutsStep, texte forcé' {
+    $config = New-TestLaunchConfig
+    Mock Write-SetupLog {}
+    Mock New-SetupShortcutWithFallback { 'C:\Bureau\Hex Launcher.lnk' }
+    Mock New-SetupShortcuts { @('C:\Bureau\League of Legends JP-FR.lnk') }
+    Mock Remove-ObsoleteShortcuts {}
+    Mock Select-IconSetForConfig { $null }
+    Mock Save-LaunchForcedTextLocale { $true }
+
+    It 'crée des raccourcis mixtes pour chaque langue cochée et mémorise la langue du texte' {
+        Reset-SetupTestState @{ Config = $config }
+        Mock Get-SetupShortcutSelection { @{ Codes = @('ja_JP', 'fr_FR'); CompanionIds = @(); TextCode = 'fr_FR' } }
+        Invoke-SetupShortcutsStep | Should Be $true
+        Assert-MockCalled -Scope It New-SetupShortcuts -Exactly -Times 1 -ParameterFilter {
+            $Combinations.Count -eq 2 -and $Combinations[0].Name -eq 'League of Legends JP-FR' -and $Combinations[1].Name -eq 'League of Legends FR'
+        }
+        Assert-MockCalled -Scope It Save-LaunchForcedTextLocale -Exactly -Times 1 -ParameterFilter { $Locale -eq 'fr_FR' -and $ConfigPath -eq $SetupConfigPath }
+        Assert-MockCalled -Scope It Write-SetupLog -Exactly -Times 1 -ParameterFilter { $Text -eq 'Texte forcé : fr_FR' }
+    }
+
+    It 'mémorise l''absence de texte forcé quand la case est décochée' {
+        Reset-SetupTestState @{ Config = $config }
+        Mock Get-SetupShortcutSelection { @{ Codes = @('ja_JP'); CompanionIds = @(); TextCode = '' } }
+        Invoke-SetupShortcutsStep | Should Be $true
+        Assert-MockCalled -Scope It Save-LaunchForcedTextLocale -Exactly -Times 1 -ParameterFilter { $Locale -eq '' }
+        Assert-MockCalled -Scope It Write-SetupLog -Exactly -Times 1 -ParameterFilter { $Text -eq 'Texte forcé : désactivé' }
+        Assert-MockCalled -Scope It New-SetupShortcuts -Exactly -Times 1 -ParameterFilter { $Combinations[0].Name -eq 'League of Legends JP' }
+    }
+}

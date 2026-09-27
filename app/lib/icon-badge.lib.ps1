@@ -19,11 +19,15 @@
     Pastilles empilées (jeu « original-badges », sur l'icône du binaire de League of Legends) : pays en haut à
     droite, compagnon juste en dessous. Sous 32 px une seule pastille subsiste, le pays : c'est lui qui définit
     le raccourci, le compagnon est contextuel.
+
+    Texte forcé : la pastille pays porte deux langues, coupée en diagonale (icon-split.lib.ps1) — voix en haut à
+    gauche, texte en bas à droite.
 #>
 
 . (Join-Path $PSScriptRoot 'icon.lib.ps1')
 . (Join-Path $PSScriptRoot 'palette.lib.ps1')
 . (Join-Path $PSScriptRoot 'flag.lib.ps1')
+. (Join-Path $PSScriptRoot 'icon-split.lib.ps1')
 
 $BadgeShape = @{
     Diameter     = 0.34    # disque, en fraction du côté de l'icône
@@ -167,11 +171,24 @@ function Draw-FlagBadgeDisc($G, $M, [System.Drawing.Bitmap]$Flag) {
     $ring.Dispose(); $texture.Dispose()
 }
 
-# Dessine la pastille pays en place sur le bitmap d'une entrée ; sans dessin pour la langue → throw, l'appelant replie
-function Add-CountryBadgeToBitmap([System.Drawing.Bitmap]$Bitmap, [string]$Code, [int]$Slot = 0) {
+# Drapeau d'une langue, ou deux drapeaux coupés en diagonale (voix, texte) pour un raccourci à texte forcé
+function New-CountryBadgeBitmap([string[]]$Codes, [int]$Diameter) {
+    $flag = New-FlagBadgeBitmap $Codes[0] $Diameter
+    if ($Codes.Count -lt 2) { return $flag }
+    try {
+        $text = New-FlagBadgeBitmap $Codes[1] $Diameter
+        Add-DiagonalSplitToBitmap $text $flag
+        return $text
+    }
+    finally { $flag.Dispose() }
+}
+
+# Dessine la pastille pays en place sur le bitmap d'une entrée ; $Codes = voix[, texte forcé] ; sans dessin pour une
+# langue → throw, l'appelant replie
+function Add-CountryBadgeToBitmap([System.Drawing.Bitmap]$Bitmap, [string[]]$Codes, [int]$Slot = 0) {
     $metrics  = Get-BadgeMetrics $Bitmap.Width $Slot
     $diameter = [Math]::Max(1, [int][Math]::Round($metrics.Diameter))
-    $flag = New-FlagBadgeBitmap $Code $diameter
+    $flag = New-CountryBadgeBitmap $Codes $diameter
     try {
         $g = [System.Drawing.Graphics]::FromImage($Bitmap)
         $g.SmoothingMode = 'AntiAlias'; $g.InterpolationMode = 'HighQualityBicubic'; $g.CompositingQuality = 'HighQuality'
@@ -181,8 +198,8 @@ function Add-CountryBadgeToBitmap([System.Drawing.Bitmap]$Bitmap, [string]$Code,
 }
 
 # BUSINESS_RULE : pile verticale, pays en haut, compagnon en dessous ; sous StackMinSize le pays seul subsiste
-function Add-StackedBadgesToBitmap([System.Drawing.Bitmap]$Bitmap, [string]$Code, $Badge, $Style = $BadgeDefaultStyle) {
-    Add-CountryBadgeToBitmap $Bitmap $Code 0
+function Add-StackedBadgesToBitmap([System.Drawing.Bitmap]$Bitmap, [string[]]$Codes, $Badge, $Style = $BadgeDefaultStyle) {
+    Add-CountryBadgeToBitmap $Bitmap $Codes 0
     if ($Badge -and $Bitmap.Width -ge $BadgeShape.StackMinSize) { Add-BadgeToBitmap $Bitmap $Badge $Style 1 }
 }
 
@@ -197,12 +214,14 @@ function Get-BadgeSignature($Badge, $Style = $BadgeDefaultStyle) {
 }
 
 # Empreinte d'une pile pays + compagnon : le texte du dessin du drapeau en fait partie, une retouche du drapeau
-# change donc le nom du fichier composé — sans compagnon, la pile ne porte que le pays
-function Get-StackedBadgeSignature([string]$Code, $Badge, $Style = $BadgeDefaultStyle) {
-    $drawing   = if (Get-FlagDrawing $Code) { (Get-FlagDrawing $Code).ToString() } else { '' }
+# change donc le nom du fichier composé — sans compagnon, la pile ne porte que le pays. Une seule langue garde
+# l'empreinte d'avant le texte forcé ; deux langues y ajoutent le réglage du trait
+function Get-StackedBadgeSignature([string[]]$Codes, $Badge, $Style = $BadgeDefaultStyle) {
+    $drawing   = @($Codes | ForEach-Object { if (Get-FlagDrawing $_) { (Get-FlagDrawing $_).ToString() } else { '' } }) -join '|'
     $companion = if ($Badge) { Get-BadgeSignature $Badge $Style } else { 'none' }
     $render    = ($FlagBadgeRender.GetEnumerator() | Sort-Object Name | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join ';'
-    return ConvertTo-RenderSignature "$Code|$drawing|$companion|$render|$(Get-BadgeShapeKey)"
+    if ($Codes.Count -gt 1) { $render += "|$(Get-DiagonalSplitKey)" }
+    return ConvertTo-RenderSignature "$($Codes -join '|')|$drawing|$companion|$render|$(Get-BadgeShapeKey)"
 }
 
 function Get-BadgeShapeKey {
@@ -233,11 +252,11 @@ function Add-CompanionBadge([string]$SourceIco, $Badge, [string]$DestinationIco,
 
 # Icône d'un binaire (lue en mémoire, jamais copiée) + pastille pays + pastille compagnon éventuelle → icône de
 # destination : le seul fichier dérivé, local au poste (ico\<jeu>\companion, hors dépôt et hors release)
-function Add-StackedBadgesToExecutableIcon([string]$ExecutablePath, [string]$Code, $Badge, [string]$DestinationIco, $Style = $BadgeDefaultStyle) {
+function Add-StackedBadgesToExecutableIcon([string]$ExecutablePath, [string[]]$Codes, $Badge, [string]$DestinationIco, $Style = $BadgeDefaultStyle) {
     if ($Badge -and [string]::IsNullOrWhiteSpace($Badge.color)) { throw "Pastille compagnon invalide : couleur manquante" }
     $entries = Read-ExecutableIconEntries $ExecutablePath
     try {
-        foreach ($entry in $entries) { Add-StackedBadgesToBitmap $entry.Bitmap $Code $Badge $Style }
+        foreach ($entry in $entries) { Add-StackedBadgesToBitmap $entry.Bitmap $Codes $Badge $Style }
         Write-Ico $entries $DestinationIco
     }
     finally { $entries | ForEach-Object { $_.Bitmap.Dispose() } }

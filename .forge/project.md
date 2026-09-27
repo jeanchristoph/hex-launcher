@@ -16,7 +16,7 @@ lol/  (dépôt hex-launcher)
 ├── README.md / .fr.md / .ja.md  # Mention légale Riot en tête
 ├── LICENSE, .gitignore, .gitattributes
 ├── tests/                       # Pester 3.4 : *.tests.ps1 + companion-test-helpers.ps1 — Invoke-Pester -Path tests (dev, hors release)
-├── tools/                       # Dev, hors release : make-release.ps1 ; make-flag-icons.ps1 (29 .ico de app/ico depuis le SVG, resvg + drapeaux GDI+) ; logo/make-logo-svg.py + logo/hex-launcher-logo-drawing.png → logo/hex-launcher-logo.svg (logo HL, source de vérité ; Python, potrace, resvg) ; logo/hex_launcher_gear_multisize.ico + settings.png (engrenage, source fournie par l'utilisateur, copié tel quel en app/ico/hex-launcher-setup.ico)
+├── tools/                       # Dev, hors release : make-release.ps1 ; fetch-libzstd.ps1 (libzstd.dll de la release officielle facebook/zstd, SHA-256 du zip et de la DLL épinglés) ; make-flag-icons.ps1 (29 .ico de app/ico depuis le SVG, resvg + drapeaux GDI+) ; logo/make-logo-svg.py + logo/hex-launcher-logo-drawing.png → logo/hex-launcher-logo.svg (logo HL, source de vérité ; Python, potrace, resvg) ; logo/hex_launcher_gear_multisize.ico + settings.png (engrenage, source fournie par l'utilisateur, copié tel quel en app/ico/hex-launcher-setup.ico)
 └── app/                         # Tout le moteur — les scripts sont relatifs à $PSScriptRoot
     ├── setup.ps1              # Assistant de configuration unique (WinForms thème LoL, machine à états pure testée, hooks CompanionUi ; chemins Riot corrigeables page 1 avec Parcourir…)
     ├── detect-config.ps1        # Génère config.json (Riot Client, yaml, applis compagnon détectées via le catalogue) — Main gardé
@@ -36,6 +36,13 @@ lol/  (dépôt hex-launcher)
     ├── lib/icon-set.lib.ps1     # Jeux d'icônes : Get-IconSets (sous-dossiers de ico\ avec hex-launcher.ico ou icon-source.json, ordre fixe $IconSetDisplayOrder), repli flat, préféré original-badges (présélection), Resolve-IconSet avec repli, Get-IconSetSource ; libellés traduits iconSet.<camelCase> côté setup (jeu externe league-client, badges)
     ├── lib/flag.lib.ps1         # Drapeaux GDI+ ($FlagDrawings, une définition pour les icônes et les pastilles pays) ; New-FlagBitmap neutre, résolveur de couleur optionnel injecté par le générateur
     ├── lib/riot-install.lib.ps1 # RiotClientInstalls.json (fichier officiel Riot, lecture seule) : Find-RiotClientPath, Find-LeagueClientPath (associated_client → LeagueClient.exe)
+    ├── lib/forced-text.lib.ps1  # Texte forcé : pose (fichiers texte de B sous les noms de A, locale Riot = A = voix) et restauration ; marqueur %LOCALAPPDATA%\hex-launcher\forced-text-state.json
+    ├── lib/riot-text-files.lib.ps1 # Game.ok + Game.manifest (lecture seule), garde « même id de manifest », cache %LOCALAPPDATA%\hex-launcher\text\<manifestId>\<locale>\
+    ├── lib/riot-cdn.lib.ps1     # CDN public Riot : plages HTTP Range par bundle, hôte *.riotcdn.net imposé, écriture .part puis renommage
+    ├── lib/zstd.lib.ps1         # libzstd.dll par P/Invoke, empreinte vérifiée avant LoadLibraryW ; C# compilé au premier besoin
+    ├── lib/rman-reader.cs       # Lecteur RMAN (en-tête + FlatBuffers) compilé par Add-Type au premier manifest lu
+    ├── lib/native/libzstd.dll   # zstd 1.5.7 x64 officielle (BSD, licence à côté) — seule dépendance binaire
+    ├── lib/icon-split.lib.ps1   # Icône coupée en diagonale (voix haut-gauche, texte bas-droite, trait ramené à l'alpha du cadre)
     ├── lib/i18n.lib.ps1         # Traductions : Resolve-UiLanguage, Initialize-Translation, Get-Text, Get-LocalizedValue
     ├── i18n/{fr,en,ja}.json     # Dictionnaires plats section.cle → texte, mêmes clés partout (test de catalogue)
     ├── locales.json             # Catalogue des locales Riot (code, label natif, default)
@@ -51,6 +58,7 @@ lol/  (dépôt hex-launcher)
 - `create-shortcuts.ps1 -Locales ja_JP,ko_KR -Companions blitz,opgg` ; raccourci → `launch-lol.ps1 -Locale xx_XX [-Companion <id>]`
 - Raccourci `.lnk` → `powershell.exe -WindowStyle Hidden -File launch-lol.ps1 -Locale xx_XX`
 - `create-shortcuts.ps1 -Locales ja_JP,ko_KR` (mode script sans dialogue)
+- Texte forcé : `create-shortcuts.ps1 -Locales ja_JP -TextLocale fr_FR` → raccourci `League of Legends JP-FR` → `launch-lol.ps1 -Locale ja_JP -TextLocale fr_FR` (-Locale = voix)
 
 ## Detected conventions
 - Naming: fonctions PowerShell `Verb-Noun` approuvés (`Read-LaunchConfig`, `Test-CompanionAppEnabled`, `Find-CompanionApp`) ; booléens `Test-*` ; fichiers kebab-case ; commentaires et messages utilisateur en français, README trilingue
@@ -61,6 +69,9 @@ lol/  (dépôt hex-launcher)
 - Tests: Pester 3.4 (livré avec PS 5.1), mocks sur registre/process/réseau, `Assert-MockCalled -Scope It -Exactly` (un Mock dans un It survit jusqu'à la fin du Describe) ; `.Count` sur un PSCustomObject seul rend vide → envelopper avec `@()` ; `return` déroule un tableau vide en rien → l'appelant enveloppe toujours dans `@()`, jamais de virgule unaire (elle imbrique quand l'appelant fait déjà `@()`)
 - Messages console dans une fonction à valeur de retour → `Write-Host`, jamais une chaîne nue (elle polluerait le pipeline de retour)
 - i18n : aucune chaîne utilisateur littérale dans `setup.ps1`, `manage-companion-app.ps1`, `create-shortcuts.ps1`, `detect-config.ps1` — tout passe par `Get-Text 'section.cle' args` (placeholders `{0}` .NET, pluriels par clés `.one`/`.many`) ; les textes sont lus à l'affichage, jamais figés dans une variable de script (la langue change en cours de route). Les throw/warnings des libs (intégrité catalogue, .ico) restent en français. Valeur traduisible d'un catalogue JSON → objet `{ fr, en, ja }` lu par `Get-LocalizedValue`. Chaque fichier de tests force `Initialize-Translation 'fr'` après le dot-sourcing : les assertions restent indépendantes de la langue de Windows. Les scripts dot-sourcés rechargent la lib i18n (état remis à `$null`) → `setup.ps1` initialise la traduction APRÈS tous ses dot-sourcings
+
+- C# via Add-Type : compilateur CodeDom du .NET Framework = C# 5 (pas de filtre `when`, pas d'interpolation `$""`) ; `.cs` en UTF-8 avec BOM (sinon csc lit en ANSI) ; compilation paresseuse (au premier besoin, jamais au dot-sourcing : ~1 s par lancement sinon)
+- Noms de raccourcis en ASCII : WScript.Shell convertit les chemins en ANSI (un « ⁄ » U+2044 y redevient « / »)
 
 ## Critical files
 - `companion-apps.json` — point d'extension unique pour une appli compagnon ; Porofessor passe par `OverwolfLauncher.exe -launchapp <extensionId>`, sa désinstallation est interactive (menu Overwolf, Overwolf coché par défaut)
@@ -77,10 +88,15 @@ lol/  (dépôt hex-launcher)
 - Pastille pays (`Add-CountryBadgeToBitmap`) : drapeau de `flag.lib.ps1` dessiné à 4× (min 64 px), réduit `HighQualityBicubic` dans un carré, disque inscrit découpé par `TextureBrush`, couleurs brutes (ni voile ni palette) ; pile (`Add-StackedBadgesToBitmap`) : pays en `Slot 0`, compagnon en `Slot 1` dessous (`Get-BadgeMetrics -Slot`), sous 32 px (`StackMinSize`) le pays seul ; empreinte `Get-StackedBadgeSignature` (code, texte du dessin, pastille, style, métriques). L'icône du binaire est lue en mémoire par `Read-ExecutableIconEntries` (`PrivateExtractIcons`, 256 → 16 px, `DestroyIcon`)
 - Pastilles compagnon : `badge { glyph, color }` dans `companion-apps.json` (P/B/O/M), dessinées par GDI+, couleurs du catalogue, voile nuit de `lib/palette.lib.ps1` seulement si le jeu d'icônes le demande (`ico/<jeu>/badge-style.json` : `nightVeil`, `reducedPalette`, lus par `Get-IconSetBadgeStyle` ; flat = voile seul, classic = tout à false ; les deux jeux livrés portent le fichier complet comme modèle ; signature de cache sur les couleurs restituées) — jamais un logo tiers
 
+- Texte forcé (branche text-lang, 2026-09-27) : restauration au début de CHAQUE lancement (avant le changement de langue — sinon on remettrait des fichiers d'une locale que Riot vient de retirer) ; pose après l'apparition du client LoL (patch Riot terminé ; seul `League of Legends.exe` lit Global/UI, au début d'une partie) ; démarrage manuel : attente du client 600 s. Sauvegarde = amorçage du cache de la voix (fichiers identiques au CDN pour ce manifest) ; restauration retéléchargée si un patch a changé le manifest. `hash_type` du manifest LoL = 4 (BLAKE3, absent de .NET) → contrôle réduit aux tailles + magic `RW`. Validation réelle : Global/UI.ja_JP téléchargés identiques octet pour octet aux fichiers installés. Relevé : `.forge/branch/text-lang/output/20260926-forced-text-files.md`
+- `config.json` : `forcedTextLocale` = présélection de la case « Forcer le texte en » de setup ; le choix réel est porté par chaque raccourci (`-TextLocale`)
+
 ## Tools & access
 - Available MCPs: ClickUp, claude-in-chrome, phpstorm (non pertinent ici)
 - Identité visuelle : nom `hex-launcher`, mention de non-affiliation Riot en tête des README ; logo HL vectoriel original (tools/logo/hex-launcher-logo.svg, dessin utilisateur vectorisé) et icônes générées par tools/make-flag-icons.ps1 (dépendance dev : resvg via scoop)
 - Registre et configuration Windows : lecture seule, interdiction d'écrire (règle utilisateur, CLAUDE.md global)
+- Installation LoL de l'utilisateur : lecture seule pendant le développement (jamais copier, écrire, changer la langue ni lancer) ; tests sur TestDrive / mocks, essai réel par l'utilisateur
+- Réseau : CDN public Riot (`lol.secure.dyn.riotcdn.net/channels/public/{releases,bundles}`), sans authentification — seul le mode texte forcé l'utilise
 - External documentation: `RiotClientInstalls.json` (`%ProgramData%\Riot Games\`) et `league_of_legends.live.product_settings.yaml` — fichiers officiels Riot lus/écrits par le lanceur ; README.md du projet (référence fonctionnelle complète)
 
 ## Backlog

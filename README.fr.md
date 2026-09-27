@@ -4,6 +4,8 @@
 
 > **Projet non affilié à Riot Games.** Riot Games ne soutient ni ne sponsorise ce projet. League of Legends et Riot Games sont des marques ou marques déposées de Riot Games, Inc.
 
+> **Utilisation à vos risques.** Cet outil n'est pas un logiciel Riot et s'utilise à vos propres risques : l'auteur ne peut être tenu responsable d'aucune sanction appliquée à votre compte Riot (suspension, bannissement), ni d'aucun autre dommage.
+
 **Windows uniquement, pour l'instant** (Windows 10/11, PowerShell 5.1 inclus — macOS non pris en charge).
 
 Assistant de lancement League of Legends pour Windows : démarre le jeu dans la langue de son choix
@@ -37,8 +39,11 @@ installe, et on obtient un raccourci par langue × appli compagnon
 | `app/lib/i18n.lib.ps1` / `app/i18n/` | Traductions de l'assistant et de la console : un dictionnaire `fr.json` / `en.json` / `ja.json` par langue, mêmes clés partout |
 | `app/lib/launch-config.lib.ps1` | Fonctions partagées : lecture/écriture de `config.json`, migration de l'ancien format à une seule appli |
 | `app/lib/splash.lib.ps1` | Splash animé partagé (lancement du jeu, installation des applis compagnon) |
+| `app/lib/forced-text.lib.ps1` / `riot-text-files.lib.ps1` / `riot-cdn.lib.ps1` | Texte forcé : pose et restauration des fichiers texte ; lecture de `Game.ok` et `Game.manifest` (lecture seule) et cache ; téléchargement par plages depuis le CDN Riot |
+| `app/lib/zstd.lib.ps1` / `rman-reader.cs` / `native/libzstd.dll` | Décompression zstd (DLL officielle, empreinte vérifiée) et lecture du manifest RMAN du patcher Riot |
+| `app/lib/icon-split.lib.ps1` | Icône coupée en diagonale des raccourcis à texte forcé |
 | `tests/` | Tests Pester (`Invoke-Pester -Path tests`) |
-| `tools/` | Développement uniquement, hors release : `make-release.ps1`, `make-flag-icons.ps1` (régénère toutes les icônes de `app/ico/` depuis le logo vectoriel), `logo/make-logo-svg.py` + `logo/hex-launcher-logo-drawing.png` → `logo/hex-launcher-logo.svg` (logo HL original, source de vérité) |
+| `tools/` | Développement uniquement, hors release : `make-release.ps1`, `fetch-libzstd.ps1` (retélécharge `libzstd.dll` depuis la release officielle et vérifie ses empreintes), `make-flag-icons.ps1` (régénère toutes les icônes de `app/ico/` depuis le logo vectoriel), `logo/make-logo-svg.py` + `logo/hex-launcher-logo-drawing.png` → `logo/hex-launcher-logo.svg` (logo HL original, source de vérité) |
 | `app/ico/` | Jeux d'icônes, un dossier chacun : `flat/` (défaut : drapeau plat derrière le logo HL) et `classic/` (les anciennes icônes en relief) ; chacun contient l'icône de base + une variante drapeau par langue (`hex-launcher-xx.ico`) et un sous-dossier généré `companion/` avec les icônes drapeau + pastille composées sur ce poste. `original/` et `original-badges/` ne contiennent qu'un marqueur `icon-source.json` : l'icône officielle du jeu, référencée depuis `LeagueClient.exe` installé — nue, ou avec pastilles pays et compagnon composées sur ce poste |
 
 ## Confiance — ce que fait `setup.bat`, ce qu'il ne fait pas
@@ -49,15 +54,22 @@ Cliquer sur un `.bat` inconnu fait peur, à juste titre. Voici de quoi vérifier
   Tout le code est dans `app\`, en clair (PowerShell), identique à ce dépôt public.
 - **Aucune donnée collectée, aucune télémétrie, aucun compte, aucun serveur.** Hex Launcher ne parle qu'au Riot Client
   de *votre* PC (`127.0.0.1`, son API locale) et ne contacte Internet que pour télécharger une appli compagnon *que
-  vous avez cochée*, depuis le site de son éditeur ou winget. Le journal `app\launch.log` reste dans le dossier.
+  vous avez cochée*, depuis le site de son éditeur ou winget, et, en mode texte forcé, les fichiers texte de la langue
+  choisie depuis le CDN officiel de Riot. Le journal `app\launch.log` reste dans le dossier.
 - **Jamais administrateur** : lancé « en tant qu'administrateur », il refuse. Registre Windows lu seulement (pour
   détecter les applis déjà installées), jamais écrit. Il n'écrit que dans son propre dossier (`config.json`, icônes
-  composées), sur le Bureau (les raccourcis) et, le temps d'une installation que vous avez demandée, l'installeur de
-  l'appli compagnon dans le dossier temporaire de Windows.
+  composées), sur le Bureau (les raccourcis), le temps d'une installation que vous avez demandée, l'installeur de
+  l'appli compagnon dans le dossier temporaire de Windows et, en mode texte forcé, les deux fichiers texte du jeu et un
+  cache dans `%LOCALAPPDATA%\hex-launcher\`.
+- **Une seule dépendance binaire** : `app\lib\native\libzstd.dll`, la bibliothèque officielle de décompression zstd
+  (Meta, licence BSD, v1.5.7), nécessaire au mode texte forcé. Son empreinte SHA-256 est vérifiée avant chaque
+  chargement ; `tools\fetch-libzstd.ps1` la retélécharge depuis la release officielle.
 - **Rien sans votre clic.** Une appli compagnon n'est installée ou désinstallée qu'après *Appliquer*, la liste exacte
   des actions étant affichée avant. La page d'accueil ne modifie rien.
-- **Le jeu n'est pas modifié.** Seule la langue change, par l'API officielle locale du Riot Client (ce que fait son
-  propre réglage) ; aucun fichier de League of Legends n'est touché.
+- **Le jeu n'est pas modifié, sauf en mode texte forcé.** La langue change par l'API officielle locale du Riot Client
+  (ce que fait son propre réglage). Aucun fichier de League of Legends n'est touché, sauf si vous activez le mode
+  texte forcé : les fichiers texte de la langue choisie remplacent alors ceux de la langue des voix (voir la section
+  dédiée).
 - **Vérifiable.** Chaque release publie l'empreinte SHA-256 de son zip ; comparez avec
   `Get-FileHash hex-launcher-x.y.z.zip` dans PowerShell. Le code source est ce dépôt.
 
@@ -198,6 +210,7 @@ automatiquement à la prochaine lecture.
 | `companionApps[].name` | Nom affiché dans le splash. Cosmétique. |
 | `companionApps[].path` | Exécutable à lancer. |
 | `companionApps[].arguments` | Arguments de lancement. Chaîne vide `""` si aucun. |
+| `forcedTextLocale` | Langue du texte forcé choisie dans `setup.bat` (ex. `fr_FR`), vide sinon. Sert à la présélection de la page *Raccourcis* ; ce sont les raccourcis qui portent le choix (`-TextLocale`). |
 
 Si un `path` n'existe pas sur la machine, le lanceur l'ignore et affiche un avertissement dans le splash —
 le jeu démarre quand même. Idem si un raccourci demande un `id` absent de la liste.
@@ -240,6 +253,31 @@ Pour une langue absente du catalogue (nouvelle locale Riot) :
 2. (optionnel) ajouter le dessin du drapeau dans `$FlagDrawings` de `app/lib/flag.lib.ps1` (il sert aux icônes et à la
    pastille pays) et lancer `powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-flag-icons.ps1 -Locales xx_XX`.
 
+## Texte forcé (voix et texte dans deux langues)
+
+Les voix dans une langue, le texte en jeu dans une autre : sur la page *Raccourcis* de `setup.bat`, cochez
+« Forcer le texte en : » et choisissez la langue du texte. Chaque langue cochée reste celle des voix ; le raccourci
+s'appelle `League of Legends JP-FR` et son icône est coupée en diagonale (voix en haut, texte en bas).
+
+> ⚠️ Ce mode remplace des fichiers du jeu. Riot n'autorise pas les modifications de fichiers : le compte peut être
+> sanctionné, jusqu'au bannissement. À vos risques.
+
+Comment : aucun réglage Riot ne sépare texte et voix. Une fois le client LoL ouvert, le lanceur remplace les deux
+fichiers texte de la langue des voix (`Global`, `UI`) par ceux de la langue choisie, téléchargés depuis le CDN officiel
+de Riot pour la version exacte installée (~4 Mo par langue et par patch, en cache dans `%LOCALAPPDATA%\hex-launcher\text\`).
+Ce sont les fichiers originaux signés par Riot, identiques à ceux d'un joueur dans cette langue. Les fichiers d'origine
+sont remis en place au lancement suivant.
+
+Limites :
+- le client LoL (menus, boutique) reste dans la langue des voix : seul le jeu en partie change ;
+- LoL lancé sans raccourci Hex Launcher garde le texte forcé jusqu'au prochain lancement par un raccourci ou jusqu'au
+  prochain patch ;
+- hors ligne ou en cas d'erreur, la partie se joue dans la langue des voix (ligne `TEXT` dans `launch.log`) ;
+- en démarrage manuel, le texte est posé dès que vous appuyez sur **Jouer** (10 min au plus).
+
+En mode script : `create-shortcuts.ps1 -Locales ja_JP -TextLocale fr_FR` (le lanceur reçoit alors
+`launch-lol.ps1 -Locale ja_JP -TextLocale fr_FR`).
+
 ### Icônes
 
 Le jeu `flat` est construit à partir du logo vectoriel `tools/logo/hex-launcher-logo.svg` (cadre or +
@@ -276,6 +314,9 @@ Le lanceur fait donc, dans l'ordre :
    splash prévient dès le troisième lancement.
 5. Fermer les autres applis compagnon de `config.json`, puis lancer celle nommée par `-Companion`, s'il y en a une.
 
+Texte forcé (`-TextLocale`) : avant l'étape 1, une pose précédente est remise en place (avant tout changement de
+langue) ; après l'étape 3 — ou 4, une fois **Jouer** appuyé — les fichiers texte de la langue choisie sont posés.
+
 Le lanceur n'a pas de mémoire : le lancement direct est tenté à chaque fois. S'il échoue régulièrement sur votre
 poste, cochez « Démarrage manuel » (section Compatibilité Riot) dans `setup.bat` — le lanceur y passe alors d'emblée.
 
@@ -298,6 +339,7 @@ Utiliser le lanceur ne demande rien de plus que Windows 10/11. Contribuer, si :
 | Régénérer le jeu d'icônes `flat` (`tools/make-flag-icons.ps1`) | `resvg` (SVG → PNG) | `scoop install resvg` |
 | Régénérer le logo SVG (`tools/logo/make-logo-svg.py`) | Python 3 avec Pillow et numpy, `potrace` (PNG → SVG), `resvg` | `pip install pillow numpy` · `scoop install potrace resvg` |
 | Publier une release (`tools/make-release.ps1 -Publish`) | GitHub CLI `gh`, authentifié | `scoop install gh` ou https://cli.github.com |
+| Changer de version de `libzstd.dll` (`tools/fetch-libzstd.ps1`) | aucun (PowerShell) | release officielle https://github.com/facebook/zstd/releases |
 
 Tout ce qui est dans `tools/` et `tests/` reste hors du zip de release. Les couleurs des drapeaux passent par la palette
 réduite et l'atténuation de `app/lib/palette.lib.ps1` ; les pastilles compagnon n'en prennent le voile nuit et/ou la palette réduite que dans les jeux qui le demandent (`badge-style.json`).
@@ -320,6 +362,8 @@ Installeurs, désinstalleurs, réseau et registre sont mockés : les tests ne to
 - **Caractères bizarres dans le splash ou les dialogues** (`Ã©`, `â€¦`) : un `.ps1` a été réenregistré sans BOM.
   Tous les scripts (`launch-lol.ps1`, `manage-companion-app.ps1`, `create-shortcuts.ps1`, `lib\*.ps1`) doivent
   être en **UTF-8 avec BOM** (VS Code : barre d'état → encodage → « Enregistrer avec l'encodage »).
+- **Le texte n'est pas dans la langue forcée** : lire les lignes `TEXT` de `app\launch.log` (hors ligne, patch en
+  cours, langue des voix pas encore installée…).
 - **L'icône du raccourci n'est pas à jour** : cache d'icônes Windows. Clic droit → Actualiser dans le
   dossier, sinon se déconnecter/reconnecter.
 - **« Ne pas exécuter en tant qu'administrateur »** : `setup.bat` a été lancé élevé. Le lancer normalement.

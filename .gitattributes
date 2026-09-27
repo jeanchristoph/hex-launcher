@@ -4,3 +4,5 @@
 *.json text eol=crlf
 *.md text eol=lf
 *.ico binary
+*.cs text eol=crlf
+*.dll binary

@@ -119,6 +119,24 @@ function Save-LaunchRiotPaths($Config, [string]$ConfigPath, [hashtable]$Paths) {
     return $true
 }
 
+# Langue du texte forcé choisie dans setup (présélection de la page Raccourcis) ; '' = aucun texte forcé
+function Get-LaunchForcedTextLocale($Config) {
+    if ($null -ne $Config.forcedTextLocale) { return [string]$Config.forcedTextLocale }
+    return ''
+}
+
+function Set-LaunchForcedTextLocale($Config, [string]$Locale) {
+    $Config | Add-Member -NotePropertyName forcedTextLocale -NotePropertyValue $Locale -Force
+}
+
+# Écrit config.json seulement si le choix change ; rend $true s'il a été écrit
+function Save-LaunchForcedTextLocale($Config, [string]$ConfigPath, [string]$Locale) {
+    if ((Get-LaunchForcedTextLocale $Config) -eq $Locale) { return $false }
+    Set-LaunchForcedTextLocale $Config $Locale
+    Write-LaunchConfig $Config $ConfigPath
+    return $true
+}
+
 function Get-LaunchIconSetName($Config) {
     if ($null -ne $Config.iconSet) { return [string]$Config.iconSet }
     return ''

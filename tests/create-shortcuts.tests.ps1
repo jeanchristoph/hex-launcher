@@ -147,10 +147,15 @@ Describe 'Remove-StaleIconVariants' {
     }
 }
 
-Describe 'Get-StackedIconStem' {
+Describe 'Get-CombinationIconStem' {
     It 'nomme par le pays, puis l''identifiant du compagnon s''il y en a un' {
-        Get-StackedIconStem (New-ShortcutCombination 'ja_JP' $null) | Should Be 'hex-launcher-jp'
-        Get-StackedIconStem (New-ShortcutCombination 'ja_JP' ([pscustomobject]@{ id = 'blitz'; name = 'Blitz' })) | Should Be 'hex-launcher-jp-blitz'
+        Get-CombinationIconStem (New-ShortcutCombination 'ja_JP' $null) | Should Be 'hex-launcher-jp'
+        Get-CombinationIconStem (New-ShortcutCombination 'ja_JP' ([pscustomobject]@{ id = 'blitz'; name = 'Blitz' })) | Should Be 'hex-launcher-jp-blitz'
+    }
+
+    It 'insère le pays du texte forcé entre celui des voix et le compagnon' {
+        Get-CombinationIconStem (New-ShortcutCombination 'ja_JP' $null 'fr_FR') | Should Be 'hex-launcher-jp-fr'
+        Get-CombinationIconStem (New-ShortcutCombination 'ja_JP' ([pscustomobject]@{ id = 'blitz'; name = 'Blitz' }) 'fr_FR') | Should Be 'hex-launcher-jp-fr-blitz'
     }
 }
 
@@ -181,14 +186,14 @@ Describe 'Resolve-ShortcutIconPath sur un jeu externe' {
         $script:LeagueClientPath = $exe
         $script:CompanionBadges = @{ blitz = $badge }
         Mock New-Item {}
-        Mock Add-StackedBadgesToExecutableIcon { param($ExecutablePath, $Code, $Badge, $DestinationIco, $Style) $DestinationIco }
+        Mock Add-StackedBadgesToExecutableIcon { param($ExecutablePath, $Codes, $Badge, $DestinationIco, $Style) $DestinationIco }
 
         It 'compose pays + compagnon dans ico\original-badges\companion' {
             try {
                 $combination = New-ShortcutCombination 'ja_JP' $blitz
                 Resolve-ShortcutIconPath $combination | Should Be (Get-StackedIconPath $combination $badge)
                 Get-StackedIconPath $combination $badge | Should Match 'ico\\original-badges\\companion\\hex-launcher-jp-blitz-[0-9a-f]{8}\.ico$'
-                Assert-MockCalled Add-StackedBadgesToExecutableIcon -Scope It -Exactly 1 -ParameterFilter { $ExecutablePath -eq $exe -and $Code -eq 'ja_JP' -and $Badge.glyph -eq 'B' }
+                Assert-MockCalled Add-StackedBadgesToExecutableIcon -Scope It -Exactly 1 -ParameterFilter { $ExecutablePath -eq $exe -and ($Codes -join ',') -eq 'ja_JP' -and $Badge.glyph -eq 'B' }
             } finally { Set-ActiveIconSet '' | Out-Null; $script:LeagueClientPath = $null }
         }
 
@@ -197,7 +202,7 @@ Describe 'Resolve-ShortcutIconPath sur un jeu externe' {
             try {
                 $combination = New-ShortcutCombination 'fr_FR' $null
                 Resolve-ShortcutIconPath $combination | Should Match 'ico\\original-badges\\companion\\hex-launcher-fr-[0-9a-f]{8}\.ico$'
-                Assert-MockCalled Add-StackedBadgesToExecutableIcon -Scope It -Exactly 1 -ParameterFilter { $Code -eq 'fr_FR' -and $null -eq $Badge }
+                Assert-MockCalled Add-StackedBadgesToExecutableIcon -Scope It -Exactly 1 -ParameterFilter { ($Codes -join ',') -eq 'fr_FR' -and $null -eq $Badge }
             } finally { Set-ActiveIconSet '' | Out-Null; $script:LeagueClientPath = $null }
         }
     }
@@ -231,6 +236,83 @@ Describe 'Resolve-ShortcutIconPath sur un jeu externe' {
                 Resolve-ShortcutIconPath (New-ShortcutCombination 'fr_FR' $null) | Should Match 'ico\\flat\\hex-launcher-fr\.ico$'
                 Assert-MockCalled Write-Warning -Scope It -Exactly 1
                 Assert-MockCalled Find-LeagueClientPath -Scope It -Exactly 1
+            } finally { Set-ActiveIconSet '' | Out-Null; $script:LeagueClientPath = $null }
+        }
+    }
+}
+
+Describe 'Resolve-ShortcutIconPath, texte forcé' {
+    $blitz = [pscustomobject]@{ id = 'blitz'; name = 'Blitz' }
+    $badge = [pscustomobject]@{ glyph = 'B'; color = '#E0432B' }
+    $exe   = 'C:\Riot Games\League of Legends\LeagueClient.exe'
+
+    Context 'jeu de fichiers (flat) : deux drapeaux coupés en diagonale' {
+        Set-ActiveIconSet 'flat' | Out-Null
+        $script:CompanionBadges = @{ blitz = $badge }
+        Mock New-Item {}
+        Mock Remove-StaleIconVariants {}
+        Mock Merge-DiagonalSplitIco { $Split.Destination }
+        Mock Add-CompanionBadge { $DestinationIco }
+
+        It 'compose drapeau des voix en haut, drapeau du texte en bas, puis la pastille compagnon' {
+            try {
+                $path = Resolve-ShortcutIconPath (New-ShortcutCombination 'ja_JP' $blitz 'fr_FR')
+                $path | Should Match 'ico\\flat\\companion\\hex-launcher-jp-fr-blitz-[0-9a-f]{8}\.ico$'
+                Assert-MockCalled Merge-DiagonalSplitIco -Scope It -Exactly 1 -ParameterFilter {
+                    $Split.Upper -match 'hex-launcher-jp\.ico$' -and $Split.Lower -match 'hex-launcher-fr\.ico$' -and $Split.Destination -eq $path
+                }
+                Assert-MockCalled Add-CompanionBadge -Scope It -Exactly 1 -ParameterFilter { $SourceIco -eq $path -and $DestinationIco -eq $path }
+            } finally { Set-ActiveIconSet '' | Out-Null }
+        }
+
+        It 'ne pose pas de pastille sans compagnon' {
+            Set-ActiveIconSet 'flat' | Out-Null
+            try {
+                Resolve-ShortcutIconPath (New-ShortcutCombination 'ja_JP' $null 'fr_FR') | Should Match 'hex-launcher-jp-fr-[0-9a-f]{8}\.ico$'
+                Assert-MockCalled Add-CompanionBadge -Scope It -Exactly 0
+            } finally { Set-ActiveIconSet '' | Out-Null }
+        }
+    }
+
+    Context 'échec de la composition coupée' {
+        Set-ActiveIconSet 'flat' | Out-Null
+        $script:CompanionBadges = @{}
+        Mock New-Item {}
+        Mock Remove-StaleIconVariants {}
+        Mock Merge-DiagonalSplitIco { throw 'GDI+ indisponible' }
+        Mock Write-Warning {}
+
+        It 'replie sur l''icône de la langue des voix avec un avertissement' {
+            try {
+                Resolve-ShortcutIconPath (New-ShortcutCombination 'ja_JP' $null 'fr_FR') | Should Match 'ico\\flat\\hex-launcher-jp\.ico$'
+                Assert-MockCalled Write-Warning -Scope It -Exactly 1
+            } finally { Set-ActiveIconSet '' | Out-Null }
+        }
+    }
+
+    Context 'original-badges : pastille pays coupée sur l''icône du binaire' {
+        Set-ActiveIconSet 'original-badges' | Out-Null
+        $script:LeagueClientPath = $exe
+        $script:CompanionBadges = @{ blitz = $badge }
+        Mock New-Item {}
+        Mock Add-StackedBadgesToExecutableIcon { param($ExecutablePath, $Codes, $Badge, $DestinationIco, $Style) $DestinationIco }
+
+        It 'passe les deux langues, voix d''abord, à la pastille pays' {
+            try {
+                Resolve-ShortcutIconPath (New-ShortcutCombination 'ja_JP' $blitz 'fr_FR') | Should Match 'ico\\original-badges\\companion\\hex-launcher-jp-fr-blitz-[0-9a-f]{8}\.ico$'
+                Assert-MockCalled Add-StackedBadgesToExecutableIcon -Scope It -Exactly 1 -ParameterFilter { ($Codes -join ',') -eq 'ja_JP,fr_FR' }
+            } finally { Set-ActiveIconSet '' | Out-Null; $script:LeagueClientPath = $null }
+        }
+    }
+
+    Context 'original : icône nue' {
+        Set-ActiveIconSet 'original' | Out-Null
+        $script:LeagueClientPath = $exe
+        Mock Merge-DiagonalSplitIco { throw 'ne doit pas être appelé' }
+
+        It 'rend le binaire lui-même, sans rien composer' {
+            try {
+                Resolve-ShortcutIconPath (New-ShortcutCombination 'ja_JP' $null 'fr_FR') | Should Be $exe
             } finally { Set-ActiveIconSet '' | Out-Null; $script:LeagueClientPath = $null }
         }
     }
@@ -380,11 +462,68 @@ Describe 'New-ShortcutWithFallback' {
 
 Describe 'Get-ShortcutName' {
     It 'nomme le raccourci par le pays de la langue' {
-        Get-ShortcutName 'ja_JP' $null | Should Be 'League of Legends JP'
+        (New-ShortcutCombination 'ja_JP' $null).Name | Should Be 'League of Legends JP'
     }
 
     It 'ajoute l''appli compagnon au libellé' {
-        Get-ShortcutName 'ja_JP' ([pscustomobject]@{ name = 'Blitz' }) | Should Be 'League of Legends JP - Blitz'
+        (New-ShortcutCombination 'ja_JP' ([pscustomobject]@{ name = 'Blitz' })).Name | Should Be 'League of Legends JP - Blitz'
+    }
+
+    It 'accole le pays du texte forcé à celui des voix par un tiret ASCII (WScript.Shell convertit les noms en ANSI)' {
+        (New-ShortcutCombination 'ja_JP' $null 'fr_FR').Name | Should Be "League of Legends JP-FR"
+        (New-ShortcutCombination 'ja_JP' ([pscustomobject]@{ name = 'Blitz' }) 'fr_FR').Name | Should Be "League of Legends JP-FR - Blitz"
+        (New-ShortcutCombination 'ja_JP' $null 'fr_FR').Name.IndexOfAny([IO.Path]::GetInvalidFileNameChars()) | Should Be -1
+    }
+}
+
+Describe 'New-ShortcutCombination, texte forcé' {
+    It 'ignore un texte forcé identique à la langue des voix : le raccourci reste normal' {
+        $combination = New-ShortcutCombination 'fr_FR' $null 'fr_FR'
+        $combination.TextCode | Should Be ''
+        $combination.Name | Should Be 'League of Legends FR'
+    }
+
+    It 'applique le texte forcé à chaque langue cochée' {
+        (Get-ShortcutCombinations @('ja_JP', 'ko_KR', 'fr_FR') @() 'fr_FR' | ForEach-Object { $_.Name }) -join '|' |
+            Should Be "League of Legends JP-FR|League of Legends KR-FR|League of Legends FR"
+    }
+}
+
+Describe 'Get-LauncherArguments' {
+    It 'passe -TextLocale au lanceur pour un raccourci mixte' {
+        Get-LauncherArguments (New-ShortcutCombination 'ja_JP' ([pscustomobject]@{ id = 'blitz'; name = 'Blitz' }) 'fr_FR') |
+            Should Match '-Locale ja_JP -TextLocale fr_FR -Companion blitz$'
+    }
+
+    It 'ne passe pas -TextLocale pour un raccourci normal' {
+        Get-LauncherArguments (New-ShortcutCombination 'ja_JP' $null) | Should Not Match 'TextLocale'
+    }
+}
+
+Describe 'Get-ShortcutDescription' {
+    $blitz = [pscustomobject]@{ id = 'blitz'; name = 'Blitz' }
+
+    It 'décrit la langue des voix et celle du texte' {
+        Get-ShortcutDescription (New-ShortcutCombination 'ja_JP' $null 'fr_FR') | Should Be 'Lance League of Legends en ja_JP (voix), texte en fr_FR'
+    }
+
+    It 'nomme l''appli compagnon d''un raccourci mixte' {
+        Get-ShortcutDescription (New-ShortcutCombination 'ja_JP' $blitz 'fr_FR') | Should Be 'Lance League of Legends en ja_JP (voix), texte en fr_FR, avec Blitz'
+    }
+
+    It 'garde les infobulles des raccourcis normaux' {
+        Get-ShortcutDescription (New-ShortcutCombination 'ja_JP' $blitz) | Should Be 'Lance League of Legends en ja_JP avec Blitz'
+    }
+}
+
+Describe 'Get-ExistingLaunchShortcuts' {
+    It 'relit la langue des voix, le texte forcé et le compagnon d''un raccourci posé' {
+        Mock Resolve-ShortcutIconPath { Get-FlagIconPath 'ja_JP' }
+        $desktop = (New-Item -ItemType Directory -Path (Join-Path $TestDrive 'bureau-mixte') -Force).FullName   # $folder appartient au script
+        New-LaunchShortcut (New-ShortcutCombination 'ja_JP' ([pscustomobject]@{ id = 'blitz'; name = 'Blitz' }) 'fr_FR') $desktop | Out-Null
+        New-LaunchShortcut (New-ShortcutCombination 'ko_KR' $null) $desktop | Out-Null
+        $existing = @(Get-ExistingLaunchShortcuts $desktop | Sort-Object Code)
+        @($existing | ForEach-Object { '{0}/{1}/{2}' -f $_.Code, $_.TextCode, $_.CompanionId }) -join ' ' | Should Be 'ja_JP/fr_FR/blitz ko_KR//'
     }
 }
 

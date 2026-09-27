@@ -151,6 +151,27 @@ Describe 'Save-LaunchUseLocalApi' {
     }
 }
 
+Describe 'Save-LaunchForcedTextLocale' {
+    AfterEach { Remove-TestTempFiles }
+
+    It 'rend une langue vide quand le poste n''a jamais forcé le texte' {
+        Get-LaunchForcedTextLocale (Read-LaunchConfig (New-TempConfig)) | Should Be ''
+    }
+
+    It 'écrit config.json quand la langue change, et la relit telle quelle' {
+        $path = New-TempConfig
+        $config = Read-LaunchConfig $path
+        Save-LaunchForcedTextLocale $config $path 'fr_FR' | Should Be $true
+        Get-LaunchForcedTextLocale (Read-LaunchConfig $path) | Should Be 'fr_FR'
+    }
+
+    It 'n''écrit rien quand la langue est déjà celle du fichier' {
+        $path = New-TempConfig
+        $config = Read-LaunchConfig $path
+        Save-LaunchForcedTextLocale $config $path '' | Should Be $false
+    }
+}
+
 Describe 'ConvertTo-LaunchPathValue' {
     It 'retire les guillemets d''un chemin collé depuis l''Explorateur et les espaces autour' {
         ConvertTo-LaunchPathValue '  "C:\Riot Games\Riot Client\RiotClientServices.exe"  ' | Should Be 'C:\Riot Games\Riot Client\RiotClientServices.exe'

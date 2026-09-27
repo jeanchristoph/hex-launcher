@@ -74,7 +74,7 @@ $script:InstallState = @{
 }
 
 # Contrôles propres à une page : remis à zéro à chaque affichage, pour ne jamais lire un contrôle détruit
-$SetupPageControlNames = @('Log', 'AppList', 'UninstallBox', 'LocaleList', 'CompanionList', 'RiotPathBoxes', 'RiotPathStatuses')
+$SetupPageControlNames = @('Log', 'AppList', 'UninstallBox', 'LocaleList', 'CompanionList', 'RiotPathBoxes', 'RiotPathStatuses', 'ForcedTextBox', 'ForcedTextList', 'ForcedTextWarning')
 
 # Dossier d'installation habituel de Riot : point de départ de « Parcourir… » quand le chemin courant ne mène nulle part
 $SetupRiotGamesFolder = 'C:\Riot Games'
@@ -520,6 +520,8 @@ function Set-SetupBusy([bool]$Busy) {
     $state.IsBusy = $Busy
     foreach ($control in @($controls.Cancel, $controls.Back, $controls.Next, $controls.LanguageBox)) { if ($null -ne $control) { $control.Enabled = -not $Busy } }
     foreach ($control in @($controls.Inputs)) { $control.Enabled = -not $Busy }
+    # La liste du texte forcé ne se réactive qu'avec sa case cochée
+    if (-not $Busy -and $null -ne $controls.ForcedTextBox) { Update-SetupForcedTextControls }
     $controls.Progress.Visible = $Busy
     Invoke-SplashTick
 }
@@ -564,6 +566,8 @@ function Get-SetupPageSelection {
     if ($null -ne $controls.IconSetList) { $selection.IconSetList = @(Get-SetupSelectedIconSetName $controls.IconSetList) }
     if ($null -ne $controls.UninstallBox) { $selection.UninstallOthers = [bool]$controls.UninstallBox.Checked }
     if ($null -ne $controls.LegacyLaunchBox) { $selection.LegacyLaunchBox = @([string]$controls.LegacyLaunchBox.Checked) }
+    if ($null -ne $controls.ForcedTextBox) { $selection.ForcedTextBox = @([string]$controls.ForcedTextBox.Checked) }
+    if ($null -ne $controls.ForcedTextList) { $selection.ForcedTextList = @([string](Get-ThemedComboBoxKey $controls.ForcedTextList)) }
     if ($null -ne $controls.RiotPathBoxes) { $selection.RiotPaths = Get-SetupRiotPathInputs }
     return $selection
 }
@@ -798,26 +802,35 @@ function New-SetupShortcutsControls {
     $iconSetsTop     = $columnsTop + $companionHeight + 12
     $previewSize     = 64
     $iconListHeight  = 4 * 17 + 4   # les quatre jeux livrés visibles sans défilement
-    $controls.LocaleList    = New-SetupCheckedList (Get-LocaleListItems $state.Locales) (Get-SetupPreselection 'LocaleList' (Get-PreselectedCodes $state.Locales $state.ExistingShortcuts)) 0 $columnsTop $columnWidth 230
+    $forcedText      = Get-SetupForcedTextLayout $columnsTop $SetupRiotCompatibilityTop
+    $controls.LocaleList    = New-SetupCheckedList (Get-LocaleListItems $state.Locales) (Get-SetupPreselection 'LocaleList' (Get-PreselectedCodes $state.Locales $state.ExistingShortcuts)) 0 $columnsTop $columnWidth $forcedText.LocaleListHeight
     $controls.CompanionList = New-SetupCheckedList (Get-ShortcutCompanionListItems $companionApps) (Get-SetupPreselection 'CompanionList' (Get-PreselectedShortcutCompanionIds $companionApps $state.ExistingShortcuts)) $rightColumn $columnsTop $columnWidth $companionHeight
     $controls.IconSetList   = New-SetupIconSetList $state.IconSets (Get-SetupPreselectedIconSetName $state) $rightColumn ($iconSetsTop + 24) ($columnWidth - $previewSize - 12) $iconListHeight
     $controls.IconSetPreview = New-ThemedPicture ($rightColumn + $columnWidth - $previewSize) ($iconSetsTop + 24) $previewSize
     # Section « Compatibilité Riot » en pleine largeur sous les deux colonnes, le journal dessous
-    $compatibility  = Get-SetupRiotCompatibilityLayout 350
+    $compatibility  = Get-SetupRiotCompatibilityLayout $SetupRiotCompatibilityTop
     # Note sous la liste des jeux (jeux externes), dans l'espace qui reste au-dessus de la section
     $noteTop        = $iconSetsTop + 24 + $iconListHeight + 2
     $controls.IconSetNote   = New-ThemedLabel '' $rightColumn $noteTop $columnWidth ([Math]::Max(28, $compatibility.TitleTop - $noteTop)) 'Muted' 8.25
     $controls.LegacyLaunchBox = New-SetupLegacyLaunchBox $state 0 $compatibility.BoxTop $layout.ContentWidth
+    $controls.ForcedTextBox     = New-SetupForcedTextBox (Get-SetupPreselectedForcedText $state) 0 $forcedText.BoxTop $columnWidth
+    $controls.ForcedTextList    = New-ThemedComboBox (Get-LocaleListItems $state.Locales) (Get-SetupPreselectedForcedTextList $state) 0 $forcedText.ListTop $columnWidth
+    $controls.ForcedTextWarning = New-ThemedLabel (Get-Text 'setup.shortcuts.forcedTextWarning') 0 $forcedText.WarningTop $columnWidth $forcedText.WarningHeight 'Danger' 8.25
     $controls.Log           = New-ThemedLog 0 $compatibility.LogTop $layout.ContentWidth ($layout.ContentHeight - $compatibility.LogTop)
-    $controls.Inputs        = @($controls.LocaleList, $controls.CompanionList, $controls.IconSetList)
+    $controls.Inputs        = @($controls.LocaleList, $controls.CompanionList, $controls.IconSetList, $controls.ForcedTextBox, $controls.ForcedTextList)
     $controls.IconSetList.Add_SelectedIndexChanged({ Invoke-SetupSafely { Update-SetupIconSetPreview } })
+    $controls.ForcedTextBox.Add_CheckedChanged({ Invoke-SetupSafely { Update-SetupForcedTextControls } })
     Update-SetupIconSetPreview
+    Update-SetupForcedTextControls
     return @(
         (New-ThemedLabel (Get-Text 'setup.shortcuts.intro' $Destination) 0 0 $layout.ContentWidth 66 'Muted')
         (New-ThemedLabel (Get-Text 'shortcuts.languages') 0 ($columnsTop - 24) $columnWidth 22 'Gold' 10 'Bold')
         (New-ThemedLabel (Get-Text 'setup.shortcuts.companions') $rightColumn ($columnsTop - 24) $columnWidth 22 'Gold' 10 'Bold')
         (New-ThemedLabel (Get-Text 'setup.shortcuts.iconSet') $rightColumn $iconSetsTop $columnWidth 22 'Gold' 10 'Bold')
         $controls.LocaleList
+        $controls.ForcedTextBox
+        $controls.ForcedTextList
+        $controls.ForcedTextWarning
         $controls.CompanionList
         $controls.IconSetList
         $controls.IconSetPreview
@@ -850,6 +863,63 @@ function New-SetupLegacyLaunchBox($State, [int]$Left, [int]$Top, [int]$Width) {
         $box.Checked = -not (Get-LaunchUseLocalApi $State.Config)
     }
     return $box
+}
+
+# ---------------------------------------------------------------- Texte forcé (page 3)
+
+# Haut de la section « Compatibilité Riot », en pleine largeur sous les deux colonnes
+$SetupRiotCompatibilityTop = 350
+
+# Colonne de gauche sous la liste des langues : la case, la liste déroulante pleine largeur (« Português (Brasil) »
+# ne tient pas à côté de la case dans une demi-colonne de 250 px), puis l'avertissement rouge jusqu'à la section Riot
+function Get-SetupForcedTextLayout([int]$ColumnsTop, [int]$SectionTop) {
+    $localeListHeight = 130
+    $boxTop     = $ColumnsTop + $localeListHeight + 6
+    $listTop    = $boxTop + 26
+    $warningTop = $listTop + 30
+    return @{ LocaleListHeight = $localeListHeight; BoxTop = $boxTop; ListTop = $listTop; WarningTop = $warningTop; WarningHeight = $SectionTop - $warningTop - 2 }
+}
+
+# Langue du texte forcé à présélectionner : saisie en attente (redessin), sinon config.json, sinon celle d'un
+# raccourci déjà posé (config.json recréé) ; '' = case décochée
+function Get-SetupPreselectedForcedText($State) {
+    $pending = @(Get-SetupPreselection 'ForcedTextBox' @())
+    if ($pending.Count -gt 0 -and $pending[0] -ne 'True') { return '' }
+    if ($pending.Count -gt 0) { return [string]@(Get-SetupPreselection 'ForcedTextList' @(''))[0] }
+    $configured = Get-LaunchForcedTextLocale $State.Config
+    if ($configured) { return $configured }
+    $mixed = @($State.ExistingShortcuts | Where-Object { $_.TextCode })
+    if ($mixed.Count -eq 0) { return '' }
+    return [string]$mixed[0].TextCode
+}
+
+# Langue sélectionnée dans la liste : celle présélectionnée, sinon la première du catalogue (la case décide)
+function Get-SetupPreselectedForcedTextList($State) {
+    $pending = @(Get-SetupPreselection 'ForcedTextList' @())
+    if ($pending.Count -gt 0 -and $pending[0]) { return [string]$pending[0] }
+    $preselected = Get-SetupPreselectedForcedText $State
+    if ($preselected) { return $preselected }
+    return [string](@($State.Locales) | Select-Object -First 1).code
+}
+
+function New-SetupForcedTextBox([string]$Preselected, [int]$Left, [int]$Top, [int]$Width) {
+    $box = New-ThemedCheckBox (Get-Text 'setup.shortcuts.forcedText') $Left $Top $Width
+    $box.Checked = [bool]$Preselected
+    return $box
+}
+
+# Liste active et avertissement rouge visibles seulement case cochée
+function Update-SetupForcedTextControls {
+    $controls = $script:InstallState.Controls
+    $isForced = [bool]$controls.ForcedTextBox.Checked
+    $controls.ForcedTextList.Enabled    = $isForced
+    $controls.ForcedTextWarning.Visible = $isForced
+}
+
+# Langue du texte forcé retenue : '' si la case est décochée ou la liste vide
+function Get-SetupForcedTextCode([bool]$IsChecked, [string]$Locale) {
+    if (-not $IsChecked -or -not $Locale) { return '' }
+    return $Locale
 }
 
 # Liste des jeux, le jeu présélectionné sélectionné ; les clés (noms de dossier) dans Tag comme les listes à cocher
@@ -900,6 +970,7 @@ function Get-SetupShortcutSelection {
         CompanionIds = @(Get-SetupCheckedKeys $controls.CompanionList)
         IconSet      = Get-SetupSelectedIconSetName $controls.IconSetList
         UseLocalApi  = -not [bool]$controls.LegacyLaunchBox.Checked
+        TextCode     = Get-SetupForcedTextCode ([bool]$controls.ForcedTextBox.Checked) ([string](Get-ThemedComboBoxKey $controls.ForcedTextList))
     }
 }
 
@@ -926,7 +997,11 @@ function Invoke-SetupShortcutsStep {
         Save-LaunchUseLocalApi $state.Config $SetupConfigPath ([bool]$selection.UseLocalApi) | Out-Null
         Write-SetupLog (Get-Text $(if ($selection.UseLocalApi) { 'setup.shortcuts.directLaunchChosen' } else { 'setup.shortcuts.legacyLaunchChosen' }))
     }
-    $combinations = Get-ShortcutCombinations $selection.Codes (Resolve-ShortcutCompanions $state.Config $selection.CompanionIds)
+    if ($null -ne $selection.TextCode) {
+        Save-LaunchForcedTextLocale $state.Config $SetupConfigPath $selection.TextCode | Out-Null
+        Write-SetupLog $(if ($selection.TextCode) { Get-Text 'setup.shortcuts.forcedTextChosen' $selection.TextCode } else { Get-Text 'setup.shortcuts.forcedTextOff' })
+    }
+    $combinations = Get-ShortcutCombinations $selection.Codes (Resolve-ShortcutCompanions $state.Config $selection.CompanionIds) ([string]$selection.TextCode)
     $state.ShortcutPaths = @(New-SetupShortcuts $combinations)
     foreach ($line in @(Remove-ObsoleteShortcuts $state.ExistingShortcuts $combinations)) { Write-SetupLog $line }
     $state.SetupShortcutPath = New-SetupConfigurationShortcut

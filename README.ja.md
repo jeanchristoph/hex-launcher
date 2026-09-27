@@ -4,6 +4,8 @@
 
 > **Riot Games とは無関係のプロジェクトです。**Riot Games はこのプロジェクトを支持・後援していません。League of Legends および Riot Games は Riot Games, Inc. の商標または登録商標です。
 
+> **ご利用は自己責任でお願いします。**このツールは Riot のソフトウェアではなく、ご自身の責任でご利用ください。Riot アカウントに科されたいかなる処分（利用停止、BAN）についても、その他のいかなる損害についても、作者は一切の責任を負いません。
+
 **現時点では Windows 専用です**（Windows 10/11、PowerShell 5.1 同梱 — macOS は非対応）。
 
 Windows 向け League of Legends 起動アシスタント：デスクトップのショートカットから、好きな言語（日本語、フランス語など）で
@@ -34,8 +36,11 @@ Windows 向け League of Legends 起動アシスタント：デスクトップ�
 | `app/lib/companion-app.lib.ps1` | 共通関数：カタログ、レジストリによる検出（読み取り専用）、アンインストールコマンド、Authenticode 署名検証 |
 | `app/lib/launch-config.lib.ps1` | 共通関数：`config.json` の読み書き、旧形式（単一アプリ）からの移行 |
 | `app/lib/splash.lib.ps1` | 共通のアニメーション付きスプラッシュ（ゲーム起動、補助アプリのインストール） |
+| `app/lib/forced-text.lib.ps1` / `riot-text-files.lib.ps1` / `riot-cdn.lib.ps1` | テキスト強制：テキストファイルの配置と復元、`Game.ok` と `Game.manifest` の読み取り（読み取りのみ）とキャッシュ、Riot CDN からの範囲指定ダウンロード |
+| `app/lib/zstd.lib.ps1` / `rman-reader.cs` / `native/libzstd.dll` | zstd の展開（公式 DLL、ハッシュ検証済み）と Riot パッチャーの RMAN マニフェストの読み取り |
+| `app/lib/icon-split.lib.ps1` | テキスト強制ショートカット用の、対角線で分割したアイコン |
 | `tests/` | Pester テスト（`Invoke-Pester -Path tests`） |
-| `tools/` | 開発専用、配布物には含まれません：`make-release.ps1`、`make-flag-icons.ps1`（ベクターロゴから `app/ico/` の全アイコンを再生成）、`logo/make-logo-svg.py` ＋ `logo/hex-launcher-logo-drawing.png` → `logo/hex-launcher-logo.svg`（オリジナル HL ロゴ、原本） |
+| `tools/` | 開発専用、配布物には含まれません：`make-release.ps1`、`fetch-libzstd.ps1`（公式リリースから `libzstd.dll` を再ダウンロードし、ハッシュを検証）、`make-flag-icons.ps1`（ベクターロゴから `app/ico/` の全アイコンを再生成）、`logo/make-logo-svg.py` ＋ `logo/hex-launcher-logo-drawing.png` → `logo/hex-launcher-logo.svg`（オリジナル HL ロゴ、原本） |
 | `app/lib/icon.lib.ps1` / `icon-badge.lib.ps1` | `.ico` の読み書き、実行ファイルのアイコンのメモリ上での読み取り、補助アプリバッジと国バッジの合成 |
 | `app/lib/flag.lib.ps1` / `riot-install.lib.ps1` | GDI+ で描く国旗（アイコンと国バッジで共通の定義）；`RiotClientInstalls.json` から読む Riot Client と `LeagueClient.exe` の場所 |
 | `app/lib/i18n.lib.ps1` / `app/i18n/` | アシスタントとコンソールの翻訳：言語ごとの辞書 `fr.json` / `en.json` / `ja.json`（すべて同じキー） |
@@ -49,15 +54,21 @@ Windows 向け League of Legends 起動アシスタント：デスクトップ�
   コードはすべて `app\` にあり、平文の PowerShell で、この公開リポジトリと同一です。
 - **データ収集なし、テレメトリなし、アカウントなし、サーバーなし。** Hex Launcher が通信するのは*あなたの* PC 上の
   Riot Client（`127.0.0.1`、ローカル API）だけで、インターネットに接続するのは*あなたがチェックした*補助アプリを
-  配布元サイトまたは winget からダウンロードするときだけです。ログ `app\launch.log` はフォルダーから出ません。
+  配布元サイトまたは winget からダウンロードするときと、テキスト強制モードで選んだ言語のテキストファイルを Riot 公式 CDN
+  からダウンロードするときだけです。ログ `app\launch.log` はフォルダーから出ません。
 - **管理者としては絶対に実行しません**：「管理者として実行」すると拒否します。Windows レジストリは読み取りのみ
   （インストール済みアプリの検出）、書き込みは一切しません。書き込むのは自分のフォルダー内（`config.json`、合成した
-  アイコン）、デスクトップ（ショートカット）、そしてあなたが依頼したインストールの間だけ Windows の一時フォルダーに
-  置かれる補助アプリのインストーラーです。
+  アイコン）、デスクトップ（ショートカット）、あなたが依頼したインストールの間だけ Windows の一時フォルダーに
+  置かれる補助アプリのインストーラー、そしてテキスト強制モードではゲームのテキストファイル 2 つと
+  `%LOCALAPPDATA%\hex-launcher\` のキャッシュです。
+- **バイナリ依存はひとつだけ**：`app\lib\native\libzstd.dll`。テキスト強制モードに必要な、zstd 展開の公式ライブラリ
+  （Meta、BSD ライセンス、v1.5.7）です。読み込みのたびに SHA-256 ハッシュを検証します。
+  `tools\fetch-libzstd.ps1` で公式リリースから再ダウンロードできます。
 - **クリックなしには何もしません。** 補助アプリのインストール・アンインストールは「適用」を押した後だけで、実行される
   操作の一覧が事前に表示されます。ようこそページは何も変更しません。
-- **ゲームは変更されません。** 変わるのは言語だけで、Riot Client 自身のローカル API（本体の設定と同じ仕組み）を
-  使います。League of Legends のファイルには触れません。
+- **ゲームは変更されません（テキスト強制モードを除く）。** 言語の切り替えには Riot Client 自身のローカル API（本体の
+  設定と同じ仕組み）を使います。League of Legends のファイルには触れません。ただしテキスト強制モードを有効にした
+  場合は、選んだ言語のテキストファイルがボイス言語のテキストファイルを置き換えます（専用セクションを参照）。
 - **検証できます。** 各リリースは zip の SHA-256 を公開しています。PowerShell の
   `Get-FileHash hex-launcher-x.y.z.zip` と比較してください。ソースコードはこのリポジトリです。
 
@@ -191,6 +202,7 @@ ID：`porofessor`、`blitz`、`opgg`、`mobalytics`、`none`。終了コード�
 | `companionApps[].name` | スプラッシュに表示される名前。見た目のみ。 |
 | `companionApps[].path` | 起動する実行ファイル。 |
 | `companionApps[].arguments` | 起動引数。なければ空文字 `""`。 |
+| `forcedTextLocale` | `setup.bat` で選んだテキスト強制の言語（例：`fr_FR`）、なければ空。「ショートカット」ページでの事前選択に使います。選択を保持するのはショートカットの方です（`-TextLocale`）。 |
 
 `path` がこの PC に存在しない場合、ランチャーはそれをスキップしてスプラッシュに警告を表示します — ゲームは起動します。
 ショートカットが一覧にない `id` を要求した場合も同様です。
@@ -229,6 +241,31 @@ Riot が提供するすべての言語が `locales.json` にあり、インス�
 2. （任意）`app/lib/flag.lib.ps1` の `$FlagDrawings`（アイコンと国バッジの両方で使用）に国旗の描画を追加し、
    `powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-flag-icons.ps1 -Locales xx_XX` を実行。
 
+## テキスト強制（ボイスとテキストを別々の言語で）
+
+ボイスはある言語、ゲーム内テキストは別の言語で：`setup.bat` の「ショートカット」ページで「テキストを強制：」に
+チェックを入れ、テキストの言語を選びます。チェックした各言語はボイスの言語のままです。ショートカット名は
+`League of Legends JP-FR` となり、アイコンは対角線で分割されます（上がボイス、下がテキスト）。
+
+> ⚠️ このモードはゲームのファイルを置き換えます。Riot はファイルの改変を認めていません：アカウントが処分を受け、
+> BAN に至る可能性があります。自己責任でご利用ください。
+
+仕組み：テキストとボイスを分ける Riot の設定はありません。LoL クライアントが開いたら、ランチャーはボイス言語の
+テキストファイル 2 つ（`Global`、`UI`）を、選んだ言語のものに置き換えます。これはインストール済みの正確なバージョンに
+合わせて Riot 公式 CDN からダウンロードします（1 言語・1 パッチあたり約 4 MB、`%LOCALAPPDATA%\hex-launcher\text\` にキャッシュ）。
+Riot が署名したオリジナルのファイルで、その言語でプレイしているプレイヤーのものと同一です。元のファイルは
+次回の起動時に元に戻されます。
+
+制限事項：
+- LoL クライアント（メニュー、ストア）はボイスの言語のままです：変わるのは試合中のゲームだけです；
+- Hex Launcher のショートカットを使わずに起動した LoL は、次にショートカットから起動するか次のパッチまで、
+  強制したテキストのままです；
+- オフラインやエラーの場合、試合はボイスの言語で行われます（`launch.log` の `TEXT` 行）；
+- 手動起動では、**プレイ** を押した時点でテキストが配置されます（最大 10 分）。
+
+スクリプトモード：`create-shortcuts.ps1 -Locales ja_JP -TextLocale fr_FR`（ランチャーには
+`launch-lol.ps1 -Locale ja_JP -TextLocale fr_FR` が渡されます）。
+
 ### アイコン
 
 `flat` セットはベクターロゴ `tools/logo/hex-launcher-logo.svg`（金の枠＋HL モノグラム＋宝石、背景は透明）から作られます。
@@ -262,6 +299,9 @@ Riot Client の「言語」設定はランチャーの言語を変えるだけ�
    閉じます。その場合は Windows の再起動が必要です — スプラッシュは 3 回目の起動から警告を表示します。
 5. `config.json` の他の補助アプリを閉じてから、`-Companion` で指定された補助アプリがあれば起動する。
 
+テキスト強制（`-TextLocale`）：ステップ 1 の前に、前回配置したファイルを元に戻します（言語を変更する前）。
+ステップ 3 の後 — またはステップ 4 で **プレイ** が押された後 — に、選んだ言語のテキストファイルを配置します。
+
 ランチャーは何も記憶しません。直接起動は毎回試みられます。この PC で失敗が続く場合は、`setup.bat` で
 「手動起動」（Riot との互換性）にチェックを入れてください。以後ランチャーは最初から手動起動を使います。
 
@@ -283,6 +323,7 @@ Riot Client の「言語」設定はランチャーの言語を変えるだけ�
 | `flat` アイコンセットの再生成（`tools/make-flag-icons.ps1`） | `resvg`（SVG → PNG） | `scoop install resvg` |
 | ロゴ SVG の再生成（`tools/logo/make-logo-svg.py`） | Python 3 ＋ Pillow ＋ numpy、`potrace`（PNG → SVG）、`resvg` | `pip install pillow numpy` · `scoop install potrace resvg` |
 | リリースの公開（`tools/make-release.ps1 -Publish`） | GitHub CLI `gh`（ログイン済み） | `scoop install gh` または https://cli.github.com |
+| `libzstd.dll` のバージョン変更（`tools/fetch-libzstd.ps1`） | なし（PowerShell） | 公式リリース https://github.com/facebook/zstd/releases |
 
 `tools/` と `tests/` の内容はリリース zip に含まれません。国旗の色は `app/lib/palette.lib.ps1` の縮小パレットと減光を通り、
 コンパニオンバッジには、それを求めるセット（`badge-style.json`）でのみ夜色のベールや縮小パレットが適用されます。
@@ -304,6 +345,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-Pester -Path test
 - **スプラッシュやダイアログの文字化け**（`Ã©`、`â€¦`）：`.ps1` が BOM なしで保存し直されています。
   すべてのスクリプト（`launch-lol.ps1`、`manage-companion-app.ps1`、`create-shortcuts.ps1`、`lib\*.ps1`）は
   **BOM 付き UTF-8** である必要があります（VS Code：ステータスバー → エンコード → 「エンコード付きで保存」）。
+- **テキストが強制した言語になっていない**：`app\launch.log` の `TEXT` 行を確認してください（オフライン、パッチ適用中、
+  ボイスの言語がまだインストールされていないなど）。
 - **ショートカットのアイコンが更新されない**：Windows のアイコンキャッシュです。フォルダーで右クリック → 最新の情報に更新、
   それでもだめならサインアウト／サインインしてください。
 - **「管理者として実行しないでください」**：`setup.bat` を昇格して起動しました。通常起動してください。

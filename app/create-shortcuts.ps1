@@ -9,7 +9,8 @@
     Les langues viennent de locales.json, les applis compagnon de la liste companionApps de config.json
     (remplie par detect-config.ps1 et manage-companion-app.ps1). Sans -Locales, une boîte de dialogue à
     cases à cocher permet de choisir langues et compagnons. Un raccourci est créé par combinaison :
-    « League of Legends JP - Blitz » ; sans compagnon coché : « League of Legends JP ».
+    « League of Legends JP - Blitz » ; sans compagnon coché : « League of Legends JP ». Avec -TextLocale fr_FR, la
+    langue cochée reste celle des voix et le texte en jeu est forcé : « League of Legends JP-FR - Blitz ».
     Les raccourcis obsolètes (combinaisons décochées) sont retirés de la destination, pour qu'elle
     reflète toujours le dernier choix.
 
@@ -28,6 +29,7 @@
     powershell -NoProfile -ExecutionPolicy Bypass -File create-shortcuts.ps1
     powershell -NoProfile -ExecutionPolicy Bypass -File create-shortcuts.ps1 -Locales ja_JP,ko_KR
     powershell -NoProfile -ExecutionPolicy Bypass -File create-shortcuts.ps1 -Locales ja_JP -Companions blitz,opgg
+    powershell -NoProfile -ExecutionPolicy Bypass -File create-shortcuts.ps1 -Locales ja_JP,ko_KR -TextLocale fr_FR
     powershell -NoProfile -ExecutionPolicy Bypass -File create-shortcuts.ps1 -Destination "D:\Jeux"
     powershell -NoProfile -ExecutionPolicy Bypass -File create-shortcuts.ps1 -Language ja
 #>
@@ -37,6 +39,10 @@ param(
 
     # Identifiants des applis compagnon (ex. blitz,opgg) parmi companionApps de config.json. Vide → sans compagnon.
     [string[]]$Companions,
+
+    # Texte forcé (ex. fr_FR) pour toutes les langues : chaque raccourci garde la voix de sa langue. Vide → aucun.
+    [ValidatePattern('^([a-z]{2}_[A-Z]{2})?$')]
+    [string]$TextLocale = '',
 
     # Dossier où créer les raccourcis (défaut : Bureau de l'utilisateur courant)
     [string]$Destination = [Environment]::GetFolderPath('Desktop'),
@@ -79,11 +85,20 @@ function Read-LocaleCatalog([string]$Path) {
     return Read-JsonCatalog $Path
 }
 
-# ja_JP → "League of Legends JP" ; ja_JP + Blitz → "League of Legends JP - Blitz"
-function Get-ShortcutName([string]$Code, $Companion) {
-    $name = "League of Legends $($Code.Split('_')[1])"
-    if ($Companion) { $name += " - $($Companion.name)" }
+# « / » est interdit dans un nom de fichier, et WScript.Shell convertit les noms en ANSI (un « ⁄ » U+2044 y redevient
+# « / ») : séparateur ASCII, choix de l'utilisateur le 2026-09-27
+$ForcedTextNameSeparator = '-'
+
+# ja_JP → "League of Legends JP" ; texte forcé fr_FR → "League of Legends JP-FR" ; + Blitz → "… - Blitz"
+function Get-ShortcutName($Combination) {
+    $name = "League of Legends $(Get-LocaleCountry $Combination.Code)"
+    if ($Combination.TextCode) { $name += $ForcedTextNameSeparator + (Get-LocaleCountry $Combination.TextCode) }
+    if ($Combination.Companion) { $name += " - $($Combination.Companion.name)" }
     return $name
+}
+
+function Get-LocaleCountry([string]$Code) {
+    return $Code.Split('_')[1]
 }
 
 # ---------------------------------------------------------------- Jeu d'icônes
@@ -202,8 +217,10 @@ function Resolve-CompanionIconPath([string]$Code, $Companion) {
     }
 }
 
-# Icône d'un jeu de fichiers .ico : drapeau + pastille avec compagnon, drapeau seul sans
+# Icône d'un jeu de fichiers .ico : drapeau + pastille avec compagnon, drapeau seul sans ; texte forcé → deux drapeaux
+# coupés en diagonale
 function Resolve-FileIconPath($Combination) {
+    if ($Combination.TextCode) { return Resolve-SplitIconPath $Combination }
     if ($Combination.Companion) { return Resolve-CompanionIconPath $Combination.Code $Combination.Companion }
     return Resolve-IconPath $Combination.Code
 }
@@ -236,17 +253,25 @@ function Resolve-ExternalIconPath($Combination, $Source) {
     return Resolve-StackedIconPath $Combination $exe
 }
 
-# ja_JP → hex-launcher-jp ; ja_JP + blitz → hex-launcher-jp-blitz : tige des variantes d'une combinaison
-function Get-StackedIconStem($Combination) {
-    $stem = "hex-launcher-$($Combination.Code.Split('_')[1].ToLower())"
+# ja_JP → hex-launcher-jp ; + texte fr_FR → hex-launcher-jp-fr ; + blitz → hex-launcher-jp-fr-blitz : tige des
+# variantes d'une combinaison
+function Get-CombinationIconStem($Combination) {
+    $stem = "hex-launcher-$((Get-LocaleCountry $Combination.Code).ToLower())"
+    if ($Combination.TextCode) { $stem += "-$((Get-LocaleCountry $Combination.TextCode).ToLower())" }
     if ($Combination.Companion) { $stem += "-$($Combination.Companion.id)" }
     return $stem
+}
+
+# Langues portées par la pastille pays : celle des voix, puis celle du texte forcé s'il y en a un
+function Get-CombinationCountryCodes($Combination) {
+    if ($Combination.TextCode) { return @($Combination.Code, $Combination.TextCode) }
+    return @($Combination.Code)
 }
 
 # ico\<jeu>\companion\hex-launcher-jp-blitz-<empreinte>.ico : l'empreinte (pays, dessin du drapeau, pastille, style)
 # change le chemin dès que le rendu change, pour contourner le cache d'icônes d'Explorer
 function Get-StackedIconPath($Combination, $Badge) {
-    return Join-Path $companionIconFolder "$(Get-StackedIconStem $Combination)-$(Get-StackedBadgeSignature $Combination.Code $Badge (Get-ActiveBadgeStyle)).ico"
+    return Join-Path $companionIconFolder "$(Get-CombinationIconStem $Combination)-$(Get-StackedBadgeSignature (Get-CombinationCountryCodes $Combination) $Badge (Get-ActiveBadgeStyle)).ico"
 }
 
 # Pastille du compagnon de la combinaison, $null sans compagnon ou sans pastille au catalogue
@@ -261,23 +286,58 @@ function Resolve-StackedIconPath($Combination, [string]$Exe) {
     try {
         New-Item -ItemType Directory -Path $companionIconFolder -Force | Out-Null
         $target = Get-StackedIconPath $Combination $badge
-        Remove-StaleIconVariants (Get-StackedIconStem $Combination) $target
-        return Add-StackedBadgesToExecutableIcon $Exe $Combination.Code $badge $target (Get-ActiveBadgeStyle)
+        Remove-StaleIconVariants (Get-CombinationIconStem $Combination) $target
+        return Add-StackedBadgesToExecutableIcon $Exe (Get-CombinationCountryCodes $Combination) $badge $target (Get-ActiveBadgeStyle)
     } catch {
         Write-Warning (Get-Text 'shortcuts.iconNotStacked' $Combination.Name, $_.Exception.Message)
         return $Exe
     }
 }
 
-# Une combinaison = une langue et, optionnellement, une appli compagnon
-function New-ShortcutCombination([string]$Code, $Companion) {
-    return [pscustomobject]@{ Code = $Code; Companion = $Companion; Name = (Get-ShortcutName $Code $Companion) }
+# ---------------------------------------------------------------- Icône coupée (texte forcé, jeux de fichiers)
+
+# ico\<jeu>\companion\hex-launcher-jp-fr[-blitz]-<empreinte>.ico : l'empreinte suit le trait et la pastille compagnon
+function Get-SplitIconPath($Combination, $Badge) {
+    $companion = if ($Badge) { Get-BadgeSignature $Badge (Get-ActiveBadgeStyle) } else { 'none' }
+    $signature = ConvertTo-RenderSignature "$($Combination.Code)|$($Combination.TextCode)|$companion|$(Get-DiagonalSplitKey)"
+    return Join-Path $companionIconFolder "$(Get-CombinationIconStem $Combination)-$signature.ico"
 }
 
-function Get-ShortcutCombinations([string[]]$Codes, [object[]]$CompanionApps) {
+# Drapeau des voix en haut à gauche, drapeau du texte en bas à droite, pastille compagnon par-dessus ; recomposée à
+# chaque exécution. Échec → icône de la langue des voix, comme un raccourci normal : l'installation aboutit toujours
+function Resolve-SplitIconPath($Combination) {
+    $badge = Get-CombinationBadge $Combination
+    try {
+        New-Item -ItemType Directory -Path $companionIconFolder -Force | Out-Null
+        $target = Get-SplitIconPath $Combination $badge
+        Remove-StaleIconVariants (Get-CombinationIconStem $Combination) $target
+        Merge-DiagonalSplitIco ([pscustomobject]@{ Upper = (Resolve-IconPath $Combination.Code); Lower = (Resolve-IconPath $Combination.TextCode); Destination = $target }) | Out-Null
+        if ($badge) { Add-CompanionBadge $target $badge $target (Get-ActiveBadgeStyle) | Out-Null }
+        return $target
+    } catch {
+        Write-Warning (Get-Text 'shortcuts.iconNotSplit' $Combination.Name, $_.Exception.Message)
+        return Resolve-FileIconPath (New-ShortcutCombination $Combination.Code $Combination.Companion)
+    }
+}
+
+# Une combinaison = une langue (celle des voix) et, optionnellement, une appli compagnon et une langue de texte forcé.
+# Un texte forcé dans la langue des voix n'en est pas un : le raccourci reste normal.
+function New-ShortcutCombination([string]$Code, $Companion, [string]$TextCode = '') {
+    $combination = [pscustomobject]@{ Code = $Code; TextCode = (Get-ForcedTextCode $Code $TextCode); Companion = $Companion; Name = '' }
+    $combination.Name = Get-ShortcutName $combination
+    return $combination
+}
+
+function Get-ForcedTextCode([string]$Code, [string]$TextCode) {
+    if ($TextCode -eq $Code) { return '' }
+    return $TextCode
+}
+
+# $TextCode : langue du texte forcé appliquée à toutes les langues cochées (vide = aucun texte forcé)
+function Get-ShortcutCombinations([string[]]$Codes, [object[]]$CompanionApps, [string]$TextCode = '') {
     $combinations = foreach ($code in $Codes) {
-        if ($CompanionApps.Count -eq 0) { New-ShortcutCombination $code $null }
-        foreach ($companion in $CompanionApps) { New-ShortcutCombination $code $companion }
+        if ($CompanionApps.Count -eq 0) { New-ShortcutCombination $code $null $TextCode }
+        foreach ($companion in $CompanionApps) { New-ShortcutCombination $code $companion $TextCode }
     }
     return @($combinations | Where-Object { $null -ne $_ })
 }
@@ -292,7 +352,8 @@ function Get-ExistingLaunchShortcuts([string]$Directory) {
         if ($shortcut.Arguments -notmatch [regex]::Escape($launcher)) { continue }
         $code      = if ($shortcut.Arguments -match '-Locale\s+([a-z]{2}_[A-Z]{2})') { $Matches[1] } else { '' }
         $companion = if ($shortcut.Arguments -match '-Companion\s+(\S+)') { $Matches[1] } else { '' }
-        [pscustomobject]@{ Path = $file.FullName; Code = $code; CompanionId = $companion }
+        $textCode  = if ($shortcut.Arguments -match '-TextLocale\s+([a-z]{2}_[A-Z]{2})') { $Matches[1] } else { '' }
+        [pscustomobject]@{ Path = $file.FullName; Code = $code; CompanionId = $companion; TextCode = $textCode }
     }
     return @($found | Where-Object { $null -ne $_ })
 }
@@ -409,6 +470,7 @@ function Select-IconSetForConfig($Config, [string]$ConfigPath, [string]$Requeste
 
 function Get-LauncherArguments($Combination) {
     $arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$launcher`" -Locale $($Combination.Code)"
+    if ($Combination.TextCode) { $arguments += " -TextLocale $($Combination.TextCode)" }
     if ($Combination.Companion) { $arguments += " -Companion $($Combination.Companion.id)" }
     return $arguments
 }
@@ -428,8 +490,16 @@ function New-LaunchShortcut($Combination, [string]$Directory) {
 
 # Infobulle du raccourci, dans la langue de l'installation
 function Get-ShortcutDescription($Combination) {
+    if ($Combination.TextCode) { return Get-ForcedTextShortcutDescription $Combination }
     if ($Combination.Companion) { return Get-Text 'shortcuts.descriptionWithCompanion' $Combination.Code, $Combination.Companion.name }
     return Get-Text 'shortcuts.description' $Combination.Code
+}
+
+function Get-ForcedTextShortcutDescription($Combination) {
+    if ($Combination.Companion) {
+        return Get-Text 'shortcuts.descriptionForcedTextWithCompanion' $Combination.Code, $Combination.TextCode, $Combination.Companion.name
+    }
+    return Get-Text 'shortcuts.descriptionForcedText' $Combination.Code, $Combination.TextCode
 }
 
 # Bureau en priorité ; si l'écriture y échoue (dossier protégé, OneDrive verrouillé, chemin absent),
@@ -512,7 +582,8 @@ if ($MyInvocation.InvocationName -ne '.') {
     if ($Locales.Count -eq 0) { Get-Text 'shortcuts.noLanguage'; exit 0 }
 
     $selectedCompanions = @($Companions | ForEach-Object { Find-LaunchCompanion $config $_ })
-    $combinations = Get-ShortcutCombinations $Locales $selectedCompanions
+    if ($TextLocale -and $TextLocale -notin $catalog.code) { throw (Get-Text 'shortcuts.unknownLocales' $TextLocale) }
+    $combinations = Get-ShortcutCombinations $Locales $selectedCompanions $TextLocale
     foreach ($combination in $combinations) {
         Get-Text 'shortcuts.created' (New-LaunchShortcutWithFallback $combination)
     }

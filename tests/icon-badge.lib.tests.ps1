@@ -135,6 +135,30 @@ Describe 'Add-CountryBadgeToBitmap' {
     }
 }
 
+Describe 'Add-CountryBadgeToBitmap, texte forcé' {
+    It 'coupe la pastille en diagonale : Japon (voix) en haut à gauche, France (texte) en bas à droite, trait sombre au centre' {
+        $bmp = New-Object System.Drawing.Bitmap(256, 256, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+        try {
+            Add-CountryBadgeToBitmap $bmp @('ja_JP', 'fr_FR')
+            $m = Get-BadgeMetrics 256; $r = $m.Diameter / 2
+            $bmp.GetPixel([int]($m.Cx - $r * 0.6), [int]($m.Cy - $r * 0.2)).ToArgb() | Should Be (Get-Argb '#FFFFFF')
+            $bmp.GetPixel([int]($m.Cx + $r * 0.75), [int]($m.Cy + $r * 0.3)).ToArgb() | Should Be (Get-Argb '#E1000F')
+            $center = $bmp.GetPixel([int]$m.Cx, [int]$m.Cy)
+            [Math]::Max($center.R, [Math]::Max($center.G, $center.B)) | Should BeLessThan 64
+        } finally { $bmp.Dispose() }
+    }
+}
+
+Describe 'Get-StackedBadgeSignature, texte forcé' {
+    It 'distingue la pastille coupée de chacune de ses deux langues seules' {
+        $split = Get-StackedBadgeSignature @('ja_JP', 'fr_FR') $null
+        $split | Should Match '^[0-9a-f]{8}$'
+        $split | Should Not Be (Get-StackedBadgeSignature 'ja_JP' $null)
+        $split | Should Not Be (Get-StackedBadgeSignature 'fr_FR' $null)
+        $split | Should Not Be (Get-StackedBadgeSignature @('fr_FR', 'ja_JP') $null)
+    }
+}
+
 Describe 'Add-StackedBadgesToBitmap' {
     function New-BlankBitmap([int]$Size) {
         $bmp = New-Object System.Drawing.Bitmap($Size, $Size, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)

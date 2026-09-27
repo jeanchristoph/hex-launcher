@@ -1007,3 +1007,123 @@ Describe 'Start-LeagueClient' {
         { Start-LeagueClient -Path 'C:\Riot\RiotClientServices.exe' -YamlPath 'C:\yaml' -Value 'ja_JP' -OnTick { } } | Should Not Throw
     }
 }
+
+Describe 'Test-ForcedTextRequested' {
+    It 'demande le texte forcé seulement pour une langue de texte différente de celle des voix' {
+        Test-ForcedTextRequested 'fr_FR' 'ja_JP' | Should Be $true
+        Test-ForcedTextRequested 'ja_JP' 'ja_JP' | Should Be $false
+        Test-ForcedTextRequested '' 'ja_JP' | Should Be $false
+    }
+}
+
+Describe 'Get-LeagueFolder' {
+    It 'rend le dossier de LeagueClient.exe' {
+        Mock Find-LeagueClientPath { 'C:\Riot Games\League of Legends\LeagueClient.exe' }
+        Get-LeagueFolder | Should Be 'C:\Riot Games\League of Legends'
+    }
+
+    Context 'League of Legends introuvable' {
+        It 'rend null' {
+            Mock Find-LeagueClientPath { $null }
+            Get-LeagueFolder | Should BeNullOrEmpty
+        }
+    }
+}
+
+Describe 'Restore-ForcedTextAtLaunch' {
+    It 'ne bloque jamais le lancement quand la restauration échoue' {
+        Mock Restore-ForcedText { throw 'fichier verrouillé' }
+        Mock Write-LaunchLogLine { $true }
+        { Restore-ForcedTextAtLaunch } | Should Not Throw
+        Assert-MockCalled Write-LaunchLogLine -Scope It -Exactly 1 -ParameterFilter { $Detail -like '*restauration reportée*fichier verrouillé*' }
+    }
+}
+
+Describe 'Install-ForcedTextAtLaunch' {
+    Mock Write-LaunchLogLine { $true }
+
+    Context 'League of Legends installé' {
+        It 'pose le texte demandé sur la langue des voix du dossier du jeu' {
+            Mock Get-LeagueFolder { 'C:\Riot Games\League of Legends' }
+            Mock Install-ForcedText { }
+            Install-ForcedTextAtLaunch 'ja_JP' 'fr_FR' | Should Be $true
+            Assert-MockCalled Install-ForcedText -Scope It -Exactly 1 -ParameterFilter {
+                $Request.LeagueFolder -eq 'C:\Riot Games\League of Legends' -and $Request.VoiceLocale -eq 'ja_JP' -and $Request.TextLocale -eq 'fr_FR'
+            }
+        }
+    }
+
+    Context 'pose en échec (hors ligne, patch en cours…)' {
+        It 'rend false et journalise la cause, sans lever' {
+            Mock Get-LeagueFolder { 'C:\Riot Games\League of Legends' }
+            Mock Install-ForcedText { throw 'Impossible de résoudre le nom distant' }
+            Install-ForcedTextAtLaunch 'ja_JP' 'fr_FR' | Should Be $false
+            Assert-MockCalled Write-LaunchLogLine -Scope It -Exactly 1 -ParameterFilter { $Detail -like 'abandon — jeu en ja_JP*nom distant' }
+        }
+    }
+
+    Context 'League of Legends introuvable' {
+        It 'rend false sans rien tenter' {
+            Mock Get-LeagueFolder { $null }
+            Mock Install-ForcedText { }
+            Install-ForcedTextAtLaunch 'ja_JP' 'fr_FR' | Should Be $false
+            Assert-MockCalled Install-ForcedText -Scope It -Exactly 0
+        }
+    }
+}
+
+Describe 'Complete-ForcedTextLaunch' {
+    Mock Write-LaunchLogLine { $true }
+
+    function New-ForcedTextContext([string]$Outcome) {
+        $script:statuses = New-Object Collections.Generic.List[string]
+        return [pscustomobject]@{ Outcome = $Outcome; VoiceLocale = 'ja_JP'; TextLocale = 'fr_FR'; TextLabel = 'Français'
+                                  OnTick = $null; OnStatus = { param($Message) $script:statuses.Add($Message) }; ShouldStop = $null }
+    }
+
+    Context 'chemin rapide réussi' {
+        It 'pose le texte aussitôt, le client LoL étant déjà en marche' {
+            Mock Wait-GameClientStart { $true }
+            Mock Install-ForcedTextAtLaunch { $true }
+            Complete-ForcedTextLaunch (New-ForcedTextContext 'api') | Should Be 'installed'
+            Assert-MockCalled Wait-GameClientStart -Scope It -Exactly 0
+            Assert-MockCalled Install-ForcedTextAtLaunch -Scope It -Exactly 1 -ParameterFilter { $VoiceLocale -eq 'ja_JP' -and $TextLocale -eq 'fr_FR' }
+            $script:statuses -join ' | ' | Should Be 'Texte du jeu en Français…'
+        }
+    }
+
+    Context 'démarrage manuel, le joueur clique sur Jouer' {
+        It 'attend le client LoL avant de poser le texte' {
+            Mock Wait-GameClientStart { $true }
+            Mock Install-ForcedTextAtLaunch { $true }
+            Complete-ForcedTextLaunch (New-ForcedTextContext 'legacy') | Should Be 'installed'
+            Assert-MockCalled Wait-GameClientStart -Scope It -Exactly 1 -ParameterFilter { $TimeoutSeconds -eq $ForcedTextClientWaitSeconds }
+        }
+    }
+
+    Context 'démarrage manuel sans client LoL' {
+        It 'renonce sans rien poser' {
+            Mock Wait-GameClientStart { $false }
+            Mock Install-ForcedTextAtLaunch { $true }
+            Complete-ForcedTextLaunch (New-ForcedTextContext 'legacy') | Should Be 'skipped'
+            Assert-MockCalled Install-ForcedTextAtLaunch -Scope It -Exactly 0
+        }
+    }
+
+    Context 'lancement interrompu ou impossible' {
+        It 'ne tente rien' {
+            Mock Install-ForcedTextAtLaunch { $true }
+            Complete-ForcedTextLaunch (New-ForcedTextContext 'cancelled') | Should Be 'skipped'
+            Complete-ForcedTextLaunch (New-ForcedTextContext 'failed') | Should Be 'skipped'
+            Assert-MockCalled Install-ForcedTextAtLaunch -Scope It -Exactly 0
+        }
+    }
+
+    Context 'pose en échec' {
+        It 'annonce que le jeu reste dans la langue des voix' {
+            Mock Install-ForcedTextAtLaunch { $false }
+            Complete-ForcedTextLaunch (New-ForcedTextContext 'api') | Should Be 'failed'
+            $script:statuses -join ' | ' | Should Be 'Texte du jeu en Français… | Texte forcé indisponible — jeu dans la langue des voix'
+        }
+    }
+}
