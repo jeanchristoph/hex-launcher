@@ -555,6 +555,14 @@ function Test-ForcedTextRequested([string]$TextLocale, [string]$Locale) {
     return [bool]$TextLocale -and $TextLocale -ne $Locale
 }
 
+# Texte forcé : une ligne jaune collée sous le titre rappelle que des fichiers du jeu sont remplacés (demande utilisateur
+# du 2026-09-27) ; l'avertissement détaillé (risque de ban) reste dans le setup. La langue du texte y figure sous son
+# nom natif (celui du catalogue) ; '' hors texte forcé
+function Get-LaunchSplashWarning([string]$TextLabel) {
+    if (-not $TextLabel) { return '' }
+    return 'MODIFIED GAME FILES — TEXT: {0}' -f $TextLabel
+}
+
 # Dossier du jeu (celui de LeagueClient.exe, qui contient Game.ok et Game\) ; $null si LoL est introuvable
 function Get-LeagueFolder {
     $client = Find-LeagueClientPath
@@ -592,14 +600,19 @@ function Install-ForcedTextAtLaunch([string]$VoiceLocale, [string]$TextLocale) {
 #>
 function Complete-ForcedTextLaunch($Context) {
     if ($Context.Outcome -notin @('api', 'legacy')) { return 'skipped' }
-    if ($Context.Outcome -eq 'legacy' -and -not (Wait-GameClientStart $ForcedTextClientWaitSeconds $Context.OnTick $Context.ShouldStop)) {
-        Write-LaunchLogLine 'TEXT' ('abandon — aucun client de jeu en {0} s de démarrage manuel' -f $ForcedTextClientWaitSeconds) | Out-Null
-        return 'skipped'
-    }
+    if ($Context.Outcome -eq 'legacy' -and -not (Wait-ForcedTextClient $Context)) { return 'skipped' }
     Write-LaunchStatus $Context.OnStatus ('Texte du jeu en {0}…' -f $Context.TextLabel)
     if ((Wait-ForcedTextWindow $Context) -and (Install-ForcedTextAtLaunch $Context.VoiceLocale $Context.TextLocale)) { return 'installed' }
     Write-LaunchStatus $Context.OnStatus 'Texte forcé indisponible — jeu dans la langue des voix'
     return 'failed'
+}
+
+# Démarrage manuel : attend que le joueur clique sur Jouer. Échéance ou croix du splash : la durée réelle dit lequel
+function Wait-ForcedTextClient($Context) {
+    $chrono = [Diagnostics.Stopwatch]::StartNew()
+    if (Wait-GameClientStart $ForcedTextClientWaitSeconds $Context.OnTick $Context.ShouldStop) { return $true }
+    Write-LaunchLogLine 'TEXT' ('abandon — aucun client de jeu après {0} de démarrage manuel' -f (Format-LaunchLogDuration $chrono)) | Out-Null
+    return $false
 }
 
 # BUSINESS_RULE : le client LoL vérifie l'installation une fois par session (~11 s après son démarrage) et répare
@@ -668,7 +681,9 @@ if ($MyInvocation.InvocationName -ne '.') {
         $(if ($tryLocalApi) { 'rapide' } elseif ($NoLocalApi) { 'manuel (-NoLocalApi)' } else { 'manuel (case de setup.bat)' }), `
         $(if ($riotVersion) { $riotVersion } else { 'version inconnue' })) | Out-Null
 
-    $splash = New-SplashWindow -Subtitle (Get-LocaleLabel $Locale (Join-Path $PSScriptRoot 'locales.json'))
+    $localesPath = Join-Path $PSScriptRoot 'locales.json'
+    $textLabel   = $(if ($isForcedText) { Get-LocaleLabel $TextLocale $localesPath } else { '' })
+    $splash = New-SplashWindow -Subtitle (Get-LocaleLabel $Locale $localesPath) -Warning (Get-LaunchSplashWarning $textLabel)
     if (Test-LaunchBurst (Join-Path $PSScriptRoot $LaunchLogFileName)) {
         Update-SplashStatus $splash $LaunchBurstWarningMessage
         Wait-WithAnimation $LaunchBurstWarningSeconds

@@ -34,7 +34,7 @@ Describe 'New-SplashRule' {
 Describe 'Add-SplashControls' {
     It 'pose le titre, le sous-titre, la barre et la ligne de statut — tous des contrôles réels, pas des textes' {
         $form = New-Object System.Windows.Forms.Form
-        Add-SplashControls $form '日本語' 'LEAGUE OF LEGENDS'
+        Add-SplashControls $form ([pscustomobject]@{ Title = 'LEAGUE OF LEGENDS'; Subtitle = '日本語'; Warning = '' })
         $labels = @($form.Controls | Where-Object { $_ -is [System.Windows.Forms.Label] })
         $labels.Count | Should Be 3
         @($form.Controls | Where-Object { $_ -is [System.Windows.Forms.Panel] }).Count | Should Be 1
@@ -42,9 +42,20 @@ Describe 'Add-SplashControls' {
         ($labels | Where-Object { $_.Text -eq '日本語' }).Dock          | Should Be 'Top'
     }
 
+    It 'pose la ligne d''avertissement en jaune, juste sous le titre' {
+        $form = New-Object System.Windows.Forms.Form
+        Add-SplashControls $form ([pscustomobject]@{ Title = 'LEAGUE OF LEGENDS'; Subtitle = '日本語'; Warning = 'MODIFIED GAME FILES' })
+        $warning = @($form.Controls | Where-Object { $_.Text -eq 'MODIFIED GAME FILES' })[0]
+        $warning.ForeColor | Should Be (Get-ThemeColor 'Warning')
+        $title   = @($form.Controls | Where-Object { $_.Text -eq 'LEAGUE OF LEGENDS' })[0]
+        $form.PerformLayout()
+        $title.Top      | Should Be 0
+        $warning.Top    | Should Be $title.Bottom
+    }
+
     It 'range la ligne de statut dans Tag, vide au départ' {
         $form = New-Object System.Windows.Forms.Form
-        Add-SplashControls $form 'x' 'y'
+        Add-SplashControls $form ([pscustomobject]@{ Title = 'y'; Subtitle = 'x'; Warning = '' })
         $form.Tag -is [System.Windows.Forms.Label] | Should Be $true
         $form.Tag.Text | Should Be ''
         $form.Tag.Dock | Should Be 'Fill'

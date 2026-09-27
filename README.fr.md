@@ -43,8 +43,8 @@ installe, et on obtient un raccourci par langue × appli compagnon
 | `app/lib/zstd.lib.ps1` / `rman-reader.cs` / `native/libzstd.dll` | Décompression zstd (DLL officielle, empreinte vérifiée) et lecture du manifest RMAN du patcher Riot |
 | `app/lib/icon-split.lib.ps1` | Icône coupée en diagonale des raccourcis à texte forcé |
 | `tests/` | Tests Pester (`Invoke-Pester -Path tests`) |
-| `tools/` | Développement uniquement, hors release : `make-release.ps1`, `fetch-libzstd.ps1` (retélécharge `libzstd.dll` depuis la release officielle et vérifie ses empreintes), `make-flag-icons.ps1` (régénère toutes les icônes de `app/ico/` depuis le logo vectoriel), `logo/make-logo-svg.py` + `logo/hex-launcher-logo-drawing.png` → `logo/hex-launcher-logo.svg` (logo HL original, source de vérité) |
-| `app/ico/` | Jeux d'icônes, un dossier chacun : `flat/` (défaut : drapeau plat derrière le logo HL) et `classic/` (les anciennes icônes en relief) ; chacun contient l'icône de base + une variante drapeau par langue (`hex-launcher-xx.ico`) et un sous-dossier généré `companion/` avec les icônes drapeau + pastille composées sur ce poste. `original/` et `original-badges/` ne contiennent qu'un marqueur `icon-source.json` : l'icône officielle du jeu, référencée depuis `LeagueClient.exe` installé — nue, ou avec pastilles pays et compagnon composées sur ce poste |
+| `tools/` | Développement uniquement, hors release : `make-release.ps1`, `fetch-libzstd.ps1` (retélécharge `libzstd.dll` depuis la release officielle et vérifie ses empreintes), `make-flag-icons.ps1` (régénère toutes les icônes de `app/ico/` depuis le logo vectoriel), `make-logo-icon.ps1` (régénère l'icône du jeu `logo-badges`), `watch-launch.ps1` (essai réel : lance le jeu et relève les écritures sur les fichiers texte), `logo/make-logo-svg.py` + `logo/hex-launcher-logo-drawing.png` → `logo/hex-launcher-logo.svg` (logo HL original, source de vérité) |
+| `app/ico/` | Jeux d'icônes, un dossier chacun : `flat/` (défaut : drapeau plat derrière le logo HL) et `classic/` (les anciennes icônes en relief) ; chacun contient l'icône de base + une variante drapeau par langue (`hex-launcher-xx.ico`) et un sous-dossier généré `companion/` avec les icônes drapeau + pastille composées sur ce poste. `original/` et `original-badges/` ne contiennent qu'un marqueur `icon-source.json` : l'icône officielle du jeu, référencée depuis `LeagueClient.exe` installé — nue, ou avec pastilles pays et compagnon composées sur ce poste ; `logo-badges/` : une icône de base seule (logo HL sans cadre ni drapeau), sur laquelle les pastilles pays et compagnon sont composées sur ce poste |
 
 ## Confiance — ce que fait `setup.bat`, ce qu'il ne fait pas
 
@@ -229,7 +229,7 @@ par exemple `hex-launcher-jp.ico` pour `ja_JP`) ; sans drapeau → l'icône de b
 choisit sur la page *Raccourcis* de `setup.bat` (avec un aperçu de son icône de base) et reste mémorisé dans `config.json`
 (`iconSet`) ; en mode script : `create-shortcuts.ps1 -IconSet classic`. Tout dossier déposé dans `app/ico/` qui contient
 un `hex-launcher.ico` devient un jeu sélectionnable. Les jeux livrés s'affichent dans un ordre fixe et sous un libellé
-traduit (« LoL officielle + pastilles », « LoL officielle, nue », « Classique (relief) », « Drapeau plat + logo HL ») ;
+traduit (« LoL officielle + pastilles », « LoL officielle, nue », « Logo HL + pastilles », « Classique (relief) », « Drapeau plat + logo HL ») ;
 un jeu ajouté s'affiche après, sous le nom de son dossier. Installation neuve : `original-badges` est présélectionné ;
 `flat` reste le jeu de repli (icône de fenêtre, drapeau manquant, LoL introuvable).
 Un raccourci avec appli compagnon porte en plus une pastille de couleur en haut à droite — P Porofessor, B Blitz,
@@ -247,6 +247,11 @@ Deux jeux « externes » utilisent l'icône officielle de League of Legends, ré
 Un tel jeu est un dossier sans `.ico`, marqué par `icon-source.json` : `{ "source": "league-client", "badges": true }`.
 Si `LeagueClient.exe` est introuvable, les raccourcis reçoivent les icônes du jeu par défaut.
 
+Le jeu `logo-badges` n'a pas de drapeau : son icône de base est le logo HL seul, sans cadre, agrandi et calé en bas.
+Chaque raccourci y reçoit la pastille pays (coupée en diagonale en mode texte forcé) et la pastille compagnon, composées
+sur ce poste comme pour `original-badges` ; marqueur `{ "source": "set-base", "badges": true }`. L'icône se régénère avec
+`powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-logo-icon.ps1` (`resvg` requis).
+
 Pour une langue absente du catalogue (nouvelle locale Riot) :
 1. ajouter une ligne dans `locales.json` avec le code exact tel qu'il apparaît dans `available_locales`
    du fichier yaml ;
@@ -256,11 +261,13 @@ Pour une langue absente du catalogue (nouvelle locale Riot) :
 ## Texte forcé (voix et texte dans deux langues)
 
 Les voix dans une langue, le texte en jeu dans une autre : sur la page *Raccourcis* de `setup.bat`, cochez
-« Forcer le texte en : » et choisissez la langue du texte. Chaque langue cochée reste celle des voix ; le raccourci
+« Forcer le texte en jeu en : » et choisissez la langue du texte. Chaque langue cochée reste celle des voix ; le raccourci
 s'appelle `League of Legends JP-FR` et son icône est coupée en diagonale (voix en haut, texte en bas).
 
 > ⚠️ Ce mode remplace des fichiers du jeu. Riot n'autorise pas les modifications de fichiers : le compte peut être
 > sanctionné, jusqu'au bannissement. À vos risques.
+
+Pendant un lancement avec texte forcé, le splash affiche en jaune sous le titre « MODIFIED GAME FILES — TEXT: … », suivi du nom de la langue du texte (ex. « TEXT: 日本語 »).
 
 Comment : aucun réglage Riot ne sépare texte et voix. Une fois le client LoL ouvert et sa vérification des fichiers passée (une
 quinzaine de secondes, le splash affiche « Texte du jeu en … »), le lanceur remplace les deux
@@ -272,8 +279,8 @@ sont remis en place au lancement suivant.
 Limites :
 - le client LoL (menus, boutique) reste dans la langue des voix : seul le jeu en partie change ;
 - poser plus tôt est inutile : le client répare tout fichier modifié lors de sa vérification ;
-- LoL lancé sans raccourci Hex Launcher garde le texte forcé jusqu'au prochain lancement par un raccourci ou jusqu'au
-  prochain patch ;
+- LoL lancé sans raccourci Hex Launcher (Riot Client, puis Jouer) : à son ouverture, le client LoL vérifie ses fichiers
+  et remet ceux d'origine ; la partie se joue alors entièrement dans la langue des voix ;
 - hors ligne ou en cas d'erreur, la partie se joue dans la langue des voix (ligne `TEXT` dans `launch.log`) ;
 - en démarrage manuel, le texte est posé dès que vous appuyez sur **Jouer** (10 min au plus).
 
@@ -339,6 +346,7 @@ Utiliser le lanceur ne demande rien de plus que Windows 10/11. Contribuer, si :
 | Exécuter les scripts, interface WinForms, dessin GDI+ | Windows PowerShell 5.1, .NET Framework (`System.Drawing`, `System.Windows.Forms`) | intégrés à Windows |
 | Tests | Pester 3.4 | livré avec Windows PowerShell 5.1 |
 | Régénérer le jeu d'icônes `flat` (`tools/make-flag-icons.ps1`) | `resvg` (SVG → PNG) | `scoop install resvg` |
+| Régénérer l'icône du jeu `logo-badges` (`tools/make-logo-icon.ps1`) | `resvg` (SVG → PNG) | `scoop install resvg` |
 | Régénérer le logo SVG (`tools/logo/make-logo-svg.py`) | Python 3 avec Pillow et numpy, `potrace` (PNG → SVG), `resvg` | `pip install pillow numpy` · `scoop install potrace resvg` |
 | Publier une release (`tools/make-release.ps1 -Publish`) | GitHub CLI `gh`, authentifié | `scoop install gh` ou https://cli.github.com |
 | Changer de version de `libzstd.dll` (`tools/fetch-libzstd.ps1`) | aucun (PowerShell) | release officielle https://github.com/facebook/zstd/releases |

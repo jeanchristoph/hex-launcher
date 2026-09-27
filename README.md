@@ -43,8 +43,8 @@ they get installed for you, and you get one shortcut per language × companion a
 | `app/lib/zstd.lib.ps1` / `rman-reader.cs` / `native/libzstd.dll` | zstd decompression (official DLL, hash checked) and reading of the Riot patcher's RMAN manifest |
 | `app/lib/icon-split.lib.ps1` | Diagonally split icon of forced text shortcuts |
 | `tests/` | Pester tests (`Invoke-Pester -Path tests`) |
-| `tools/` | Development only, not shipped: `make-release.ps1`, `fetch-libzstd.ps1` (downloads `libzstd.dll` again from the official release and checks its hashes), `make-flag-icons.ps1` (rebuilds the `flat` icon set from the vector logo), `logo/make-logo-svg.py` + `logo/hex-launcher-logo-drawing.png` → `logo/hex-launcher-logo.svg` (the original HL logo, source of truth) |
-| `app/ico/` | Icon sets, one folder each: `flat/` (default: flat flag behind the HL logo) and `classic/` (the former embossed icons); each holds the base icon + one flag variant per language (`hex-launcher-xx.ico`), and a generated `companion/` subfolder with the flag + badge icons composed on this machine. `original/` and `original-badges/` hold only an `icon-source.json` marker: the official game icon, referenced from the installed `LeagueClient.exe` — bare, or with country and companion badges composed on this machine |
+| `tools/` | Development only, not shipped: `make-release.ps1`, `fetch-libzstd.ps1` (downloads `libzstd.dll` again from the official release and checks its hashes), `make-flag-icons.ps1` (rebuilds the `flat` icon set from the vector logo), `make-logo-icon.ps1` (rebuilds the icon of the `logo-badges` set), `watch-launch.ps1` (real-world test: launches the game and records writes to the text files), `logo/make-logo-svg.py` + `logo/hex-launcher-logo-drawing.png` → `logo/hex-launcher-logo.svg` (the original HL logo, source of truth) |
+| `app/ico/` | Icon sets, one folder each: `flat/` (default: flat flag behind the HL logo) and `classic/` (the former embossed icons); each holds the base icon + one flag variant per language (`hex-launcher-xx.ico`), and a generated `companion/` subfolder with the flag + badge icons composed on this machine. `original/` and `original-badges/` hold only an `icon-source.json` marker: the official game icon, referenced from the installed `LeagueClient.exe` — bare, or with country and companion badges composed on this machine; `logo-badges/`: a single base icon (HL logo without frame or flag), onto which the country and companion badges are composed on this machine |
 
 ## Trust — what `setup.bat` does, and does not do
 
@@ -227,7 +227,7 @@ e.g. `hex-launcher-jp.ico` for `ja_JP`); missing flag → the set's base icon, t
 the *Shortcuts* page of `setup.bat` (with a preview of its base icon) and remembered in `config.json` (`iconSet`);
 in script mode: `create-shortcuts.ps1 -IconSet classic`. Any folder dropped in `app/ico/` that contains a
 `hex-launcher.ico` becomes a selectable set. Shipped sets are listed in a fixed order under a translated label
-("Official LoL + badges", "Official LoL, plain", "Classic (embossed)", "Flat flag + HL logo"); an added set comes after,
+("Official LoL + badges", "Official LoL, plain", "HL logo + badges", "Classic (embossed)", "Flat flag + HL logo"); an added set comes after,
 under its folder name. On a fresh install `original-badges` is preselected; `flat` remains the fallback set (window
 icon, missing flag, LoL not found).
 A shortcut with a companion app also carries a coloured badge in the top-right corner — P Porofessor, B Blitz,
@@ -245,6 +245,11 @@ Two “external” sets use the official League of Legends icon, referenced from
 Such a set is a folder without any `.ico`, marked by `icon-source.json`: `{ "source": "league-client", "badges": true }`.
 If `LeagueClient.exe` cannot be found, shortcuts get the default set's icons.
 
+The `logo-badges` set has no flag: its base icon is the HL logo alone, without a frame, enlarged and aligned to the bottom.
+Each shortcut gets the country badge (split diagonally in forced text mode) and the companion badge, composed on this
+machine as for `original-badges`; marker `{ "source": "set-base", "badges": true }`. Rebuild the icon with
+`powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-logo-icon.ps1` (`resvg` required).
+
 For a language missing from the catalogue (new Riot locale):
 1. add a line to `locales.json` with the exact code as it appears in `available_locales` of the yaml file;
 2. (optional) add the flag drawing to `$FlagDrawings` in `app/lib/flag.lib.ps1` (used by the icons and the country
@@ -253,11 +258,13 @@ For a language missing from the catalogue (new Riot locale):
 ## Forced text (voice and text in two languages)
 
 Voices in one language, in-game text in another: on the *Shortcuts* page of `setup.bat`, tick
-"Force the text in:" and pick the text language. Every ticked language remains the voice language; the shortcut
+"Force the in-game text in:" and pick the text language. Every ticked language remains the voice language; the shortcut
 is named `League of Legends JP-FR` and its icon is split diagonally (voice at the top, text at the bottom).
 
 > ⚠️ This mode replaces game files. Riot does not allow file modifications: the account can be
 > sanctioned, up to a ban. At your own risk.
+
+During a launch with forced text, the splash shows "MODIFIED GAME FILES — TEXT: …" in yellow under the title, followed by the name of the text language (e.g. "TEXT: 日本語").
 
 How: no Riot setting separates text and voice. Once the LoL client is open and its file check has passed (about fifteen
 seconds, the splash shows "Texte du jeu en …"), the launcher replaces the two
@@ -269,8 +276,8 @@ are put back at the next launch.
 Limits:
 - the LoL client (menus, store) stays in the voice language: only the in-match game changes;
 - placing the files earlier is useless: the client repairs any modified file during its check;
-- LoL started without a Hex Launcher shortcut keeps the forced text until the next launch through a shortcut or until
-  the next patch;
+- LoL started without a Hex Launcher shortcut (Riot Client, then Play): when it opens, the LoL client checks its files
+  and puts the original ones back; the match is then played entirely in the voice language;
 - offline or on error, the match is played in the voice language (`TEXT` line in `launch.log`);
 - with the manual start, the text is placed as soon as you press **Play** (10 min at most).
 
@@ -335,6 +342,7 @@ Running the launcher needs nothing beyond Windows 10/11. Contributing does:
 | Run the scripts, WinForms UI, GDI+ drawing | Windows PowerShell 5.1, .NET Framework (`System.Drawing`, `System.Windows.Forms`) | built into Windows |
 | Tests | Pester 3.4 | ships with Windows PowerShell 5.1 |
 | Rebuild the `flat` icon set (`tools/make-flag-icons.ps1`) | `resvg` (SVG → PNG) | `scoop install resvg` |
+| Rebuild the icon of the `logo-badges` set (`tools/make-logo-icon.ps1`) | `resvg` (SVG → PNG) | `scoop install resvg` |
 | Rebuild the logo SVG (`tools/logo/make-logo-svg.py`) | Python 3 with Pillow and numpy, `potrace` (PNG → SVG), `resvg` | `pip install pillow numpy` · `scoop install potrace resvg` |
 | Publish a release (`tools/make-release.ps1 -Publish`) | GitHub CLI `gh`, signed in | `scoop install gh` or https://cli.github.com |
 | Change the `libzstd.dll` version (`tools/fetch-libzstd.ps1`) | none (PowerShell) | official release https://github.com/facebook/zstd/releases |

@@ -1,5 +1,27 @@
 # Log — text-lang
 
+- [2026-09-27 22:25] Livraison : version 0.3.0, notes FR validées puis EN (output/20260927-release-notes-0-3-0.md) ; grave dev master + release v0.3.0.
+- [2026-09-27 22:15] Setup (demandes utilisateur) : case « Forcer le texte en jeu en : » (FR donné, EN/JA traduits, README ×3) ; liste des jeux d'icônes à 5 lignes (logo-badges la faisait défiler) ; journal d'installation caché tant qu'il est vide (New-SetupLog, choix utilisateur). 903/903. config.json iconSet=logo-badges / forcedTextLocale vide : setup lancé par l'utilisateur à 22:00:45, laissé tel quel.
+- [2026-09-27 22:10] T14.5 : README FR validé, EN/JA traduits par agent. T14 terminé.
+- [2026-09-27 22:40] T14.4 : libellé « Logo HL + pastilles » et note setBase validés FR puis EN/JA ; raccourcis réels logo-badges (dossier temporaire, config.json restauré) conformes. T14.5 : README FR validé, EN/JA confiés à un agent.
+- [2026-09-27 22:20] T14.1–T14.3 : générateur make-logo-icon.ps1 (SVG sans frame, viewBox resserré, calé en bas après recommandation), source set-base, pastilles sur l'.ico du jeu ; pas d'empreinte de l'icône de base dans le nom composé (régénération rare) ; 898/898.
+- [2026-09-27 22:00] T14 ajouté (validé) : jeu d'icônes logo HL sans cadre + pastilles, sans drapeau ; maquette scratchpad (pastilles sur le haut du « L » si centré).
+- [2026-09-27 21:50] T13 : logo HL et cadre au-dessus du trait (flat, classic) — masque par comparaison des icônes de base bleue/verte ; classic demande un seuil large (icônes générées séparément, logo non identique au pixel). Rendu validé (« nickel ») ; 881/881.
+- [2026-09-27 21:40] Release 0.3.0 annulée par l'utilisateur à la validation des notes FR (brouillon laissé dans output/). Aucune commande git.
+- [2026-09-27 21:35] README ×3 : limite « LoL lancé sans raccourci garde le texte forcé » fausse (remarque utilisateur) — la vérification du client LoL remet les fichiers d'origine à son ouverture ; FR validé puis EN/JA.
+- [2026-09-27 21:25] T11.7 : relance unique à 21:23:33 après ~5 min sans démarrage (réparation Riot finie) → VAN 216 toujours là (21:23:50). Contredit la levée en 5 min de 14:14 ; « redémarrage requis » du README / splash non contredit à ce stade.
+- [2026-09-27 21:19] T11.7 : VAN 216 provoqué (21:18:30, 4ᵉ démarrage en ~1 min 20 : 21:17:14, 21:17:51, 21:18:18) et vu à l'écran par l'utilisateur. Réparation du client LoL à 21:18:31 (inconsistent, ja_JP) — cause probable : boucle de Claude, la relance de 21:17:51 (404 → démarrage manuel → « tout Riot fermé ») a coupé le retéléchargement ja_JP. Aucun texte forcé en place (restauration 21:17:14, marqueur supprimé). Boucle arrêtée.
+- [2026-09-27 21:22] T11.3 réussi : partie d'entraînement voix FR + texte JA, affichage japonais correct (confirmation utilisateur).
+- [2026-09-27 21:18] T12 : séparateur tiret long « MODIFIED GAME FILES — TEXT: 日本語 » (parenthèses écartées : doublées avec « English (Philippines) ») ; 131/131 lanceur.
+- [2026-09-27 21:15] T12 : « voix → texte » retiré ; la langue du texte passe dans la ligne jaune « MODIFIED GAME FILES (TEXT: <nom natif>) », ligne de langue = voix (choix utilisateur) ; 872/872.
+- [2026-09-27 21:12] T11.3 : « non pas bon » mal interprété par Claude comme un échec en jeu (il visait le splash « voix → texte »). Fichiers fr_FR = texte ja_JP à l'octet, ja_JP retirés par Riot, Maps/Shipping/Common.fr_FR non remplacé sans effet visible.
+- [2026-09-27 21:08] T12 : ligne de langue « Français → 日本語 » (voix → texte) en texte forcé seulement, choix utilisateur (noms natifs, pas de noms anglais au catalogue) ; 874/874.
+- [2026-09-27 21:05] T11.3 : FR voix + JA texte — restauration 21:02:51, voix FR téléchargées par Riot (~70 s de 424), vérification +10,5 s, pose ja_JP sur fr_FR 21:04:10. Police en jeu à confirmer par l'utilisateur.
+- [2026-09-27 21:05] Confirmation utilisateur après le JP-FR de 20:59 (pose +10,6 s, pas de VAN 216 au 4ᵉ démarrage en 5 min) : client LoL en japonais, texte du jeu en français, comme prévu.
+- [2026-09-27 21:00] Essais réels (lancés par Claude, autorisés ; limite Vanguard levée par l'utilisateur) : T11.2 démarrage manuel OK, T11.4 icônes OK, T11.8 OK (0 écriture ×3). Watcher versionné dans tools/watch-launch.ps1 : l'action Register-ObjectEvent horodatait au traitement → TimeGenerated.
+- [2026-09-27 20:58] T12 retouché (utilisateur) : sans ⚠, ligne collée sous le titre, splash à 170 px.
+- [2026-09-27 20:55] T12 : splash en mode texte forcé — ligne jaune « ⚠ MODIFIED GAME FILES » sous le titre doré (formulation et mise en page choisies par l'utilisateur, NOT SAFE MODE écarté) ; couleur Warning #F0B232 ; 872/872.
+- [2026-09-27 20:45] T11.9 : abandon en démarrage manuel journalisé avec la durée réelle (13:14 : croix à +17 s, journal « 600 s »). T11.1 et T11.5 cochés d'après le journal (setup 13:41:18, Porofessor après la pose à 13:41).
 - [2026-09-27 14:22] JP normal sous FileSystemWatcher (14:20:42, parti avant la consigne « à faire plus tard ») : 0 écriture sur les .wad.client, empreintes inchangées, aucune ligne TEXT. Test complet JP×3 noté en T11.8.
 - [2026-09-27 14:30] T11 ajouté (validé) : essais réels restants T11.1–T11.7.
 - [2026-09-27 14:25] Observation utilisateur : VAN 216 de 14:09:45 levée sans redémarrage de Windows (lancement de 14:14:44 normal). À confirmer avant de modifier README / avertissement du splash.

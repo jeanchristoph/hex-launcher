@@ -40,11 +40,11 @@ Windows 向け League of Legends 起動アシスタント：デスクトップ�
 | `app/lib/zstd.lib.ps1` / `rman-reader.cs` / `native/libzstd.dll` | zstd の展開（公式 DLL、ハッシュ検証済み）と Riot パッチャーの RMAN マニフェストの読み取り |
 | `app/lib/icon-split.lib.ps1` | テキスト強制ショートカット用の、対角線で分割したアイコン |
 | `tests/` | Pester テスト（`Invoke-Pester -Path tests`） |
-| `tools/` | 開発専用、配布物には含まれません：`make-release.ps1`、`fetch-libzstd.ps1`（公式リリースから `libzstd.dll` を再ダウンロードし、ハッシュを検証）、`make-flag-icons.ps1`（ベクターロゴから `app/ico/` の全アイコンを再生成）、`logo/make-logo-svg.py` ＋ `logo/hex-launcher-logo-drawing.png` → `logo/hex-launcher-logo.svg`（オリジナル HL ロゴ、原本） |
+| `tools/` | 開発専用、配布物には含まれません：`make-release.ps1`、`fetch-libzstd.ps1`（公式リリースから `libzstd.dll` を再ダウンロードし、ハッシュを検証）、`make-flag-icons.ps1`（ベクターロゴから `app/ico/` の全アイコンを再生成）、`make-logo-icon.ps1`（`logo-badges` セットのアイコンを再生成）、`watch-launch.ps1`（実機テスト：ゲームを起動し、テキストファイルへの書き込みを記録）、`logo/make-logo-svg.py` ＋ `logo/hex-launcher-logo-drawing.png` → `logo/hex-launcher-logo.svg`（オリジナル HL ロゴ、原本） |
 | `app/lib/icon.lib.ps1` / `icon-badge.lib.ps1` | `.ico` の読み書き、実行ファイルのアイコンのメモリ上での読み取り、補助アプリバッジと国バッジの合成 |
 | `app/lib/flag.lib.ps1` / `riot-install.lib.ps1` | GDI+ で描く国旗（アイコンと国バッジで共通の定義）；`RiotClientInstalls.json` から読む Riot Client と `LeagueClient.exe` の場所 |
 | `app/lib/i18n.lib.ps1` / `app/i18n/` | アシスタントとコンソールの翻訳：言語ごとの辞書 `fr.json` / `en.json` / `ja.json`（すべて同じキー） |
-| `app/ico/` | アイコンセット（フォルダーごとに 1 セット）：`flat/`（既定：HL ロゴの背後にフラットな国旗）と `classic/`（以前の立体アイコン）。各セットに基本アイコン＋言語ごとの国旗バージョン（`hex-launcher-xx.ico`）と、この PC で合成された国旗＋バッジのアイコンが入る生成フォルダー `companion/` があります。`original/` と `original-badges/` にはマーカー `icon-source.json` しかありません：インストール済みの `LeagueClient.exe` から参照するゲームの公式アイコンで、そのまま、または国と補助アプリのバッジをこの PC で合成して使います |
+| `app/ico/` | アイコンセット（フォルダーごとに 1 セット）：`flat/`（既定：HL ロゴの背後にフラットな国旗）と `classic/`（以前の立体アイコン）。各セットに基本アイコン＋言語ごとの国旗バージョン（`hex-launcher-xx.ico`）と、この PC で合成された国旗＋バッジのアイコンが入る生成フォルダー `companion/` があります。`original/` と `original-badges/` にはマーカー `icon-source.json` しかありません：インストール済みの `LeagueClient.exe` から参照するゲームの公式アイコンで、そのまま、または国と補助アプリのバッジをこの PC で合成して使います。`logo-badges/` には基本アイコン（枠も国旗もない HL ロゴ）だけが入り、その上に国と補助アプリのバッジをこの PC で合成します |
 
 ## 安心して使うために — `setup.bat` がすること、しないこと
 
@@ -220,7 +220,7 @@ Riot が提供するすべての言語が `locales.json` にあり、インス�
 セットは `setup.bat` の「ショートカット」ページで選び（基本アイコンのプレビュー付き）、`config.json`（`iconSet`）に記憶されます。
 スクリプトモード：`create-shortcuts.ps1 -IconSet classic`。`hex-launcher.ico` を含むフォルダーを `app/ico/` に置けば、
 セットとして選べるようになります。同梱のセットは固定の順序で、翻訳されたラベル（「LoL 公式＋バッジ」「LoL 公式（バッジなし）」
-「クラシック（立体）」「フラット国旗＋HL ロゴ」）で表示され、追加したセットはその後にフォルダー名で表示されます。
+「HL ロゴ＋バッジ」「クラシック（立体）」「フラット国旗＋HL ロゴ」）で表示され、追加したセットはその後にフォルダー名で表示されます。
 新規インストールでは `original-badges` が選択済みです。`flat` は引き続きフォールバック用のセットです（ウィンドウアイコン、
 国旗がない場合、LoL が見つからない場合）。
 補助アプリ付きのショートカットには右上に色付きバッジが加わります — P Porofessor、B Blitz、O OP.GG、M Mobalytics —
@@ -236,6 +236,11 @@ Riot が提供するすべての言語が `locales.json` にあり、インス�
 こうしたセットは `.ico` を持たないフォルダーで、`icon-source.json`（`{ "source": "league-client", "badges": true }`）が目印です。
 `LeagueClient.exe` が見つからなければ、ショートカットには既定セットのアイコンが使われます。
 
+`logo-badges` セットには国旗がありません。基本アイコンは枠のない HL ロゴだけで、拡大して下端に寄せてあります。
+各ショートカットには国バッジ（テキスト強制モードでは対角線で分割）と補助アプリバッジが付き、`original-badges` と同じく
+この PC で合成されます。マーカーは `{ "source": "set-base", "badges": true }` です。アイコンの再生成は
+`powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-logo-icon.ps1`（`resvg` が必要）。
+
 カタログにない言語（Riot の新しいロケール）を追加するには：
 1. yaml ファイルの `available_locales` にある正確なコードで `locales.json` に 1 行追加；
 2. （任意）`app/lib/flag.lib.ps1` の `$FlagDrawings`（アイコンと国バッジの両方で使用）に国旗の描画を追加し、
@@ -243,12 +248,14 @@ Riot が提供するすべての言語が `locales.json` にあり、インス�
 
 ## テキスト強制（ボイスとテキストを別々の言語で）
 
-ボイスはある言語、ゲーム内テキストは別の言語で：`setup.bat` の「ショートカット」ページで「テキストを強制：」に
+ボイスはある言語、ゲーム内テキストは別の言語で：`setup.bat` の「ショートカット」ページで「ゲーム内テキストを強制：」に
 チェックを入れ、テキストの言語を選びます。チェックした各言語はボイスの言語のままです。ショートカット名は
 `League of Legends JP-FR` となり、アイコンは対角線で分割されます（上がボイス、下がテキスト）。
 
 > ⚠️ このモードはゲームのファイルを置き換えます。Riot はファイルの改変を認めていません：アカウントが処分を受け、
 > BAN に至る可能性があります。自己責任でご利用ください。
+
+テキスト強制モードでの起動中、スプラッシュのタイトルの下に黄色で「MODIFIED GAME FILES — TEXT: …」と表示され、その後にテキスト言語の名前が続きます（例：「TEXT: 日本語」）。
 
 仕組み：テキストとボイスを分ける Riot の設定はありません。LoL クライアントが開き、そのファイル検証が終わったら（約 15 秒、スプラッシュに
 「Texte du jeu en …」と表示されます）、ランチャーはボイス言語の
@@ -260,8 +267,8 @@ Riot が署名したオリジナルのファイルで、その言語でプレイ
 制限事項：
 - LoL クライアント（メニュー、ストア）はボイスの言語のままです：変わるのは試合中のゲームだけです；
 - それより早く配置しても意味がありません：クライアントは検証時に変更されたファイルをすべて修復します；
-- Hex Launcher のショートカットを使わずに起動した LoL は、次にショートカットから起動するか次のパッチまで、
-  強制したテキストのままです；
+- Hex Launcher のショートカットを使わずに LoL を起動した場合（Riot クライアントから「プレイ」）：LoL クライアントが
+  起動時にファイルを検証して元のファイルに戻すため、試合はすべてボイスの言語で行われます；
 - オフラインやエラーの場合、試合はボイスの言語で行われます（`launch.log` の `TEXT` 行）；
 - 手動起動では、**プレイ** を押した時点でテキストが配置されます（最大 10 分）。
 
@@ -323,6 +330,7 @@ Riot Client の「言語」設定はランチャーの言語を変えるだけ�
 | スクリプトの実行、WinForms UI、GDI+ 描画 | Windows PowerShell 5.1、.NET Framework（`System.Drawing`、`System.Windows.Forms`） | Windows 標準 |
 | テスト | Pester 3.4 | Windows PowerShell 5.1 に同梱 |
 | `flat` アイコンセットの再生成（`tools/make-flag-icons.ps1`） | `resvg`（SVG → PNG） | `scoop install resvg` |
+| `logo-badges` セットのアイコンの再生成（`tools/make-logo-icon.ps1`） | `resvg`（SVG → PNG） | `scoop install resvg` |
 | ロゴ SVG の再生成（`tools/logo/make-logo-svg.py`） | Python 3 ＋ Pillow ＋ numpy、`potrace`（PNG → SVG）、`resvg` | `pip install pillow numpy` · `scoop install potrace resvg` |
 | リリースの公開（`tools/make-release.ps1 -Publish`） | GitHub CLI `gh`（ログイン済み） | `scoop install gh` または https://cli.github.com |
 | `libzstd.dll` のバージョン変更（`tools/fetch-libzstd.ps1`） | なし（PowerShell） | 公式リリース https://github.com/facebook/zstd/releases |

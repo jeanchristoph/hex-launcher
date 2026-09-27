@@ -146,6 +146,18 @@ Describe 'Get-IconSetSource' {
         (Get-IconSetSource (New-TestSet '{ "source": "league-client" }')).Badges | Should Be $false
     }
 
+    It 'lit la source set-base (icône de base du jeu, sans drapeau)' {
+        $source = Get-IconSetSource (New-TestSet '{ "source": "set-base", "badges": true }')
+        $source.Source | Should Be 'set-base'
+        $source.Badges | Should Be $true
+    }
+
+    It 'ne prend LeagueClient.exe comme fond que pour la source league-client' {
+        Test-IconSetFromLeagueClient (New-TestSet '{ "source": "league-client", "badges": true }') | Should Be $true
+        Test-IconSetFromLeagueClient (New-TestSet '{ "source": "set-base", "badges": true }') | Should Be $false
+        Test-IconSetFromLeagueClient (New-TestSet $null) | Should Be $false
+    }
+
     It 'rend null pour un jeu de fichiers, sans jeu, ou sans marqueur' {
         Get-IconSetSource (New-TestSet $null) | Should BeNullOrEmpty
         Get-IconSetSource $null | Should BeNullOrEmpty
@@ -159,10 +171,12 @@ Describe 'Get-IconSetSource' {
         Assert-MockCalled Write-Warning -Scope It -Exactly 2
     }
 
-    It 'reconnaît les deux jeux externes livrés : original nu, original-badges avec pastilles' {
+    It 'reconnaît les jeux à source livrés : original nu, original-badges et logo-badges avec pastilles' {
         $sets = @(Get-IconSets (Join-Path $here '..\app\ico'))
         (Get-IconSetSource (Find-IconSet $sets 'original')).Badges | Should Be $false
         (Get-IconSetSource (Find-IconSet $sets 'original-badges')).Badges | Should Be $true
+        (Get-IconSetSource (Find-IconSet $sets 'logo-badges')).Source | Should Be 'set-base'
+        (Get-IconSetSource (Find-IconSet $sets 'logo-badges')).Badges | Should Be $true
         Test-IconSetExternal (Find-IconSet $sets 'flat') | Should Be $false
     }
 }
@@ -175,11 +189,11 @@ Describe 'Get-IconSetFilePath' {
 }
 
 Describe 'jeux livrés dans app\ico' {
-    It 'propose flat (défaut), classic, original et original-badges ; les jeux de fichiers ont les 27 drapeaux du catalogue' {
+    It 'propose flat (défaut), classic, original, original-badges et logo-badges ; les jeux de drapeaux ont les 27 drapeaux du catalogue' {
         . (Join-Path $here '..\app\lib\launch-config.lib.ps1')
         $root  = Join-Path $here '..\app\ico'
         $sets  = @(Get-IconSets $root)
-        ($sets | ForEach-Object { $_.Name }) -join ',' | Should Be 'original-badges,original,classic,flat'
+        ($sets | ForEach-Object { $_.Name }) -join ',' | Should Be 'original-badges,original,logo-badges,classic,flat'
         (Get-DefaultIconSet $sets).Name | Should Be 'flat'
         $codes = @(Read-JsonCatalog (Join-Path $here '..\app\locales.json') | ForEach-Object { $_.code })
         foreach ($set in @($sets | Where-Object { -not (Test-IconSetExternal $_) })) {

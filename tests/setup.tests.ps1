@@ -238,6 +238,26 @@ Describe 'Éléments des listes' {
     }
 }
 
+Describe 'New-SetupLog' {
+    It 'reste caché tant qu''il est vide' {
+        (New-SetupLog 0 0 200 60).Visible | Should Be $false
+    }
+
+    It 'apparaît dès la première ligne ajoutée' {
+        $log = New-SetupLog 0 0 200 60
+        $log.AppendText('Créé : League of Legends JP.lnk')
+        $log.Visible | Should Be $true
+    }
+
+    It 'apparaît aussi quand son texte est posé d''un bloc, et se cache s''il est vidé' {
+        $log = New-SetupLog 0 0 200 60
+        $log.Text = "- Installer Blitz`r`n- Désinstaller OP.GG"
+        $log.Visible | Should Be $true
+        $log.Text = ''
+        $log.Visible | Should Be $false
+    }
+}
+
 Describe 'Jeu d''icônes de la page Raccourcis' {
     $sets = @(@{ Name = 'classic'; Path = 'C:\x\classic' }, @{ Name = 'flat'; Path = 'C:\x\flat' })
     $allSets = @(@{ Name = 'original-badges'; Path = 'C:\x\ob' }) + $sets
@@ -303,6 +323,21 @@ Describe 'Jeu d''icônes de la page Raccourcis' {
             Get-IconSetNoteText $originalBadges | Should Be (Get-Text 'setup.shortcuts.iconSetNote.badges')
             Get-IconSetNoteText @{ Name = 'flat'; Path = 'C:\x\flat' } | Should Be ''
             Get-IconSetNoteText $null | Should Be ''
+        }
+    }
+
+    Context 'logo-badges (icône de base du jeu, sans drapeau)' {
+        $logoBadges = Find-IconSet @(Get-IconSets (Join-Path $here '..\app\ico')) 'logo-badges'
+
+        It 'donne en aperçu hex-launcher.ico du jeu, sans chercher le binaire de LoL' {
+            Mock Find-LeagueClientPath { throw 'ne doit pas être appelé' }
+            $image = New-IconSetPreviewImage $logoBadges 64
+            try { $image.Width | Should Be 64 } finally { if ($image) { $image.Dispose() } }
+        }
+
+        It 'a son libellé et sa note : logo sans drapeau, pastilles composées sur ce poste' {
+            Get-IconSetLabel $logoBadges | Should Be 'Logo HL + pastilles'
+            Get-IconSetNoteText $logoBadges | Should Be (Get-Text 'setup.shortcuts.iconSetNote.setBase')
         }
     }
 }
@@ -1187,7 +1222,7 @@ Describe 'Texte forcé de la page Raccourcis : présélection' {
     It 'coche la case quand une langue est présélectionnée' {
         (New-SetupForcedTextBox 'fr_FR' 0 0 250).Checked | Should Be $true
         (New-SetupForcedTextBox '' 0 0 250).Checked | Should Be $false
-        (New-SetupForcedTextBox '' 0 0 250).Text | Should Be 'Forcer le texte en :'
+        (New-SetupForcedTextBox '' 0 0 250).Text | Should Be 'Forcer le texte en jeu en :'
     }
 }
 

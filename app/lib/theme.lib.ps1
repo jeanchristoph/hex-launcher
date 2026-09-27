@@ -23,6 +23,7 @@ $LolTheme = @{
     Muted       = '#A09B8C'
     Accent      = '#0AC8B9'
     Danger      = '#E84057'
+    Warning     = '#F0B232'
 }
 
 function Get-ThemeColor([string]$Name) {

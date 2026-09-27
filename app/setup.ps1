@@ -216,10 +216,10 @@ function Get-PreselectedIconSetName($Config, [object[]]$Sets) {
     return ''
 }
 
-# Entrées d'aperçu d'un jeu : hex-launcher.ico pour un jeu de fichiers, l'icône du binaire installé (lue en mémoire,
-# jamais copiée) pour un jeu externe ; binaire introuvable → throw, l'aperçu reste vide
+# Entrées d'aperçu d'un jeu : hex-launcher.ico pour un jeu de fichiers ou « set-base », l'icône du binaire installé
+# (lue en mémoire, jamais copiée) pour original / original-badges ; binaire introuvable → throw, l'aperçu reste vide
 function Read-IconSetPreviewEntries($Set, [int]$Size) {
-    if (Test-IconSetExternal $Set) {
+    if (Test-IconSetFromLeagueClient $Set) {
         $exe = Find-LeagueClientPath
         if (-not $exe) { throw 'LeagueClient.exe introuvable' }
         return @(Read-ExecutableIconEntries $exe @($Size))
@@ -240,11 +240,12 @@ function New-IconSetPreviewImage($Set, [int]$Size) {
     } catch { return $null }
 }
 
-# Note sous la liste des jeux : ce qu'implique un jeu externe (icône nue → raccourcis distingués par leur nom seul ;
-# pastilles → fichier composé sur ce poste) ; vide pour un jeu de fichiers
+# Note sous la liste des jeux : ce qu'implique un jeu à source (icône nue → raccourcis distingués par leur nom seul ;
+# pastilles → fichier composé sur ce poste ; logo sans drapeau pour set-base) ; vide pour un jeu de drapeaux
 function Get-IconSetNoteText($Set) {
     $source = Get-IconSetSource $Set
     if (-not $source) { return '' }
+    if ($source.Source -eq $IconSourceSetBase) { return Get-Text 'setup.shortcuts.iconSetNote.setBase' }
     if ($source.Badges) { return Get-Text 'setup.shortcuts.iconSetNote.badges' }
     return Get-Text 'setup.shortcuts.iconSetNote.bare'
 }
@@ -380,6 +381,15 @@ function Get-CompletionSummaryLines($Config, [string]$ConfigPath, [string[]]$Sho
 }
 
 # ---------------------------------------------------------------- Journal et sûreté d'exécution
+
+# Journal d'une page : caché tant qu'il est vide (vide et sans titre, il passait pour un champ inutile — retour
+# utilisateur du 2026-09-27), visible dès qu'il reçoit du texte, par AppendText comme par .Text
+function New-SetupLog([int]$Left, [int]$Top, [int]$Width, [int]$Height) {
+    $log = New-ThemedLog $Left $Top $Width $Height
+    $log.Visible = $false
+    $log.Add_TextChanged({ $this.Visible = $this.TextLength -gt 0 })
+    return $log
+}
 
 # Ajoute une ligne au journal de la page courante (s'il y en a un) et rafraîchit la fenêtre
 function Write-SetupLog([string]$Text) {
@@ -739,7 +749,7 @@ function New-SetupAppsControls {
     $checkTop              = 50 + $controls.AppList.Height + 10
     $controls.UninstallBox = New-ThemedCheckBox (Get-Text 'companion.uninstallOthers') 0 $checkTop $width
     $controls.UninstallBox.Checked = Get-SetupPendingUninstallOthers
-    $controls.Log          = New-ThemedLog 0 ($checkTop + 62) $width ($state.Layout.ContentHeight - $checkTop - 62)
+    $controls.Log          = New-SetupLog 0 ($checkTop + 62) $width ($state.Layout.ContentHeight - $checkTop - 62)
     $controls.Inputs       = @($controls.AppList, $controls.UninstallBox)
     $controls.AppList.Add_ItemCheck({ param($sender, $e) Invoke-SetupSafely { Update-SetupCompanionSummary $e.Index ($e.NewValue -eq 'Checked') } })
     $controls.UninstallBox.Add_CheckedChanged({ Invoke-SetupSafely { Update-SetupCompanionSummary } })
@@ -801,7 +811,7 @@ function New-SetupShortcutsControls {
     $columnsTop      = 94
     $iconSetsTop     = $columnsTop + $companionHeight + 12
     $previewSize     = 64
-    $iconListHeight  = 4 * 17 + 4   # les quatre jeux livrés visibles sans défilement
+    $iconListHeight  = 5 * 17 + 4   # les cinq jeux livrés visibles sans défilement
     $forcedText      = Get-SetupForcedTextLayout $columnsTop $SetupRiotCompatibilityTop
     $controls.LocaleList    = New-SetupCheckedList (Get-LocaleListItems $state.Locales) (Get-SetupPreselection 'LocaleList' (Get-PreselectedCodes $state.Locales $state.ExistingShortcuts)) 0 $columnsTop $columnWidth $forcedText.LocaleListHeight
     $controls.CompanionList = New-SetupCheckedList (Get-ShortcutCompanionListItems $companionApps) (Get-SetupPreselection 'CompanionList' (Get-PreselectedShortcutCompanionIds $companionApps $state.ExistingShortcuts)) $rightColumn $columnsTop $columnWidth $companionHeight
@@ -816,7 +826,7 @@ function New-SetupShortcutsControls {
     $controls.ForcedTextBox     = New-SetupForcedTextBox (Get-SetupPreselectedForcedText $state) 0 $forcedText.BoxTop $columnWidth
     $controls.ForcedTextList    = New-ThemedComboBox (Get-LocaleListItems $state.Locales) (Get-SetupPreselectedForcedTextList $state) 0 $forcedText.ListTop $columnWidth
     $controls.ForcedTextWarning = New-ThemedLabel (Get-Text 'setup.shortcuts.forcedTextWarning') 0 $forcedText.WarningTop $columnWidth $forcedText.WarningHeight 'Danger' 8.25
-    $controls.Log           = New-ThemedLog 0 $compatibility.LogTop $layout.ContentWidth ($layout.ContentHeight - $compatibility.LogTop)
+    $controls.Log           = New-SetupLog 0 $compatibility.LogTop $layout.ContentWidth ($layout.ContentHeight - $compatibility.LogTop)
     $controls.Inputs        = @($controls.LocaleList, $controls.CompanionList, $controls.IconSetList, $controls.ForcedTextBox, $controls.ForcedTextList)
     $controls.IconSetList.Add_SelectedIndexChanged({ Invoke-SetupSafely { Update-SetupIconSetPreview } })
     $controls.ForcedTextBox.Add_CheckedChanged({ Invoke-SetupSafely { Update-SetupForcedTextControls } })

@@ -250,15 +250,29 @@ function Add-CompanionBadge([string]$SourceIco, $Badge, [string]$DestinationIco,
     return $DestinationIco
 }
 
-# Icône d'un binaire (lue en mémoire, jamais copiée) + pastille pays + pastille compagnon éventuelle → icône de
-# destination : le seul fichier dérivé, local au poste (ico\<jeu>\companion, hors dépôt et hors release)
-function Add-StackedBadgesToExecutableIcon([string]$ExecutablePath, [string[]]$Codes, $Badge, [string]$DestinationIco, $Style = $BadgeDefaultStyle) {
-    if ($Badge -and [string]::IsNullOrWhiteSpace($Badge.color)) { throw "Pastille compagnon invalide : couleur manquante" }
-    $entries = Read-ExecutableIconEntries $ExecutablePath
+# Entrées d'icône déjà lues + pastille pays + pastille compagnon éventuelle → icône de destination ; libère les entrées
+function Write-StackedBadgesIco([object[]]$Entries, [string[]]$Codes, $Badge, [string]$DestinationIco, $Style) {
     try {
-        foreach ($entry in $entries) { Add-StackedBadgesToBitmap $entry.Bitmap $Codes $Badge $Style }
-        Write-Ico $entries $DestinationIco
+        foreach ($entry in $Entries) { Add-StackedBadgesToBitmap $entry.Bitmap $Codes $Badge $Style }
+        Write-Ico $Entries $DestinationIco
     }
-    finally { $entries | ForEach-Object { $_.Bitmap.Dispose() } }
+    finally { $Entries | ForEach-Object { $_.Bitmap.Dispose() } }
     return $DestinationIco
+}
+
+function Assert-StackedBadge($Badge) {
+    if ($Badge -and [string]::IsNullOrWhiteSpace($Badge.color)) { throw "Pastille compagnon invalide : couleur manquante" }
+}
+
+# Icône d'un binaire (lue en mémoire, jamais copiée) + pastilles → icône de destination : le seul fichier dérivé,
+# local au poste (ico\<jeu>\companion, hors dépôt et hors release)
+function Add-StackedBadgesToExecutableIcon([string]$ExecutablePath, [string[]]$Codes, $Badge, [string]$DestinationIco, $Style = $BadgeDefaultStyle) {
+    Assert-StackedBadge $Badge
+    return Write-StackedBadgesIco @(Read-ExecutableIconEntries $ExecutablePath) $Codes $Badge $DestinationIco $Style
+}
+
+# Même composition sur un .ico (icône de base d'un jeu « set-base », sans drapeau)
+function Add-StackedBadgesToIco([string]$SourceIco, [string[]]$Codes, $Badge, [string]$DestinationIco, $Style = $BadgeDefaultStyle) {
+    Assert-StackedBadge $Badge
+    return Write-StackedBadgesIco @(Read-IcoEntries $SourceIco) $Codes $Badge $DestinationIco $Style
 }

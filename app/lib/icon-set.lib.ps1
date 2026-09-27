@@ -19,20 +19,26 @@
     nightVeil → voile bleu nuit des drapeaux ; reducedPalette → couleurs ramenées à la palette réduite des drapeaux
     (avant le voile). Fichier ou clé absents → couleurs brutes du catalogue.
 
-    Jeu externe : un dossier sans aucun .ico, reconnu par le marqueur icon-source.json :
+    Jeu à source, reconnu par le marqueur icon-source.json :
         { "source": "league-client", "badges": false }
-    source → l'icône vient du binaire installé de League of Legends (LeagueClient.exe, référencée, jamais copiée
-    dans le projet) ; badges → pastilles pays et compagnon composées dessus, dans ico\<jeu>\companion (fichier
-    dérivé local au poste, hors dépôt et hors release). Jeux livrés : original (nue) et original-badges.
+    source → d'où vient l'icône de fond de tous les raccourcis :
+        league-client : le binaire installé de League of Legends (LeagueClient.exe, référencée, jamais copiée dans
+                        le projet ; dossier sans aucun .ico) — jeux livrés original (nue) et original-badges ;
+        set-base      : l'icône de base du jeu lui-même (hex-launcher.ico), sans drapeau — jeu livré logo-badges.
+    badges → pastilles pays et compagnon composées dessus, dans ico\<jeu>\companion (fichier dérivé local au poste,
+    hors dépôt et hors release).
 #>
 
 $DefaultIconSetName    = 'flat'                 # repli technique : seul jeu garanti d'avoir tous ses .ico
 $PreferredIconSetName  = 'original-badges'      # présélection d'une installation neuve (choix utilisateur, 2026-09-20)
-$IconSetDisplayOrder   = @('original-badges', 'original', 'classic', 'flat')
+$IconSetDisplayOrder   = @('original-badges', 'original', 'logo-badges', 'classic', 'flat')
 $IconSetBaseIcon       = 'hex-launcher.ico'
+$IconSetGreenBaseIcon  = 'hex-launcher-green.ico'   # même logo sur fond vert : la paire isole le logo (icône coupée)
 $IconSetBadgeStyleFile = 'badge-style.json'
 $IconSetSourceFile     = 'icon-source.json'
-$IconSourceLeagueClient = 'league-client'   # seule source externe connue
+$IconSourceLeagueClient = 'league-client'   # icône de LeagueClient.exe
+$IconSourceSetBase      = 'set-base'        # hex-launcher.ico du jeu, sans drapeau
+$IconSources            = @($IconSourceLeagueClient, $IconSourceSetBase)
 
 function Test-IconSetFolder([string]$Folder) {
     return (Test-Path (Join-Path $Folder $IconSetBaseIcon)) -or (Test-Path (Join-Path $Folder $IconSetSourceFile))
@@ -103,16 +109,16 @@ function Get-IconSetBadgeStyle($Set) {
     return $style
 }
 
-# Source externe du jeu : @{ Source = 'league-client'; Badges = [bool] }, ou $null pour un jeu de fichiers .ico ;
-# marqueur illisible ou source inconnue → $null avec avertissement, le jeu est alors traité comme un jeu de fichiers
+# Source du jeu : @{ Source = 'league-client' | 'set-base'; Badges = [bool] }, ou $null pour un jeu de drapeaux .ico ;
+# marqueur illisible ou source inconnue → $null avec avertissement, le jeu est alors traité comme un jeu de drapeaux
 function Get-IconSetSource($Set) {
     if (-not $Set) { return $null }
     $path = Get-IconSetFilePath $Set $IconSetSourceFile
     if (-not (Test-Path $path)) { return $null }
     try {
         $json = Get-Content -Path $path -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json
-        if ([string]$json.source -ne $IconSourceLeagueClient) { throw "source inconnue : '$($json.source)'" }
-        return @{ Source = $IconSourceLeagueClient; Badges = [bool]$json.badges }
+        if ([string]$json.source -notin $IconSources) { throw "source inconnue : '$($json.source)'" }
+        return @{ Source = [string]$json.source; Badges = [bool]$json.badges }
     } catch {
         Write-Warning "$IconSetSourceFile invalide dans le jeu $($Set.Name) ($($_.Exception.Message)) — jeu ignoré comme source externe"
         return $null
@@ -121,6 +127,12 @@ function Get-IconSetSource($Set) {
 
 function Test-IconSetExternal($Set) {
     return [bool](Get-IconSetSource $Set)
+}
+
+# Le fond des raccourcis vient de LeagueClient.exe (original, original-badges) plutôt que d'un .ico du jeu
+function Test-IconSetFromLeagueClient($Set) {
+    $source = Get-IconSetSource $Set
+    return [bool]$source -and $source.Source -eq $IconSourceLeagueClient
 }
 
 # Le jeu donné, ou à défaut le jeu par défaut « attendu » (dossier ico\flat, même absent) : jamais $null

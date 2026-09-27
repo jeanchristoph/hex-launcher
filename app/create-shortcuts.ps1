@@ -245,12 +245,22 @@ function Get-LeagueClientPath {
 }
 
 # Binaire introuvable → icônes du jeu par défaut, l'installation aboutit toujours ; « original » référence l'icône
-# du binaire telle quelle (IconLocation = <exe>,0) ; « original-badges » compose les pastilles dessus
+# du binaire telle quelle (IconLocation = <exe>,0) ; « original-badges » compose les pastilles dessus ; un jeu
+# « set-base » (logo-badges) les compose sur sa propre icône de base
 function Resolve-ExternalIconPath($Combination, $Source) {
+    if ($Source.Source -eq $IconSourceSetBase) { return Resolve-SetBaseIconPath $Combination $Source }
     $exe = Get-LeagueClientPath
     if (-not $exe) { return Resolve-FileIconPath $Combination }
     if (-not $Source.Badges) { return $exe }
-    return Resolve-StackedIconPath $Combination $exe
+    return Resolve-StackedIconPath $Combination ([pscustomobject]@{ Path = $exe; IsExecutable = $true })
+}
+
+# Icône de base du jeu courant, sans drapeau ; absente → échelle de repli des jeux de fichiers
+function Resolve-SetBaseIconPath($Combination, $Source) {
+    $base = Get-IconSetFilePath (Get-ActiveIconSet) $IconSetBaseIcon
+    if (-not (Test-Path $base)) { return Resolve-FileIconPath $Combination }
+    if (-not $Source.Badges) { return $base }
+    return Resolve-StackedIconPath $Combination ([pscustomobject]@{ Path = $base; IsExecutable = $false })
 }
 
 # ja_JP → hex-launcher-jp ; + texte fr_FR → hex-launcher-jp-fr ; + blitz → hex-launcher-jp-fr-blitz : tige des
@@ -280,17 +290,20 @@ function Get-CombinationBadge($Combination) {
     return (Get-CompanionBadges)[$Combination.Companion.id]
 }
 
-# Icône du binaire + pastille pays + pastille compagnon éventuelle, recomposée à chaque exécution ; échec → icône nue
-function Resolve-StackedIconPath($Combination, [string]$Exe) {
+# Icône de fond + pastille pays + pastille compagnon éventuelle, recomposée à chaque exécution ; échec → icône nue.
+# $Background = { Path, IsExecutable } : LeagueClient.exe (lu en mémoire) ou l'icône de base d'un jeu « set-base »
+function Resolve-StackedIconPath($Combination, $Background) {
     $badge = Get-CombinationBadge $Combination
     try {
         New-Item -ItemType Directory -Path $companionIconFolder -Force | Out-Null
         $target = Get-StackedIconPath $Combination $badge
         Remove-StaleIconVariants (Get-CombinationIconStem $Combination) $target
-        return Add-StackedBadgesToExecutableIcon $Exe (Get-CombinationCountryCodes $Combination) $badge $target (Get-ActiveBadgeStyle)
+        $codes = Get-CombinationCountryCodes $Combination
+        if ($Background.IsExecutable) { return Add-StackedBadgesToExecutableIcon $Background.Path $codes $badge $target (Get-ActiveBadgeStyle) }
+        return Add-StackedBadgesToIco $Background.Path $codes $badge $target (Get-ActiveBadgeStyle)
     } catch {
         Write-Warning (Get-Text 'shortcuts.iconNotStacked' $Combination.Name, $_.Exception.Message)
-        return $Exe
+        return $Background.Path
     }
 }
 
@@ -303,6 +316,15 @@ function Get-SplitIconPath($Combination, $Badge) {
     return Join-Path $companionIconFolder "$(Get-CombinationIconStem $Combination)-$signature.ico"
 }
 
+# Les deux icônes de base du jeu courant (fond bleu, fond vert), qui gardent logo et cadre au-dessus du trait ;
+# $null si l'une manque : trait par-dessus tout
+function Get-SplitForegroundSources {
+    $folder = Get-IconSetFolder (Get-ActiveIconSet)
+    $paths = @((Join-Path $folder $IconSetBaseIcon), (Join-Path $folder $IconSetGreenBaseIcon))
+    foreach ($path in $paths) { if (-not (Test-Path $path)) { return $null } }
+    return $paths
+}
+
 # Drapeau des voix en haut à gauche, drapeau du texte en bas à droite, pastille compagnon par-dessus ; recomposée à
 # chaque exécution. Échec → icône de la langue des voix, comme un raccourci normal : l'installation aboutit toujours
 function Resolve-SplitIconPath($Combination) {
@@ -311,7 +333,8 @@ function Resolve-SplitIconPath($Combination) {
         New-Item -ItemType Directory -Path $companionIconFolder -Force | Out-Null
         $target = Get-SplitIconPath $Combination $badge
         Remove-StaleIconVariants (Get-CombinationIconStem $Combination) $target
-        Merge-DiagonalSplitIco ([pscustomobject]@{ Upper = (Resolve-IconPath $Combination.Code); Lower = (Resolve-IconPath $Combination.TextCode); Destination = $target }) | Out-Null
+        Merge-DiagonalSplitIco ([pscustomobject]@{ Upper = (Resolve-IconPath $Combination.Code); Lower = (Resolve-IconPath $Combination.TextCode)
+                                                   Destination = $target; Foreground = (Get-SplitForegroundSources) }) | Out-Null
         if ($badge) { Add-CompanionBadge $target $badge $target (Get-ActiveBadgeStyle) | Out-Null }
         return $target
     } catch {

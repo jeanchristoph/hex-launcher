@@ -265,6 +265,25 @@ Describe 'Resolve-ShortcutIconPath, texte forcé' {
             } finally { Set-ActiveIconSet '' | Out-Null }
         }
 
+        It 'passe les deux icônes de base du jeu (fond bleu, fond vert) pour garder le logo au-dessus du trait' {
+            Set-ActiveIconSet 'flat' | Out-Null
+            try {
+                Resolve-ShortcutIconPath (New-ShortcutCombination 'ja_JP' $null 'fr_FR') | Out-Null
+                Assert-MockCalled Merge-DiagonalSplitIco -Scope It -Exactly 1 -ParameterFilter {
+                    @($Split.Foreground).Count -eq 2 -and $Split.Foreground[0] -match 'ico\\flat\\hex-launcher\.ico$' -and $Split.Foreground[1] -match 'ico\\flat\\hex-launcher-green\.ico$'
+                }
+            } finally { Set-ActiveIconSet '' | Out-Null }
+        }
+
+        It 'ne passe aucune icône de base quand l''icône verte manque (trait par-dessus tout)' {
+            Set-ActiveIconSet 'flat' | Out-Null
+            Mock Test-Path { $Path -notmatch 'hex-launcher-green\.ico$' } -ParameterFilter { $Path -match 'hex-launcher(-green)?\.ico$' }
+            try {
+                Resolve-ShortcutIconPath (New-ShortcutCombination 'ja_JP' $null 'fr_FR') | Out-Null
+                Assert-MockCalled Merge-DiagonalSplitIco -Scope It -Exactly 1 -ParameterFilter { $null -eq $Split.Foreground }
+            } finally { Set-ActiveIconSet '' | Out-Null }
+        }
+
         It 'ne pose pas de pastille sans compagnon' {
             Set-ActiveIconSet 'flat' | Out-Null
             try {
@@ -302,6 +321,47 @@ Describe 'Resolve-ShortcutIconPath, texte forcé' {
                 Resolve-ShortcutIconPath (New-ShortcutCombination 'ja_JP' $blitz 'fr_FR') | Should Match 'ico\\original-badges\\companion\\hex-launcher-jp-fr-blitz-[0-9a-f]{8}\.ico$'
                 Assert-MockCalled Add-StackedBadgesToExecutableIcon -Scope It -Exactly 1 -ParameterFilter { ($Codes -join ',') -eq 'ja_JP,fr_FR' }
             } finally { Set-ActiveIconSet '' | Out-Null; $script:LeagueClientPath = $null }
+        }
+    }
+
+    Context 'logo-badges : pastilles sur l''icône de base du jeu, sans drapeau ni binaire LoL' {
+        $script:CompanionBadges = @{ blitz = $badge }
+        Mock New-Item {}
+        Mock Add-StackedBadgesToIco { param($SourceIco, $Codes, $Badge, $DestinationIco, $Style) $DestinationIco }
+        Mock Add-StackedBadgesToExecutableIcon { throw 'ne doit pas être appelé' }
+        Mock Find-LeagueClientPath { throw 'ne doit pas être appelé' }
+
+        It 'compose la pastille pays coupée et la pastille compagnon sur hex-launcher.ico du jeu' {
+            Set-ActiveIconSet 'logo-badges' | Out-Null
+            try {
+                Resolve-ShortcutIconPath (New-ShortcutCombination 'ja_JP' $blitz 'fr_FR') | Should Match 'ico\\logo-badges\\companion\\hex-launcher-jp-fr-blitz-[0-9a-f]{8}\.ico$'
+                Assert-MockCalled Add-StackedBadgesToIco -Scope It -Exactly 1 -ParameterFilter {
+                    $SourceIco -match 'ico\\logo-badges\\hex-launcher\.ico$' -and ($Codes -join ',') -eq 'ja_JP,fr_FR' -and $Badge.glyph -eq 'B'
+                }
+            } finally { Set-ActiveIconSet '' | Out-Null }
+        }
+
+        It 'pose la seule pastille pays sur un raccourci sans compagnon' {
+            Set-ActiveIconSet 'logo-badges' | Out-Null
+            try {
+                Resolve-ShortcutIconPath (New-ShortcutCombination 'fr_FR' $null) | Should Match 'hex-launcher-fr-[0-9a-f]{8}\.ico$'
+                Assert-MockCalled Add-StackedBadgesToIco -Scope It -Exactly 1 -ParameterFilter { ($Codes -join ',') -eq 'fr_FR' -and $null -eq $Badge }
+            } finally { Set-ActiveIconSet '' | Out-Null }
+        }
+    }
+
+    Context 'logo-badges : composition en échec' {
+        $script:CompanionBadges = @{}
+        Mock New-Item {}
+        Mock Add-StackedBadgesToIco { throw 'GDI+ indisponible' }
+        Mock Write-Warning {}
+
+        It 'rend l''icône de base nue avec un avertissement' {
+            Set-ActiveIconSet 'logo-badges' | Out-Null
+            try {
+                Resolve-ShortcutIconPath (New-ShortcutCombination 'ja_JP' $null) | Should Match 'ico\\logo-badges\\hex-launcher\.ico$'
+                Assert-MockCalled Write-Warning -Scope It -Exactly 1
+            } finally { Set-ActiveIconSet '' | Out-Null }
         }
     }
 

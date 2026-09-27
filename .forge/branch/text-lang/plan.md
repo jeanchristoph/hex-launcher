@@ -73,14 +73,50 @@
 **Effort:** M
 **Files:** aucun code prévu — résultats dans `log.md`, corrections éventuelles en tâches à part
 **Description:** Un lancement toutes les 5 min, arrêt au premier avertissement Vanguard ; installation remise d'origine à la fin (fichiers ja_JP d'origine, sans marqueur).
-[ ] T11.1 — Setup de bout en bout (par l'utilisateur) : cocher « Forcer le texte en », créer les raccourcis sur le Bureau, vérifier `forcedTextLocale` dans `config.json`.
-[ ] T11.2 — Démarrage manuel avec texte forcé : attente du clic sur Jouer, puis de la vérification, puis pose.
-[ ] T11.3 — Texte CJK sur voix latine : voix FR + texte JA, police japonaise en partie (~3,5 Go de voix FR téléchargés par Riot).
-[ ] T11.4 — Icônes flat et classic sur de vrais raccourcis.
-[ ] T11.5 — JP-FR avec appli compagnon (Porofessor lancé après la pose).
+[x] T11.1 — Setup de bout en bout (par l'utilisateur) : cocher « Forcer le texte en », créer les raccourcis sur le Bureau, vérifier `forcedTextLocale` dans `config.json`.
+  → Fait par l'utilisateur : raccourcis « Hex Launcher » et « League of Legends JP-FR - Porofessor » posés à 13:41:18, `forcedTextLocale = fr_FR`, pastille coupée (original-badges).
+[x] T11.2 — Démarrage manuel avec texte forcé : attente du clic sur Jouer, puis de la vérification, puis pose.
+  → 20:52 (-NoLocalApi) : client ouvert au clic (20:53:38), Login +7,9 s, up to date +10,5 s, pose 20:53:49.
+[x] T11.3 — Texte CJK sur voix latine : voix FR + texte JA, police japonaise en partie (~3,5 Go de voix FR téléchargés par Riot).
+  → 21:02 : voix FR téléchargées (~70 s), pose ja_JP sur fr_FR 21:04:10 ; partie d'entraînement : texte japonais correct. `Common.fr_FR` non remplacé, sans effet visible.
+[x] T11.4 — Icônes flat et classic sur de vrais raccourcis.
+  → Raccourcis JP-FR / FR + Porofessor en dossier temporaire (config.json restauré) : coupe diagonale et pastille P lisibles de 256 à 16 px.
+[x] T11.5 — JP-FR avec appli compagnon (Porofessor lancé après la pose).
+  → Essai de 13:41 : pose 13:41:37, Porofessor lancé 13:41:39.
 [ ] T11.6 — Si l'occasion se présente : patch Riot entre pose et restauration (retéléchargement, purge du cache) ; restauration pendant une partie en cours (fichier verrouillé, marqueur conservé).
-[ ] T11.7 — Confirmer que VAN 216 se lève sans redémarrage de Windows, avant de corriger le README et l'avertissement du splash.
-[ ] T11.8 — Trois lancements JP normaux consécutifs (sans marqueur), un toutes les 5 min, sous surveillance `FileSystemWatcher` des `.wad.client` (script : scratchpad `watch-launch.ps1`, à versionner dans `tools/` si retenu) : zéro écriture, empreintes inchangées, aucune ligne `TEXT` ; comparer le déroulé de `launch.log` à un lancement d'avant la branche (ex. 2026-09-23 23:16). Déjà fait une fois le 2026-09-27 à 14:20 : 0 écriture.
+[!] T11.7 — Confirmer que VAN 216 se lève sans redémarrage de Windows, avant de corriger le README et l'avertissement du splash.
+  → Non concluant, arrêté par l'utilisateur : provoqué à 21:18:30, toujours présent à 21:23:50 après ~5 min sans démarrage (levé en 5 min à 14:14). Textes « redémarrez Windows » conservés.
+[x] T11.8 — Trois lancements JP normaux consécutifs (sans marqueur), un toutes les 5 min, sous surveillance `FileSystemWatcher` des `.wad.client` (script : scratchpad `watch-launch.ps1`, à versionner dans `tools/` si retenu) : zéro écriture, empreintes inchangées, aucune ligne `TEXT` ; comparer le déroulé de `launch.log` à un lancement d'avant la branche (ex. 2026-09-23 23:16). Déjà fait une fois le 2026-09-27 à 14:20 : 0 écriture.
+  → 20:57 et 20:58 sous `tools/watch-launch.ps1` (horodatage `TimeGenerated`) : 0 écriture, empreintes 8E3F/24F9 inchangées, aucune ligne TEXT, déroulé identique au 23/09. Restauration de 20:54 : 6 événements, tous de la copie.
+[x] T11.9 — Message d'abandon en démarrage manuel : durée réelle au lieu des 600 s fixes (13:14 : croix à +17 s journalisée « 600 s ») ; `launch-lol.ps1` + test. XS.
+  → `Wait-ForcedTextClient` (durée réelle, sur le modèle de `Wait-ForcedTextWindow`) ; 1 test.
+
+### T12 — Splash : ligne « MODIFIED GAME FILES » en mode texte forcé
+**Effort:** XS
+**Files:** `app/launch-lol.ps1`, `app/lib/splash.lib.ps1`, `app/lib/theme.lib.ps1`, `tests/launch-lol.tests.ps1`, `tests/splash.lib.tests.ps1`
+**Description:** Quand le texte diffère des voix, le splash affiche sous le titre doré une ligne jaune « MODIFIED GAME FILES » (formulation choisie parmi 4, dont NOT SAFE MODE). Lancement normal inchangé.
+[x] Couleur `Warning` #F0B232 dans le thème ; `New-SplashWindow -Warning` (bande de titre de 60 px partagée : titre ancré en bas, ligne jaune en haut, hauteur inchangée ; absente si vide) ; langue du texte dans la ligne jaune, nom natif : « MODIFIED GAME FILES — TEXT: 日本語 » (tient jusqu'à « English (Philippines) ») ; vu en lancement réel ; `Add-SplashControls` prend un objet { Title, Subtitle, Warning } ; `Get-LaunchSplashWarning` ; rendu hors écran vérifié ; 3 tests, suite 872/872.
+
+### T13 — Icône coupée : logo HL et cadre au-dessus du trait noir
+**Effort:** M
+**Files:** `app/lib/icon-split.lib.ps1`, `app/lib/icon-set.lib.ps1`, `app/create-shortcuts.ps1`, `tests/icon-split.lib.tests.ps1`, `tests/create-shortcuts.tests.ps1`
+**Description:** Masque « logo + cadre » tiré des deux icônes de base du jeu (fond bleu, fond vert), bord adouci entre deux seuils ; sur la bande du trait, le premier plan reprend sa valeur d'avant le trait. Jeu sans icône verte : trait par-dessus tout. original-badges non concerné.
+[x] `Join-DiagonalHalves` + `Add-DiagonalLine` (masque calculé sur la seule bande du trait) ; seuils 40 → 90 dans `$DiagonalSplit` (empreinte changée → icônes refaites) ; `Get-SplitForegroundSources` ; rendu flat et classic validé par l'utilisateur ; 9 tests, suite 881/881.
+
+### T14 — Nouveau jeu d'icônes « logo HL + pastilles »
+**Effort:** L
+**Files:** `tools/make-logo-icon.ps1`, `app/ico/logo-badges/`, `app/lib/icon-set.lib.ps1`, `app/lib/icon-badge.lib.ps1`, `app/create-shortcuts.ps1`, `app/setup.ps1`, `app/i18n/{fr,en,ja}.json`, tests associés, README ×3
+**Description:** Logo HL du SVG sans cadre ni fond, agrandi, fond transparent ; pas de drapeau : pastille pays (coupée en texte forcé) + pastille compagnon comme original-badges. Nouvelle source « base du jeu » dans icon-source.json.
+[x] T14.1 — Générateur `tools/make-logo-icon.ps1` : SVG sans le groupe `frame`, viewBox resserré sur l'emprise du logo (centré ou calé en bas), rendu resvg 256 → 16 px dans `app/ico/logo-badges/hex-launcher.ico` ; tests des fonctions pures.
+  → 9 tests ; icône générée (resvg) dans `app/ico/logo-badges/hex-launcher.ico`.
+[x] T14.2 — Placement tranché par l'utilisateur sur rendu (centré / calé en bas).
+  → Calé en bas (recommandation acceptée : la pastille pays occupe l'espace libre) ; défaut du générateur.
+[x] T14.3 — Source « base du jeu » : `icon-source.json`, `Get-IconSetSource`, pose des pastilles sur l'.ico du jeu (simple, pile, coupée), repli ; tests.
+  → `Test-IconSetFromLeagueClient`, `Add-StackedBadgesToIco`, `Resolve-SetBaseIconPath`, `Resolve-StackedIconPath` prend { Path, IsExecutable } ; ordre d'affichage : après original ; suite 898/898.
+[x] T14.4 — Setup : jeu dans la liste et l'aperçu, libellé FR validé puis EN/JA.
+  → « Logo HL + pastilles », note `iconSetNote.setBase` ; aperçu = hex-launcher.ico du jeu (`Test-IconSetFromLeagueClient`) ; raccourcis réels en dossier temporaire vérifiés ; suite 900/900.
+[x] T14.5 — README ×3 (FR validé d'abord) + project.md.
+  → FR validé, EN/JA par agent ; outils make-logo-icon.ps1 et watch-launch.ps1 cités.
 
 ## Risks
 - Vanguard / ToS (§7.1) : fichier Riot signé mais échange de .wad non autorisé — avertissement rouge + clause README.
@@ -111,4 +147,7 @@ None
 | T9 — Documentation | S | [x] |
 | T10 — Pose après la vérification du client | M | [x] |
 | T11 — Essais réels restants | M | [ ] |
+| T12 — Splash « MODIFIED GAME FILES » | XS | [x] |
+| T13 — Logo au-dessus du trait | M | [x] |
+| T14 — Jeu « logo HL + pastilles » | L | [x] |
 | **Total** | **≈ 4–6 j** | |

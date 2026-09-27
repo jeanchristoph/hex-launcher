@@ -39,19 +39,38 @@ function New-SplashRule {
     return $rule
 }
 
+# Bande du titre : 60 px. Avec un avertissement, le titre en prend le haut et la ligne jaune s'y colle dessous —
+# la hauteur du splash ne change pas
+$SplashTitleBandHeight = 60
+$SplashWarningHeight   = 24
+
 # Titre, sous-titre, filet et ligne de statut, du bas vers le haut : Dock 'Top' empile dans l'ordre inverse d'ajout.
 # Les variables locales ne reprennent jamais le nom d'un paramètre : PowerShell ignore la casse, et assigner un Label
 # à $Title ([string]) le convertirait en texte — c'est ce qui a privé le splash de son titre jusqu'en 0.2.0.
 # La ligne de statut est rangée dans Tag pour qu'Update-SplashStatus la retrouve sans variable globale.
-function Add-SplashControls($Form, [string]$SubtitleText, [string]$TitleText) {
-    $titleLabel    = New-SplashLabel $TitleText    (New-ThemeFont 16 'Bold') 'Gold'  'Top'  60
-    $subtitleLabel = New-SplashLabel $SubtitleText (New-ThemeFont 12)        'Cream' 'Top'  30
-    $statusLabel   = New-SplashLabel ''            (New-ThemeFont 9)         'Muted' 'Fill' 0
-    $Form.Controls.AddRange([System.Windows.Forms.Control[]]@($statusLabel, (New-SplashRule), $subtitleLabel, $titleLabel))
-    $Form.Tag = $statusLabel
+# $Texts = { Title, Subtitle, Warning } — Warning facultatif : ligne jaune sous le titre, absente si vide.
+function Add-SplashControls($Form, $Texts) {
+    $controls = New-Object Collections.Generic.List[System.Windows.Forms.Control]
+    $controls.Add((New-SplashLabel '' (New-ThemeFont 9) 'Muted' 'Fill' 0))
+    $controls.Add((New-SplashRule))
+    $controls.Add((New-SplashLabel $Texts.Subtitle (New-ThemeFont 12) 'Cream' 'Top' 30))
+    if (-not $Texts.Warning) { $controls.Add((New-SplashLabel $Texts.Title (New-ThemeFont 16 'Bold') 'Gold' 'Top' $SplashTitleBandHeight)) }
+    else { $controls.AddRange([System.Windows.Forms.Control[]]@(New-SplashTitleWithWarning $Texts)) }
+    $Form.Controls.AddRange($controls.ToArray())
+    $Form.Tag = $controls[0]
 }
 
-function New-SplashWindow([string]$Subtitle, [string]$Title = 'LEAGUE OF LEGENDS') {
+# Rend { ligne jaune, titre } dans l'ordre d'ajout de Add-SplashControls : titre ancré en bas de sa part de bande,
+# ligne jaune ancrée en haut de la sienne, pour qu'ils se touchent
+function New-SplashTitleWithWarning($Texts) {
+    $warningLabel = New-SplashLabel $Texts.Warning (New-ThemeFont 11 'Bold') 'Warning' 'Top' $SplashWarningHeight
+    $warningLabel.TextAlign = 'TopCenter'
+    $titleLabel = New-SplashLabel $Texts.Title (New-ThemeFont 16 'Bold') 'Gold' 'Top' ($SplashTitleBandHeight - $SplashWarningHeight)
+    $titleLabel.TextAlign = 'BottomCenter'
+    return @($warningLabel, $titleLabel)
+}
+
+function New-SplashWindow([string]$Subtitle, [string]$Title = 'LEAGUE OF LEGENDS', [string]$Warning = '') {
     $form                 = New-Object System.Windows.Forms.Form
     $form.FormBorderStyle = 'None'
     $form.StartPosition   = 'CenterScreen'
@@ -60,7 +79,7 @@ function New-SplashWindow([string]$Subtitle, [string]$Title = 'LEAGUE OF LEGENDS
     $form.TopMost         = $true
     $form.ShowInTaskbar   = $false
 
-    Add-SplashControls $form $Subtitle $Title
+    Add-SplashControls $form ([pscustomobject]@{ Title = $Title; Subtitle = $Subtitle; Warning = $Warning })
     $form.Show()
     Invoke-SplashTick
     return $form

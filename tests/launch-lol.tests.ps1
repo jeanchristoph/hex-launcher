@@ -1016,6 +1016,16 @@ Describe 'Test-ForcedTextRequested' {
     }
 }
 
+Describe 'Get-LaunchSplashWarning' {
+    It 'signale en mode texte forcé que des fichiers du jeu sont remplacés, avec la langue du texte' {
+        Get-LaunchSplashWarning '日本語' | Should Be 'MODIFIED GAME FILES — TEXT: 日本語'
+    }
+
+    It 'n''ajoute aucune ligne en lancement normal' {
+        Get-LaunchSplashWarning '' | Should Be ''
+    }
+}
+
 Describe 'Get-LeagueFolder' {
     It 'rend le dossier de LeagueClient.exe' {
         Mock Find-LeagueClientPath { 'C:\Riot Games\League of Legends\LeagueClient.exe' }
@@ -1108,6 +1118,13 @@ Describe 'Complete-ForcedTextLaunch' {
             Mock Install-ForcedTextAtLaunch { $true }
             Complete-ForcedTextLaunch (New-ForcedTextContext 'legacy') | Should Be 'skipped'
             Assert-MockCalled Install-ForcedTextAtLaunch -Scope It -Exactly 0
+        }
+
+        It 'journalise la durée réelle de l''attente, pas l''échéance (croix du splash à +17 s, 2026-09-27 13:14)' {
+            Mock Wait-GameClientStart { $false }
+            Mock Format-LaunchLogDuration { '17,3s' }
+            Complete-ForcedTextLaunch (New-ForcedTextContext 'legacy') | Out-Null
+            Assert-MockCalled Write-LaunchLogLine -Scope It -Exactly 1 -ParameterFilter { $Detail -eq 'abandon — aucun client de jeu après 17,3s de démarrage manuel' }
         }
     }
 

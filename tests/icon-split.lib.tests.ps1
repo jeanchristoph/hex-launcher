@@ -34,6 +34,29 @@ function New-TestIco([string]$Name, [string]$Color, [int[]]$Sizes) {
     return $path
 }
 
+# Faux logo : disque doré au centre, posé sur l'image (il traverse la diagonale)
+function Add-TestLogo([System.Drawing.Bitmap]$Bitmap) {
+    $g = [System.Drawing.Graphics]::FromImage($Bitmap)
+    $brush = New-Object System.Drawing.SolidBrush([System.Drawing.ColorTranslator]::FromHtml('#F0B232'))
+    $radius = $Bitmap.Width / 4
+    $g.FillEllipse($brush, [float]($Bitmap.Width / 2 - $radius), [float]($Bitmap.Height / 2 - $radius), [float](2 * $radius), [float](2 * $radius))
+    $brush.Dispose(); $g.Dispose()
+    return $Bitmap
+}
+
+function New-TestLogoIco([string]$Name, [string]$Color, [int[]]$Sizes) {
+    $path = Join-Path $TestDrive "$Name.ico"
+    $entries = @($Sizes | ForEach-Object { [pscustomobject]@{ Size = $_; Bitmap = (Add-TestLogo (New-TestSquare $_ $Color)) } })
+    Write-Ico $entries $path
+    $entries | ForEach-Object { $_.Bitmap.Dispose() }
+    return $path
+}
+
+function Test-BlackPixel([System.Drawing.Bitmap]$Bitmap, [int]$X, [int]$Y) {
+    $pixel = $Bitmap.GetPixel($X, $Y)
+    return [Math]::Max($pixel.R, [Math]::Max($pixel.G, $pixel.B)) -lt 64
+}
+
 Describe 'Add-DiagonalSplitToBitmap' {
     $upper = New-TestSquare 64 '#BC002D'   # voix : rouge
     $lower = New-TestSquare 64 '#002395'   # texte : bleu
@@ -100,10 +123,64 @@ Describe 'Merge-DiagonalSplitIco' {
     }
 }
 
+Describe 'Merge-DiagonalSplitIco — logo au-dessus du trait' {
+    $voice = New-TestLogoIco 'voix-logo' '#BC002D' @(64, 16)
+    $text  = New-TestLogoIco 'texte-logo' '#002395' @(64, 16)
+    $blue  = New-TestLogoIco 'base-bleue' '#1F3F7A' @(64, 16)
+    $green = New-TestLogoIco 'base-verte' '#077A2F' @(64, 16)
+
+    It 'laisse le logo intact là où la diagonale le traverse' {
+        $destination = Join-Path $TestDrive 'coupee-logo.ico'
+        Merge-DiagonalSplitIco ([pscustomobject]@{ Upper = $voice; Lower = $text; Destination = $destination; Foreground = @($blue, $green) }) | Out-Null
+        $entries = Read-IcoEntries $destination
+        try { Get-PixelHex $entries[0].Bitmap 32 31 | Should Be 'FFF0B232' }
+        finally { $entries | ForEach-Object { $_.Bitmap.Dispose() } }
+    }
+
+    It 'trace toujours le trait sur le fond, hors du logo' {
+        $destination = Join-Path $TestDrive 'coupee-fond.ico'
+        Merge-DiagonalSplitIco ([pscustomobject]@{ Upper = $voice; Lower = $text; Destination = $destination; Foreground = @($blue, $green) }) | Out-Null
+        $entries = Read-IcoEntries $destination
+        try { Test-BlackPixel $entries[0].Bitmap 14 49 | Should Be $true }
+        finally { $entries | ForEach-Object { $_.Bitmap.Dispose() } }
+    }
+
+    It 'passe le trait par-dessus le logo sans icônes de base (jeu sans icône verte)' {
+        $destination = Join-Path $TestDrive 'coupee-sans-base.ico'
+        Merge-DiagonalSplitIco ([pscustomobject]@{ Upper = $voice; Lower = $text; Destination = $destination; Foreground = $null }) | Out-Null
+        $entries = Read-IcoEntries $destination
+        try { Test-BlackPixel $entries[0].Bitmap 32 31 | Should Be $true }
+        finally { $entries | ForEach-Object { $_.Bitmap.Dispose() } }
+    }
+}
+
+Describe 'Get-ForegroundWeight' {
+    # Un pixel : B, G, R, A
+    function New-PixelPair([byte[]]$First, [byte[]]$Second) {
+        return [pscustomobject]@{ First = [pscustomobject]@{ Bytes = $First }; Second = [pscustomobject]@{ Bytes = $Second } }
+    }
+
+    It 'compte en premier plan un pixel identique sur les deux fonds' {
+        Get-ForegroundWeight (New-PixelPair @(50, 178, 240, 255) @(50, 178, 240, 255)) 0 | Should Be 1
+    }
+
+    It 'compte en fond un pixel qui change franchement avec la couleur du fond' {
+        Get-ForegroundWeight (New-PixelPair @(122, 63, 31, 255) @(47, 122, 7, 255)) 0 | Should Be 0
+    }
+
+    It 'fond à mi-chemin entre les deux seuils' {
+        Get-ForegroundWeight (New-PixelPair @(100, 100, 100, 255) @(165, 100, 100, 255)) 0 | Should Be 0.5
+    }
+
+    It 'ne protège rien là où les deux icônes sont transparentes' {
+        Get-ForegroundWeight (New-PixelPair @(0, 0, 0, 0) @(0, 0, 0, 0)) 0 | Should Be 0
+    }
+}
+
 Describe 'Get-DiagonalSplitKey' {
     It 'change dès qu''un réglage du trait change' {
         $before = Get-DiagonalSplitKey
-        $DiagonalSplit = @{ LineWidth = 0.05; MinLineWidth = 1.0; LineColor = '#000000' }
+        $DiagonalSplit = @{ LineWidth = 0.05; MinLineWidth = 1.0; LineColor = '#000000'; ForegroundTolerance = 40; BackgroundTolerance = 90 }
         Get-DiagonalSplitKey | Should Not Be $before
     }
 }

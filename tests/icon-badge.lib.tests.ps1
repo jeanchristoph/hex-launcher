@@ -257,6 +257,30 @@ Describe 'Add-StackedBadgesToExecutableIcon' {
     Remove-Entries $result
 }
 
+Describe 'Add-StackedBadgesToIco' {
+    $logoIco = Join-Path $here '..\app\ico\logo-badges\hex-launcher.ico'
+    $destination = Join-Path $TestDrive 'hex-launcher-jp-logo.ico'
+    Add-StackedBadgesToIco $logoIco 'ja_JP' $TestBadge $destination | Out-Null
+    $result = Read-IcoEntries $destination
+
+    It 'garde toutes les tailles de l''icône de base du jeu' {
+        ($result | ForEach-Object { $_.Size } | Sort-Object -Descending) -join ',' | Should Be '256,128,64,48,32,16'
+    }
+
+    It 'porte la pastille pays et la pastille compagnon à 256 px' {
+        $country = Get-BadgeMetrics 256 0; $companion = Get-DiscProbe 256 1
+        (Get-ChannelGap (Get-EntryOfSize $result 256).Bitmap.GetPixel([int]$country.Cx, [int]$country.Cy) '#BC002D') | Should BeLessThan 2
+        (Get-EntryOfSize $result 256).Bitmap.GetPixel($companion.X, $companion.Y).ToArgb() | Should Be (Get-Argb $TestBadge.color)
+    }
+
+    It 'refuse une icône introuvable et une pastille sans couleur' {
+        { Add-StackedBadgesToIco (Join-Path $TestDrive 'absente.ico') 'ja_JP' $null (Join-Path $TestDrive 'x.ico') } | Should Throw
+        { Add-StackedBadgesToIco $logoIco 'ja_JP' ([pscustomobject]@{ glyph = 'B'; color = '' }) (Join-Path $TestDrive 'x.ico') } | Should Throw
+    }
+
+    Remove-Entries $result
+}
+
 Describe 'Get-BadgeGlyphColor' {
     It 'écrit en blanc sur une pastille sombre' {
         Get-BadgeGlyphColor ([pscustomobject]@{ color = '#E4103F' }) | Should Be '#FFFFFF'
