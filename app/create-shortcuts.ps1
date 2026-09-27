@@ -356,13 +356,20 @@ function Get-ForcedTextCode([string]$Code, [string]$TextCode) {
     return $TextCode
 }
 
-# $TextCode : langue du texte forcé appliquée à toutes les langues cochées (vide = aucun texte forcé)
+# $TextCode : langue du texte forcé appliquée à toutes les langues cochées (vide = aucun texte forcé). Chaque langue
+# garde son raccourci normal ; le texte forcé en ajoute un second, JP-FR (demande utilisateur du 2026-09-27)
 function Get-ShortcutCombinations([string[]]$Codes, [object[]]$CompanionApps, [string]$TextCode = '') {
     $combinations = foreach ($code in $Codes) {
-        if ($CompanionApps.Count -eq 0) { New-ShortcutCombination $code $null $TextCode }
-        foreach ($companion in $CompanionApps) { New-ShortcutCombination $code $companion $TextCode }
+        if ($CompanionApps.Count -eq 0) { New-LanguageCombinations $code $null $TextCode }
+        foreach ($companion in $CompanionApps) { New-LanguageCombinations $code $companion $TextCode }
     }
     return @($combinations | Where-Object { $null -ne $_ })
+}
+
+# Le raccourci normal d'une langue, puis son raccourci à texte forcé s'il y a lieu
+function New-LanguageCombinations([string]$Code, $Companion, [string]$TextCode) {
+    New-ShortcutCombination $Code $Companion
+    if (Get-ForcedTextCode $Code $TextCode) { New-ShortcutCombination $Code $Companion $TextCode }
 }
 
 # ---------------------------------------------------------------- Raccourcis existants

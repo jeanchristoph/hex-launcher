@@ -543,9 +543,20 @@ Describe 'New-ShortcutCombination, texte forcé' {
         $combination.Name | Should Be 'League of Legends FR'
     }
 
-    It 'applique le texte forcé à chaque langue cochée' {
+    It 'garde le raccourci normal de chaque langue cochée et y ajoute le raccourci à texte forcé' {
         (Get-ShortcutCombinations @('ja_JP', 'ko_KR', 'fr_FR') @() 'fr_FR' | ForEach-Object { $_.Name }) -join '|' |
-            Should Be "League of Legends JP-FR|League of Legends KR-FR|League of Legends FR"
+            Should Be "League of Legends JP|League of Legends JP-FR|League of Legends KR|League of Legends KR-FR|League of Legends FR"
+    }
+
+    It 'fait la paire normal + texte forcé pour chaque appli compagnon' {
+        $blitz = [pscustomobject]@{ id = 'blitz'; name = 'Blitz' }
+        $combinations = @(Get-ShortcutCombinations @('ja_JP') @($blitz) 'fr_FR')
+        ($combinations | ForEach-Object { $_.Name }) -join '|' | Should Be 'League of Legends JP - Blitz|League of Legends JP-FR - Blitz'
+        ($combinations | ForEach-Object { $_.TextCode }) -join '|' | Should Be '|fr_FR'
+    }
+
+    It 'ne crée que le raccourci normal quand la langue cochée est celle du texte' {
+        @(Get-ShortcutCombinations @('fr_FR') @() 'fr_FR').Count | Should Be 1
     }
 }
 

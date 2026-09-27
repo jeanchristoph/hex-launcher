@@ -261,8 +261,9 @@ Pour une langue absente du catalogue (nouvelle locale Riot) :
 ## Texte forcé (voix et texte dans deux langues)
 
 Les voix dans une langue, le texte en jeu dans une autre : sur la page *Raccourcis* de `setup.bat`, cochez
-« Forcer le texte en jeu en : » et choisissez la langue du texte. Chaque langue cochée reste celle des voix ; le raccourci
-s'appelle `League of Legends JP-FR` et son icône est coupée en diagonale (voix en haut, texte en bas).
+« Forcer le texte en jeu en : » et choisissez la langue du texte. Chaque langue cochée reste celle des voix et garde son
+raccourci normal ; un second raccourci, `League of Legends JP-FR`, lance le jeu avec le texte forcé, son icône coupée en
+diagonale (voix en haut, texte en bas).
 
 > ⚠️ Ce mode remplace des fichiers du jeu. Riot n'autorise pas les modifications de fichiers : le compte peut être
 > sanctionné, jusqu'au bannissement. À vos risques.

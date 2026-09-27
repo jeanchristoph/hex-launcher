@@ -118,6 +118,12 @@
 [x] T14.5 — README ×3 (FR validé d'abord) + project.md.
   → FR validé, EN/JA par agent ; outils make-logo-icon.ps1 et watch-launch.ps1 cités.
 
+### T15 — Texte forcé : garder aussi le raccourci normal de chaque langue
+**Effort:** S
+**Files:** `app/create-shortcuts.ps1`, `tests/create-shortcuts.tests.ps1`, `tests/setup.tests.ps1`, README ×3
+**Description:** Case cochée → pour chaque langue (et compagnon) le raccourci normal JP ET le raccourci JP-FR ; langue = texte → normal seul ; setup et mode script (même fonction).
+[x] `New-LanguageCombinations` (paire normal + mixte) appelée par `Get-ShortcutCombinations` ; 3 tests ; README ×3 (FR validé) ; suite 905/905.
+
 ## Risks
 - Vanguard / ToS (§7.1) : fichier Riot signé mais échange de .wad non autorisé — avertissement rouge + clause README.
 - Riot Client pouvant restaurer le fichier avant le démarrage du jeu — à vérifier par l'essai réel de l'utilisateur.
@@ -150,4 +156,5 @@ None
 | T12 — Splash « MODIFIED GAME FILES » | XS | [x] |
 | T13 — Logo au-dessus du trait | M | [x] |
 | T14 — Jeu « logo HL + pastilles » | L | [x] |
+| T15 — Raccourci normal gardé en texte forcé | S | [x] |
 | **Total** | **≈ 4–6 j** | |

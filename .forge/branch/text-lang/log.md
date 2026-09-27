@@ -1,5 +1,6 @@
 # Log — text-lang
 
+- [2026-09-27 22:50] T15 : en texte forcé, chaque langue garde son raccourci normal + JP-FR (validé) ; piège PS 5.1 : @($null) rendu par un if redevient $null → fonction dédiée ; 905/905. Livraison demandée : grave dev master + release 0.3.1.
 - [2026-09-27 22:35] Message Discord de sortie 0.3.0 validé (FR, serveurs LoL francophones) : output/20260927-discord-release-0-3-0.txt.
 - [2026-09-27 22:25] Livraison : version 0.3.0, notes FR validées puis EN (output/20260927-release-notes-0-3-0.md) ; grave dev master + release v0.3.0.
 - [2026-09-27 22:15] Setup (demandes utilisateur) : case « Forcer le texte en jeu en : » (FR donné, EN/JA traduits, README ×3) ; liste des jeux d'icônes à 5 lignes (logo-badges la faisait défiler) ; journal d'installation caché tant qu'il est vide (New-SetupLog, choix utilisateur). 903/903. config.json iconSet=logo-badges / forcedTextLocale vide : setup lancé par l'utilisateur à 22:00:45, laissé tel quel.

@@ -258,8 +258,9 @@ For a language missing from the catalogue (new Riot locale):
 ## Forced text (voice and text in two languages)
 
 Voices in one language, in-game text in another: on the *Shortcuts* page of `setup.bat`, tick
-"Force the in-game text in:" and pick the text language. Every ticked language remains the voice language; the shortcut
-is named `League of Legends JP-FR` and its icon is split diagonally (voice at the top, text at the bottom).
+"Force the in-game text in:" and pick the text language. Every ticked language remains the voice language and keeps its
+normal shortcut; a second shortcut, `League of Legends JP-FR`, starts the game with the forced text, its icon split
+diagonally (voice at the top, text at the bottom).
 
 > ⚠️ This mode replaces game files. Riot does not allow file modifications: the account can be
 > sanctioned, up to a ban. At your own risk.

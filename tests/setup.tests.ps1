@@ -1275,12 +1275,12 @@ Describe 'Invoke-SetupShortcutsStep, texte forcé' {
     Mock Select-IconSetForConfig { $null }
     Mock Save-LaunchForcedTextLocale { $true }
 
-    It 'crée des raccourcis mixtes pour chaque langue cochée et mémorise la langue du texte' {
+    It 'crée, pour chaque langue cochée, le raccourci normal et le raccourci mixte, et mémorise la langue du texte' {
         Reset-SetupTestState @{ Config = $config }
         Mock Get-SetupShortcutSelection { @{ Codes = @('ja_JP', 'fr_FR'); CompanionIds = @(); TextCode = 'fr_FR' } }
         Invoke-SetupShortcutsStep | Should Be $true
         Assert-MockCalled -Scope It New-SetupShortcuts -Exactly -Times 1 -ParameterFilter {
-            $Combinations.Count -eq 2 -and $Combinations[0].Name -eq 'League of Legends JP-FR' -and $Combinations[1].Name -eq 'League of Legends FR'
+            (@($Combinations | ForEach-Object { $_.Name }) -join '|') -eq 'League of Legends JP|League of Legends JP-FR|League of Legends FR'
         }
         Assert-MockCalled -Scope It Save-LaunchForcedTextLocale -Exactly -Times 1 -ParameterFilter { $Locale -eq 'fr_FR' -and $ConfigPath -eq $SetupConfigPath }
         Assert-MockCalled -Scope It Write-SetupLog -Exactly -Times 1 -ParameterFilter { $Text -eq 'Texte forcé : fr_FR' }
