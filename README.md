@@ -86,7 +86,7 @@ Double-clicking an unknown `.bat` is scary, and rightly so. Here is how to check
      previous choice (or from what is installed). Ticked apps that are missing get installed. A separate box,
      **unticked by default**, lets you also uninstall the unticked apps that are present. A confirmation lists
      exactly what will happen; "Annuler" keeps everything as is;
-   - **[3/3] Shortcuts** — a dialog to tick the languages (JP and FR pre-ticked the first time) and the companion
+   - **[3/3] Shortcuts** — a dialog to tick the languages (the first time: JP and the language picked at the bottom left of the wizard are pre-ticked, French if it has no LoL voice-over; the forced-text list also offers that language by default) and the companion
      apps to combine. One shortcut per language × companion app is created on the desktop
      (`League of Legends JP - Blitz`); with no companion ticked, plain `League of Legends JP`. Obsolete shortcuts
      of this launcher are removed. If the desktop is not writable (protected folder, OneDrive…), they are created

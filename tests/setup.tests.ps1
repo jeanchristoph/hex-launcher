@@ -1189,9 +1189,22 @@ Describe 'Texte forcé de la page Raccourcis : mise en page' {
 Describe 'Texte forcé de la page Raccourcis : présélection' {
     $locales = @([pscustomobject]@{ code = 'ja_JP'; label = 'Japonais' }, [pscustomobject]@{ code = 'fr_FR'; label = 'Français' })
 
-    It 'laisse la case décochée sans choix enregistré ni raccourci mixte' {
+    It 'laisse la case décochée et propose la langue du launcher sans choix enregistré ni raccourci mixte' {
+        Mock Get-UiLanguage { 'fr' }
         Reset-SetupTestState @{ Config = (New-TestLaunchConfig); Locales = $locales }
         Get-SetupPreselectedForcedText $script:InstallState | Should Be ''
+        Get-SetupPreselectedForcedTextList $script:InstallState | Should Be 'fr_FR'
+    }
+
+    It 'propose le français quand la langue du launcher n''est pas au catalogue' {
+        Mock Get-UiLanguage { 'en' }
+        Reset-SetupTestState @{ Config = (New-TestLaunchConfig); Locales = $locales }
+        Get-SetupPreselectedForcedTextList $script:InstallState | Should Be 'fr_FR'
+    }
+
+    It 'propose le japonais quand le launcher est en japonais' {
+        Mock Get-UiLanguage { 'ja' }
+        Reset-SetupTestState @{ Config = (New-TestLaunchConfig); Locales = $locales }
         Get-SetupPreselectedForcedTextList $script:InstallState | Should Be 'ja_JP'
     }
 
@@ -1223,6 +1236,31 @@ Describe 'Texte forcé de la page Raccourcis : présélection' {
         (New-SetupForcedTextBox 'fr_FR' 0 0 250).Checked | Should Be $true
         (New-SetupForcedTextBox '' 0 0 250).Checked | Should Be $false
         (New-SetupForcedTextBox '' 0 0 250).Text | Should Be 'Forcer le texte en jeu en :'
+    }
+}
+
+Describe 'Remove-SetupUntouchedLanguageDefaults' {
+    $defaults = @{ LocaleList = @('ja_JP', 'fr_FR'); ForcedTextList = @('fr_FR') }
+
+    It 'oublie les listes restées sur le défaut de l''ancienne langue du launcher' {
+        $selection = @{ LocaleList = @('ja_JP', 'fr_FR'); ForcedTextList = @('fr_FR'); ForcedTextBox = @('True') }
+        Remove-SetupUntouchedLanguageDefaults $selection $defaults
+        $selection.ContainsKey('LocaleList')     | Should Be $false
+        $selection.ContainsKey('ForcedTextList') | Should Be $false
+        $selection.ForcedTextBox                 | Should Be @('True')
+    }
+
+    It 'garde les listes modifiées par l''utilisateur' {
+        $selection = @{ LocaleList = @('ja_JP'); ForcedTextList = @('de_DE') }
+        Remove-SetupUntouchedLanguageDefaults $selection $defaults
+        $selection.LocaleList     | Should Be @('ja_JP')
+        $selection.ForcedTextList | Should Be @('de_DE')
+    }
+
+    It 'ignore une page sans ces listes' {
+        $selection = @{ AppList = @('porofessor') }
+        Remove-SetupUntouchedLanguageDefaults $selection $defaults
+        $selection.Keys | Should Be @('AppList')
     }
 }
 

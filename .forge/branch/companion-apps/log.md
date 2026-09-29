@@ -1,3 +1,4 @@
+- [2026-09-29] Langue par défaut = celle de l'assistant (en bas à gauche), FR à défaut : liste du texte forcé et voix pré-cochées (JP + cette langue, fr_FR n'est plus "default"), suit un changement de langue si la liste n'a pas été touchée ; README ×3 — 921 tests. Gravé dev + master.
 - [2026-09-29] Release v0.3.2 publiée (e65750e, notes EN, dev/master à jour) ; message Discord 0.3.2 validé : output/20260929-discord-release-0-3-2.txt.
 - [2026-09-29] Règle ajoutée à coding-standards.md : un post Discord d'annonce généré à chaque release.
 - [2026-09-29] Livraison : version 0.3.2, notes FR validées puis EN (output/20260929-release-notes-0-3-2.md) ; grave dev master + release v0.3.2.

@@ -88,7 +88,7 @@ Cliquer sur un `.bat` inconnu fait peur, à juste titre. Voici de quoi vérifier
      pré-cochée d'après le choix précédent (sinon d'après ce qui est installé). Les applis cochées absentes sont
      installées. Une case à part, **décochée par défaut**, permet aussi de désinstaller les applis décochées
      présentes. Une confirmation liste exactement ce qui va se passer ; « Annuler » ne touche à rien ;
-   - **[3/3] Raccourcis** — une boîte de dialogue pour cocher les langues (JP et FR pré-cochées la première fois) et
+   - **[3/3] Raccourcis** — une boîte de dialogue pour cocher les langues (la première fois : JP et la langue choisie en bas à gauche de l'assistant pré-cochées, le français si elle n'a pas de voix LoL ; la liste du texte forcé propose aussi cette langue par défaut) et
      les applis compagnon à combiner. Un raccourci par langue × appli est créé sur le Bureau
      (`League of Legends JP - Blitz`) ; sans compagnon coché, simplement `League of Legends JP`. Les raccourcis
      obsolètes de ce lanceur sont retirés. Si le Bureau est inaccessible (dossier protégé, OneDrive…), ils sont

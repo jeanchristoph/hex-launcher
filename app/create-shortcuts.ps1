@@ -85,6 +85,19 @@ function Read-LocaleCatalog([string]$Path) {
     return Read-JsonCatalog $Path
 }
 
+# Langue proposée quand celle du launcher n'est pas au catalogue
+$FallbackLocaleCode = 'fr_FR'
+
+# Langue du catalogue qui correspond à une langue d'interface : « en-GB » exacte, sinon même langue
+# (« en » → en_US, première du catalogue), sinon le repli
+function Find-LocaleCodeForLanguage([object[]]$Catalog, [string]$Language) {
+    $exact    = $Language -replace '-', '_'
+    $language = ($Language -split '-')[0]
+    $matching = @($Catalog | Where-Object { $_.code -eq $exact }) + @($Catalog | Where-Object { $language -and $_.code -like "$($language)_*" })
+    if ($matching.Count -gt 0) { return [string]$matching[0].code }
+    return $FallbackLocaleCode
+}
+
 # « / » est interdit dans un nom de fichier, et WScript.Shell convertit les noms en ANSI (un « ⁄ » U+2044 y redevient
 # « / ») : séparateur ASCII, choix de l'utilisateur le 2026-09-27
 $ForcedTextNameSeparator = '-'
@@ -390,11 +403,12 @@ function Get-ExistingLaunchShortcuts([string]$Directory) {
 
 # ---------------------------------------------------------------- Dialogue de choix
 
-# Pré-coche les langues déjà installées dans la destination ; sinon celles marquées "default"
-function Get-PreselectedCodes([object[]]$Catalog, [object[]]$Existing) {
+# Pré-coche les langues déjà installées dans la destination ; sinon celles marquées "default" et celle du launcher
+function Get-PreselectedCodes([object[]]$Catalog, [object[]]$Existing, [string]$Language) {
     $installed = @($Catalog | Where-Object { $code = $_.code; $Existing | Where-Object { $_.Code -eq $code } } | ForEach-Object { $_.code })
     if ($installed.Count -gt 0) { return $installed }
-    return @($Catalog | Where-Object { $_.default } | ForEach-Object { $_.code })
+    $languageCode = Find-LocaleCodeForLanguage $Catalog $Language
+    return @($Catalog | Where-Object { $_.default -or $_.code -eq $languageCode } | ForEach-Object { $_.code })
 }
 
 # Pré-coche les compagnons déjà présents dans des raccourcis ; sinon toutes les applis de config.json
@@ -596,7 +610,7 @@ if ($MyInvocation.InvocationName -ne '.') {
     $existing      = Get-ExistingLaunchShortcuts $Destination
 
     if (-not $Locales) {
-        $choice = Show-ShortcutPicker $catalog (Get-PreselectedCodes $catalog $existing) $companionApps (Get-PreselectedShortcutCompanionIds $companionApps $existing)
+        $choice = Show-ShortcutPicker $catalog (Get-PreselectedCodes $catalog $existing (Get-UiLanguage)) $companionApps (Get-PreselectedShortcutCompanionIds $companionApps $existing)
         if ($null -eq $choice) { Get-Text 'shortcuts.cancelled'; exit 2 }
         $Locales    = $choice.Codes
         $Companions = $choice.CompanionIds

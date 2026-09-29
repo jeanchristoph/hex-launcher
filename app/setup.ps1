@@ -813,7 +813,7 @@ function New-SetupShortcutsControls {
     $previewSize     = 64
     $iconListHeight  = 5 * 17 + 4   # les cinq jeux livrés visibles sans défilement
     $forcedText      = Get-SetupForcedTextLayout $columnsTop $SetupRiotCompatibilityTop
-    $controls.LocaleList    = New-SetupCheckedList (Get-LocaleListItems $state.Locales) (Get-SetupPreselection 'LocaleList' (Get-PreselectedCodes $state.Locales $state.ExistingShortcuts)) 0 $columnsTop $columnWidth $forcedText.LocaleListHeight
+    $controls.LocaleList    = New-SetupCheckedList (Get-LocaleListItems $state.Locales) (Get-SetupPreselection 'LocaleList' (Get-PreselectedCodes $state.Locales $state.ExistingShortcuts (Get-UiLanguage))) 0 $columnsTop $columnWidth $forcedText.LocaleListHeight
     $controls.CompanionList = New-SetupCheckedList (Get-ShortcutCompanionListItems $companionApps) (Get-SetupPreselection 'CompanionList' (Get-PreselectedShortcutCompanionIds $companionApps $state.ExistingShortcuts)) $rightColumn $columnsTop $columnWidth $companionHeight
     $controls.IconSetList   = New-SetupIconSetList $state.IconSets (Get-SetupPreselectedIconSetName $state) $rightColumn ($iconSetsTop + 24) ($columnWidth - $previewSize - 12) $iconListHeight
     $controls.IconSetPreview = New-ThemedPicture ($rightColumn + $columnWidth - $previewSize) ($iconSetsTop + 24) $previewSize
@@ -903,13 +903,14 @@ function Get-SetupPreselectedForcedText($State) {
     return [string]$mixed[0].TextCode
 }
 
-# Langue sélectionnée dans la liste : celle présélectionnée, sinon la première du catalogue (la case décide)
+# Langue sélectionnée dans la liste : celle présélectionnée, sinon celle du launcher (en bas à gauche), sinon le
+# français (la case décide)
 function Get-SetupPreselectedForcedTextList($State) {
     $pending = @(Get-SetupPreselection 'ForcedTextList' @())
     if ($pending.Count -gt 0 -and $pending[0]) { return [string]$pending[0] }
     $preselected = Get-SetupPreselectedForcedText $State
     if ($preselected) { return $preselected }
-    return [string](@($State.Locales) | Select-Object -First 1).code
+    return Find-LocaleCodeForLanguage $State.Locales (Get-UiLanguage)
 }
 
 function New-SetupForcedTextBox([string]$Preselected, [int]$Left, [int]$Top, [int]$Width) {
@@ -1077,12 +1078,31 @@ function Show-SetupPage([string]$StepId) {
 function Set-SetupLanguage([string]$Language) {
     $state = $script:InstallState
     if ($state.IsBusy -or -not (Test-UiLanguageSupported $Language) -or $Language -eq (Get-UiLanguage)) { return $false }
+    $defaults = Get-SetupLanguageDefaults $state
     $state.PendingSelection = Get-SetupPageSelection
+    Remove-SetupUntouchedLanguageDefaults $state.PendingSelection $defaults
     Initialize-Translation $Language | Out-Null
     if ($null -ne $state.Form) { $state.Form.Text = Get-SetupWindowTitle }
     Sync-SetupLanguageBox $Language
     Show-SetupPage $state.StepId
     return $true
+}
+
+# Présélections qui dépendent de la langue du launcher (voix pré-cochées, texte forcé), telles que calculées sans saisie
+function Get-SetupLanguageDefaults($State) {
+    return @{
+        LocaleList     = @(Get-PreselectedCodes $State.Locales $State.ExistingShortcuts (Get-UiLanguage))
+        ForcedTextList = @(Get-SetupPreselectedForcedTextList $State)
+    }
+}
+
+# Saisie restée sur le défaut de l'ancienne langue : oubliée, pour que la page reprenne le défaut de la nouvelle ;
+# une liste modifiée par l'utilisateur est gardée telle quelle
+function Remove-SetupUntouchedLanguageDefaults([hashtable]$Selection, [hashtable]$Defaults) {
+    foreach ($name in @($Defaults.Keys)) {
+        if (-not $Selection.ContainsKey($name)) { continue }
+        if ((@($Selection[$name]) -join ',') -eq (@($Defaults[$name]) -join ',')) { $Selection.Remove($name) }
+    }
 }
 
 # Aligne le sélecteur sur la langue active (bascule par programme) ; sans effet s'il l'affiche déjà

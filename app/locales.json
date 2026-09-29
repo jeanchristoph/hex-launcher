@@ -1,6 +1,6 @@
 [
   { "code": "ja_JP", "label": "日本語",                    "default": true },
-  { "code": "fr_FR", "label": "Français",                 "default": true },
+  { "code": "fr_FR", "label": "Français" },
   { "code": "en_US", "label": "English (US)" },
   { "code": "en_GB", "label": "English (UK)" },
   { "code": "en_AU", "label": "English (Australia)" },

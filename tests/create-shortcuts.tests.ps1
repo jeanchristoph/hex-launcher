@@ -24,6 +24,56 @@ Describe 'Get-FlagIconPath' {
     }
 }
 
+Describe 'Find-LocaleCodeForLanguage' {
+    $catalog = @(
+        [pscustomobject]@{ code = 'ja_JP' }, [pscustomobject]@{ code = 'fr_FR' },
+        [pscustomobject]@{ code = 'en_US' }, [pscustomobject]@{ code = 'en_GB' }, [pscustomobject]@{ code = 'pt_BR' })
+
+    It 'retient la première variante du catalogue pour une langue du launcher' {
+        Find-LocaleCodeForLanguage $catalog 'en' | Should Be 'en_US'
+        Find-LocaleCodeForLanguage $catalog 'ja' | Should Be 'ja_JP'
+    }
+
+    It 'retient la variante exacte quand la langue précise le pays' {
+        Find-LocaleCodeForLanguage $catalog 'en-GB' | Should Be 'en_GB'
+    }
+
+    It 'retient la même langue d''un autre pays quand la variante exacte manque' {
+        Find-LocaleCodeForLanguage $catalog 'pt-PT' | Should Be 'pt_BR'
+    }
+
+    It 'propose le français quand la langue n''a pas de voix LoL' {
+        Find-LocaleCodeForLanguage $catalog 'nl' | Should Be 'fr_FR'
+    }
+
+    It 'propose le français quand la langue est vide' {
+        Find-LocaleCodeForLanguage $catalog '' | Should Be 'fr_FR'
+    }
+}
+
+Describe 'Get-PreselectedCodes' {
+    $catalog = @(
+        [pscustomobject]@{ code = 'ja_JP'; default = $true }, [pscustomobject]@{ code = 'fr_FR' },
+        [pscustomobject]@{ code = 'en_US' })
+
+    It 'pré-coche les langues marquées default et celle du launcher à la première installation' {
+        Get-PreselectedCodes $catalog @() 'en' | Should Be @('ja_JP', 'en_US')
+    }
+
+    It 'pré-coche le français quand la langue du launcher est absente du catalogue' {
+        Get-PreselectedCodes $catalog @() 'nl' | Should Be @('ja_JP', 'fr_FR')
+    }
+
+    It 'ne double pas une langue du launcher déjà marquée default' {
+        Get-PreselectedCodes $catalog @() 'ja' | Should Be @('ja_JP')
+    }
+
+    It 'reprend les langues des raccourcis déjà posés sans ajouter celle du launcher' {
+        $existing = @([pscustomobject]@{ Code = 'fr_FR' })
+        Get-PreselectedCodes $catalog $existing 'en' | Should Be @('fr_FR')
+    }
+}
+
 Describe 'Set-ActiveIconSet' {
     It 'replie sur le jeu par défaut avec avertissement pour un nom inconnu' {
         Mock Write-Warning {}
