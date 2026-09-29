@@ -1,3 +1,4 @@
+- [2026-09-29] T25 DPM au catalogue : download /S /currentuser signé DPMLOL SAS/FR, cycle réel 12 s / 5 s, README ×3 — 907 tests. Le site annonce l'appli gratuite jusqu'au 2026-10-03, puis réservée au premium.
 - [2026-09-14] Gravé : 458cdc8 sur companion-apps et master, release GitHub v0.1.0 publiée (hex-launcher-0.1.0.zip, 3,7 Mo). Version passée de 1.0.0 à 0.1.0 à la demande de l'utilisateur.
 - [2026-09-14] T24 faite : raccourcis sur ico\hex-launcher-xx.ico (repli base), plus aucune référence à league_of_legends.live.ico — 250 tests. Plan entièrement coché ; reste grave master + release v1.0.0.
 - [2026-09-14] Icônes finales HL déposées dans app/ico (28 .ico) → T24 ajoutée (raccourcis par drapeau, fin de l'intérim T23), T22 close comme obsolète.

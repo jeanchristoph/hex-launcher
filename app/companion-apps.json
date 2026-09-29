@@ -112,5 +112,31 @@
     "uninstall": {
       "mode": "silent"
     }
+  },
+  {
+    "id": "dpm",
+    "name": "DPM",
+    "signer": { "organization": "DPMLOL SAS", "country": "FR" },
+    "badge": { "glyph": "D", "color": "#FFFFFF", "glyphColor": "#7989EC" },
+    "processNames": ["DPM"],
+    "launch": {
+      "path": "%LOCALAPPDATA%\\Programs\\DPM\\DPM.exe",
+      "arguments": ""
+    },
+    "detect": {
+      "registryDisplayNamePattern": "^DPM(\\s|$)",
+      "path": "%LOCALAPPDATA%\\Programs\\DPM\\DPM.exe"
+    },
+    "install": {
+      "strategy": "download",
+      "url": "https://app.dpm.lol/releases/nsis/win32/x64/DPM-Setup-x64.exe",
+      "arguments": "/S /currentuser",
+      "timeoutSeconds": 180,
+      "fallback": "browser",
+      "browserUrl": "https://dpm.lol/download"
+    },
+    "uninstall": {
+      "mode": "silent"
+    }
   }
 ]

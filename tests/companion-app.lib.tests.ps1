@@ -15,9 +15,9 @@ $ProjectCatalogPath = Join-Path $here '..\app\companion-apps.json'
 Describe 'Read-CompanionCatalog' {
     AfterEach { Remove-TestTempFiles }
 
-    It 'charge le catalogue du projet avec ses quatre applications dans l''ordre de priorité' {
+    It 'charge le catalogue du projet avec ses cinq applications dans l''ordre de priorité' {
         $catalog = Read-CompanionCatalog $ProjectCatalogPath
-        ($catalog | ForEach-Object { $_.id }) -join ',' | Should Be 'porofessor,blitz,opgg,mobalytics'
+        ($catalog | ForEach-Object { $_.id }) -join ',' | Should Be 'porofessor,blitz,opgg,mobalytics,dpm'
     }
 
     It 'valide chaque entrée du catalogue du projet' {
@@ -152,6 +152,14 @@ Describe 'Get-InstalledCompanionApps' {
         $found[0].Registry.DisplayVersion | Should Be '2.5.5'
     }
 
+    It 'reconnaît DPM à son nom exact (clé réelle : DisplayName « DPM »), sans confondre un autre produit préfixé DPM' {
+        Mock Get-UninstallRegistryEntries { @((New-RegistryEntry 'DPMagic Tool' 'm.exe'), (New-RegistryEntry 'DPM' '"u.exe" /currentuser' '"u.exe" /currentuser /S' '1.9.1')) }
+        $dpm   = Find-CompanionCatalogEntry (Read-CompanionCatalog $ProjectCatalogPath) 'dpm'
+        $found = @(Get-InstalledCompanionApps @($dpm))
+        $found.Count | Should Be 1
+        $found[0].Registry.DisplayName | Should Be 'DPM'
+    }
+
     It 'ignore une application sans clé ni chemin de détection' {
         Mock Get-UninstallRegistryEntries { @(New-RegistryEntry 'Autre chose' 'x.exe') }
         @(Get-InstalledCompanionApps @(New-TestCompanionApp -Pattern '^Blitz$' -DetectPath 'C:\introuvable\blitz.exe')).Count | Should Be 0
@@ -273,6 +281,11 @@ Describe 'Test-CompanionCertificateSubject' {
 
     It 'accepte une organisation entre guillemets (Blitz, Mobalytics)' {
         Test-CompanionCertificateSubject "C=US`r`nO=`"GAMERS NET, INC.`"`r`nCN=`"GAMERS NET, INC.`"" 'GAMERS NET, INC.' 'US' | Should Be $true
+    }
+
+    It 'accepte un certificat EV aux composants OID de juridiction (DPM)' {
+        $subject = "OID.1.3.6.1.4.1.311.60.2.1.3=FR`r`nOID.2.5.4.15=Private Organization`r`nSERIALNUMBER=984 544 312`r`nC=FR`r`nL=Paris`r`nO=DPMLOL SAS`r`nCN=DPMLOL SAS"
+        Test-CompanionCertificateSubject $subject 'DPMLOL SAS' 'FR' | Should Be $true
     }
 
     It 'refuse un "O=" glissé dans le CN d''un autre éditeur' {

@@ -157,6 +157,12 @@
 **Description:** Clôt l'intérim T23 : `Resolve-IconPath($Code)` → `ico\hex-launcher-<xx>.ico` si présent, sinon `ico\hex-launcher.ico` ; `Get-InstalledLeagueIconPath` et toute référence à `league_of_legends.live.ico` supprimées ; `install.ps1` résout l'icône par combinaison ; tests (par langue, repli, langue sans drapeau) et paragraphe « Icône » des README ×3 mis à jour.
 [x] Resolve-IconPath($Code) + Get-FlagIconPath, install.ps1 allégé, test « un drapeau par langue du catalogue », README ×3 — 250 tests
 
+### T25 — DPM au catalogue
+**Effort:** S
+**Files:** `app/companion-apps.json`, `tests/companion-app.lib.tests.ps1`, `tests/create-shortcuts.tests.ps1`, `setup.bat`, `README.md`, `README.fr.md`, `README.ja.md`
+**Description:** Appli desktop DPM (dpm.lol, Electron, NSIS assisté) : `download` `https://app.dpm.lol/releases/nsis/win32/x64/DPM-Setup-x64.exe` en `/S /currentuser`, signataire `DPMLOL SAS`/FR (certificat EV DigiCert), détection `^DPM(\s|$)` + `%LOCALAPPDATA%\Programs\DPM\DPM.exe`, désinstallation silencieuse (`QuietUninstallString` HKCU), pastille D `#7989EC` sur blanc. Cycle réel sur autorisation.
+[x] install 12 s (code 0, appli non lancée), clé HKCU DisplayName « DPM », uninstall 5 s via la lib (désinstalleur signé), résidu `%LOCALAPPDATA%\dpmlol-app-updater` — 907 tests
+
 ## Risks
 - Porofessor : `/S` silencieux testé seulement avec Overwolf déjà présent ; Overwolf absent → comportement inconnu (timeout de sonde plus long, message explicite)
 - winget absent (App Installer non installé, comptes restreints) → repli `download`/`browser`
@@ -191,4 +197,5 @@
 | T22 — Monogramme H esprit LoL sans plagiat | S | [x] obsolète |
 | T23 — Icône des raccourcis : icône LoL installée (intérim) | XS | [x] |
 | T24 — Rebranchement des icônes drapeau sur les raccourcis | XS | [x] |
+| T25 — DPM au catalogue | S | [x] |
 | **Total** | **~5 j** | |

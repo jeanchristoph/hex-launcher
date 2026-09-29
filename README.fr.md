@@ -10,7 +10,7 @@
 
 Assistant de lancement League of Legends pour Windows : démarre le jeu dans la langue de son choix
 (japonais, français…) depuis un raccourci, avec un petit splash animé et sans console noire, et gère les
-**applications compagnon** (Porofessor, Blitz, OP.GG, Mobalytics) — on coche celles qu'on veut, l'outil les
+**applications compagnon** (Porofessor, Blitz, OP.GG, Mobalytics, DPM) — on coche celles qu'on veut, l'outil les
 installe, et on obtient un raccourci par langue × appli compagnon
 (`League of Legends JP - Blitz`, `League of Legends JP - Porofessor`…).
 
@@ -123,13 +123,14 @@ Rien n'est jamais désinstallé sans avoir coché la case « désinstaller » (o
 | **Blitz** | `winget install Blitz.Blitz`, silencieux (~15 s) | Silencieuse |
 | **OP.GG** | Installeur officiel depuis `op.gg`, silencieux (~10 s) | Silencieuse |
 | **Mobalytics** | Installeur officiel autonome depuis `mobalytics.gg`, silencieux (~10 s) | Silencieuse |
+| **DPM** | Installeur officiel autonome depuis `dpm.lol`, silencieux (~12 s) | Silencieuse |
 
 Règles de sûreté, toutes appliquées par le code :
 - l'outil refuse de tourner élevé (administrateur) — les installeurs sont per-user, et les commandes de
   désinstallation sont lues dans le registre utilisateur, que n'importe quel programme à vous pourrait altérer ;
 - tout binaire exécuté — installeur téléchargé **ou** désinstalleur lu dans le registre — doit porter une signature
   Authenticode valide émise pour l'éditeur nommé dans le catalogue (`Overwolf Ltd`/IL, `OP.GG`/KR,
-  `Swift Media Entertainment, Inc.`/US pour Blitz, `GAMERS NET, INC.`/US pour Mobalytics). Non signé ou éditeur
+  `Swift Media Entertainment, Inc.`/US pour Blitz, `GAMERS NET, INC.`/US pour Mobalytics, `DPMLOL SAS`/FR pour DPM). Non signé ou éditeur
   inattendu → refusé, avec un message renvoyant vers « Applications installées » de Windows ;
 - l'outil lui-même n'écrit jamais dans le registre Windows : il **lit** seulement les clés `Uninstall` ;
 - si l'installeur lance l'appli à la fin (Mobalytics), elle est refermée — elle démarrera avec le jeu.
@@ -146,7 +147,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File app\manage-companion-app.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File app\manage-companion-app.ps1 -Apps none -DryRun                 # montre ce qui serait fait
 powershell -NoProfile -ExecutionPolicy Bypass -File app\create-shortcuts.ps1 -Locales ja_JP,ko_KR -Companions blitz,opgg
 ```
-Identifiants : `porofessor`, `blitz`, `opgg`, `mobalytics`, `none`. Codes de sortie : 0 ok · 1 erreur · 2 annulé ou refusé.
+Identifiants : `porofessor`, `blitz`, `opgg`, `mobalytics`, `dpm`, `none`. Codes de sortie : 0 ok · 1 erreur · 2 annulé ou refusé.
 
 ### Ajouter une appli au catalogue
 
@@ -233,7 +234,7 @@ traduit (« LoL officielle + pastilles », « LoL officielle, nue », « Logo HL
 un jeu ajouté s'affiche après, sous le nom de son dossier. Installation neuve : `original-badges` est présélectionné ;
 `flat` reste le jeu de repli (icône de fenêtre, drapeau manquant, LoL introuvable).
 Un raccourci avec appli compagnon porte en plus une pastille de couleur en haut à droite — P Porofessor, B Blitz,
-O OP.GG, M Mobalytics — composée à l'installation dans `app/ico/<jeu>/companion/` (la lettre disparaît sous 32 px, la couleur reste).
+O OP.GG, M Mobalytics, D DPM — composée à l'installation dans `app/ico/<jeu>/companion/` (la lettre disparaît sous 32 px, la couleur reste).
 Les couleurs de pastille sont celles du catalogue ; un jeu peut les styler par un `badge-style.json` dans son dossier :
 `{ "nightVeil": true, "reducedPalette": false }` — voile nuit des drapeaux et/ou leur palette réduite (`flat` prend le
 voile, `classic` ni l'un ni l'autre). Les deux jeux livrés portent le fichier avec toutes les clés explicites, modèle pour un nouveau jeu.

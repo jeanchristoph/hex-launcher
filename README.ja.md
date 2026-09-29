@@ -10,7 +10,7 @@
 
 Windows 向け League of Legends 起動アシスタント：デスクトップのショートカットから、好きな言語（日本語、フランス語など）で
 ゲームを起動します。小さなアニメーション付きスプラッシュを表示し、黒いコンソール画面は出ません。
-さらに**補助アプリ**（Porofessor、Blitz、OP.GG、Mobalytics）を管理します — 使いたいものにチェックを入れると
+さらに**補助アプリ**（Porofessor、Blitz、OP.GG、Mobalytics、DPM）を管理します — 使いたいものにチェックを入れると
 ツールがインストールし、言語 × 補助アプリごとにショートカットが作られます
 （`League of Legends JP - Blitz`、`League of Legends JP - Porofessor` など）。
 
@@ -116,13 +116,14 @@ Windows 向け League of Legends 起動アシスタント：デスクトップ�
 | **Blitz** | `winget install Blitz.Blitz`、サイレント（約 15 秒） | サイレント |
 | **OP.GG** | `op.gg` の公式インストーラー、サイレント（約 10 秒） | サイレント |
 | **Mobalytics** | `mobalytics.gg` の公式スタンドアロンインストーラー、サイレント（約 10 秒） | サイレント |
+| **DPM** | `dpm.lol` の公式スタンドアロンインストーラー、サイレント（約 12 秒） | サイレント |
 
 安全規則（すべてコードで強制）：
 - ツールは昇格（管理者）での実行を拒否します — インストーラーはユーザー単位で、アンインストールコマンドは
   あなたのどのプログラムでも書き換えられるユーザーレジストリから読まれるためです；
 - 実行するすべてのバイナリ — ダウンロードしたインストーラー**も**レジストリから読んだアンインストーラーも — は、
   カタログに記載された発行者（`Overwolf Ltd`/IL、`OP.GG`/KR、Blitz は `Swift Media Entertainment, Inc.`/US、
-  Mobalytics は `GAMERS NET, INC.`/US）の有効な Authenticode 署名が必要です。未署名や想定外の発行者 → 拒否し、
+  Mobalytics は `GAMERS NET, INC.`/US、DPM は `DPMLOL SAS`/FR）の有効な Authenticode 署名が必要です。未署名や想定外の発行者 → 拒否し、
   Windows の「インストールされているアプリ」を使うよう案内します；
 - ツール自身は Windows レジストリに書き込みません：`Uninstall` キーを**読む**だけです；
 - セットアップがアプリを起動してしまう場合（Mobalytics）は閉じます — アプリはゲームと一緒に起動します。
@@ -139,7 +140,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File app\manage-companion-app.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File app\manage-companion-app.ps1 -Apps none -DryRun                 # 実行内容の表示のみ
 powershell -NoProfile -ExecutionPolicy Bypass -File app\create-shortcuts.ps1 -Locales ja_JP,ko_KR -Companions blitz,opgg
 ```
-ID：`porofessor`、`blitz`、`opgg`、`mobalytics`、`none`。終了コード：0 成功 · 1 エラー · 2 キャンセルまたは拒否。
+ID：`porofessor`、`blitz`、`opgg`、`mobalytics`、`dpm`、`none`。終了コード：0 成功 · 1 エラー · 2 キャンセルまたは拒否。
 
 ### カタログにアプリを追加する
 
@@ -223,7 +224,7 @@ Riot が提供するすべての言語が `locales.json` にあり、インス�
 「HL ロゴ＋バッジ」「クラシック（立体）」「フラット国旗＋HL ロゴ」）で表示され、追加したセットはその後にフォルダー名で表示されます。
 新規インストールでは `original-badges` が選択済みです。`flat` は引き続きフォールバック用のセットです（ウィンドウアイコン、
 国旗がない場合、LoL が見つからない場合）。
-補助アプリ付きのショートカットには右上に色付きバッジが加わります — P Porofessor、B Blitz、O OP.GG、M Mobalytics —
+補助アプリ付きのショートカットには右上に色付きバッジが加わります — P Porofessor、B Blitz、O OP.GG、M Mobalytics、D DPM —
 インストール時に `app/ico/<セット>/companion/` に合成されます（32 px 未満では文字が省かれ、色だけが残ります）。
 バッジの色はカタログのままです。セットのフォルダーに `badge-style.json`（`{ "nightVeil": true, "reducedPalette": false }`）を置くと、
 国旗の夜色のベールや縮小パレットをバッジに適用できます（`flat` はベールのみ、`classic` はどちらも無効）。同梱の 2 セットには全キーを明記したこのファイルが入っており、新しいセットのひな形になります。

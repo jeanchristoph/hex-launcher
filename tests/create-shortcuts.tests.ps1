@@ -75,7 +75,7 @@ Describe 'Resolve-IconPath' {
 Describe 'Read-CompanionBadges' {
     It 'indexe par identifiant les pastilles du catalogue du projet' {
         $badges = Read-CompanionBadges (Join-Path $here '..\app\companion-apps.json')
-        ($badges.Keys | Sort-Object) -join ',' | Should Be 'blitz,mobalytics,opgg,porofessor'
+        ($badges.Keys | Sort-Object) -join ',' | Should Be 'blitz,dpm,mobalytics,opgg,porofessor'
         $badges['blitz'].glyph | Should Be 'B'
     }
 

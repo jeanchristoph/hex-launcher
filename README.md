@@ -10,7 +10,7 @@
 
 League of Legends launcher helper for Windows: start the game in the language of your choice
 (Japanese, French…) from a desktop shortcut with a small animated splash and no black console window,
-and manage your **companion apps** (Porofessor, Blitz, OP.GG, Mobalytics) — tick the ones you want,
+and manage your **companion apps** (Porofessor, Blitz, OP.GG, Mobalytics, DPM) — tick the ones you want,
 they get installed for you, and you get one shortcut per language × companion app
 (`League of Legends JP - Blitz`, `League of Legends JP - Porofessor`…).
 
@@ -121,13 +121,14 @@ Nothing is ever uninstalled unless you tick the "uninstall" box (or pass `-Unins
 | **Blitz** | `winget install Blitz.Blitz`, silent (~15 s) | Silent |
 | **OP.GG** | Official installer from `op.gg`, silent (~10 s) | Silent |
 | **Mobalytics** | Official standalone installer from `mobalytics.gg`, silent (~10 s) | Silent |
+| **DPM** | Official standalone installer from `dpm.lol`, silent (~12 s) | Silent |
 
 Safety rules, all enforced by the code:
 - the tool refuses to run elevated (administrator) — installers are per-user, and uninstall commands are read
   from the user registry, which any program of yours could alter;
 - every binary it runs — a downloaded installer **or** an uninstaller read from the registry — must carry a
   valid Authenticode signature issued to the publisher named in the catalogue (`Overwolf Ltd`/IL, `OP.GG`/KR,
-  `Swift Media Entertainment, Inc.`/US for Blitz, `GAMERS NET, INC.`/US for Mobalytics). Unsigned or unexpected →
+  `Swift Media Entertainment, Inc.`/US for Blitz, `GAMERS NET, INC.`/US for Mobalytics, `DPMLOL SAS`/FR for DPM). Unsigned or unexpected →
   refused, with a message telling you to use Windows' own "Installed apps";
 - the tool itself never writes to the Windows registry: it only **reads** the `Uninstall` keys;
 - if a setup starts the app afterwards (Mobalytics), it is closed again — the app starts with the game.
@@ -144,7 +145,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File app\manage-companion-app.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File app\manage-companion-app.ps1 -Apps none -DryRun                 # shows what would happen
 powershell -NoProfile -ExecutionPolicy Bypass -File app\create-shortcuts.ps1 -Locales ja_JP,ko_KR -Companions blitz,opgg
 ```
-Ids: `porofessor`, `blitz`, `opgg`, `mobalytics`, `none`. Exit codes: 0 ok · 1 error · 2 cancelled or refused.
+Ids: `porofessor`, `blitz`, `opgg`, `mobalytics`, `dpm`, `none`. Exit codes: 0 ok · 1 error · 2 cancelled or refused.
 
 ### Adding an app to the catalogue
 
@@ -231,7 +232,7 @@ in script mode: `create-shortcuts.ps1 -IconSet classic`. Any folder dropped in `
 under its folder name. On a fresh install `original-badges` is preselected; `flat` remains the fallback set (window
 icon, missing flag, LoL not found).
 A shortcut with a companion app also carries a coloured badge in the top-right corner — P Porofessor, B Blitz,
-O OP.GG, M Mobalytics — composed at install time into `app/ico/<set>/companion/` (the letter is dropped below 32 px, the colour stays).
+O OP.GG, M Mobalytics, D DPM — composed at install time into `app/ico/<set>/companion/` (the letter is dropped below 32 px, the colour stays).
 Badge colours are those of the catalogue; a set can style them with a `badge-style.json` in its folder:
 `{ "nightVeil": true, "reducedPalette": false }` — the flags' night veil and/or their reduced palette (`flat` uses the veil,
 `classic` neither). Both shipped sets carry the file with every key spelled out, as a template for new sets.
