@@ -1,3 +1,4 @@
+- [2026-09-29] Release v0.3.2 publiée (e65750e, notes EN, dev/master à jour) ; message Discord 0.3.2 validé : output/20260929-discord-release-0-3-2.txt.
 - [2026-09-29] Règle ajoutée à coding-standards.md : un post Discord d'annonce généré à chaque release.
 - [2026-09-29] Livraison : version 0.3.2, notes FR validées puis EN (output/20260929-release-notes-0-3-2.md) ; grave dev master + release v0.3.2.
 - [2026-09-29] T25 DPM au catalogue : download /S /currentuser signé DPMLOL SAS/FR, cycle réel 12 s / 5 s, README ×3 — 907 tests. Le site annonce l'appli gratuite jusqu'au 2026-10-03, puis réservée au premium.

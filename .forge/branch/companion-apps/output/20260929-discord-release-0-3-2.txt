@@ -1,0 +1,8 @@
+🔧 **Hex Launcher 0.3.2 est dispo !**
+
+Nouvelle appli compagnon : **DPM** (dpm.lol). Coche-la dans le setup : elle s'installe toute seule en une dizaine de secondes, et se désinstalle aussi simplement si tu changes d'avis. Tu obtiens des raccourcis « League of Legends JP - DPM » qui lancent le jeu dans ta langue avec DPM, et ferment les autres overlays pour éviter les conflits.
+
+Déjà installé ? Décompresse la nouvelle version par-dessus, relance le setup et coche DPM.
+
+Gratuit, open source, Windows.
+👉 https://github.com/jeanchristoph/hex-launcher/releases/tag/v0.3.2
