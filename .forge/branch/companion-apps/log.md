@@ -1,3 +1,6 @@
+- [2026-09-30] Release v0.4.0 : notes FR validées puis EN (output/20260930-release-notes-0-4-0.md) ; launcher fusionnée dans dev et master avant publication.
+- [2026-09-30] Paquets de test gardés : dist\hex-launcher-setup-0.3.2.exe et hex-launcher-portable-0.3.2.zip (code 362d95b, version 0.3.2 avec mise à jour auto) pour tester la mise à jour vers 0.4.0.
+- [2026-09-30] Gravé 362d95b sur launcher (branche active, poussée à la demande de l'utilisateur) ; companion-apps reste à 63307db. Passage en 0.4.0 au moment du test final de validation.
 - [2026-09-30] T30 faite : README ×3 + LISEZMOI + project.md. Relevé hors périmètre : « icône officielle » / « LoL officielle » subsistent dans les README (section Langues, libellés des jeux d'icônes) — à trancher.
 - [2026-09-30] T29 faite : update-install.lib (digest obligatoire, installeur /VERYSILENT ou remplacement portable, data\ intact), relance du lanceur avec ses arguments et de setup.bat — 1020 tests.
 - [2026-09-30] Piège trouvé : WebClient *TaskAsync sous WinForms poste sa fin dans la file de messages → Task.Wait bloqué jusqu'au délai ; requêtes démarrées hors SynchronizationContext (Start-DetachedWebTask), test de non-régression.
