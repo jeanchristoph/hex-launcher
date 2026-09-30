@@ -1,0 +1,12 @@
+🔧 **Hex Launcher 0.4.2 est dispo !**
+
+Tes raccourcis LoL arrivent dans le **menu Démarrer** : tape « League » dans la recherche Windows et lance ta langue directement, sans encombrer le Bureau. Tu choisis dans l'assistant : Bureau, menu Démarrer ou les deux. Pour les garder sous la main : clic droit → *Épingler à l'écran de démarrage*.
+
+**Comment mettre à jour** :
+• En 0.4.x : accepte la mise à jour proposée au lancement, puis rouvre **Hex Launcher** (menu Démarrer) et valide la page Raccourcis.
+• Première fois : télécharge `hex-launcher-setup-0.4.2.exe` en bas de la page de la release (rubrique *Assets*) et double-clique dessus.
+
+⚠️ L'installeur n'est pas signé : si Windows affiche « Windows a protégé votre ordinateur », clique sur *Informations complémentaires* → *Exécuter quand même*.
+
+Gratuit, open source, Windows.
+👉 https://github.com/jeanchristoph/hex-launcher/releases/tag/v0.4.2
