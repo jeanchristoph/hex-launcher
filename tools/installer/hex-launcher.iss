@@ -1,5 +1,5 @@
 ﻿; Installeur par utilisateur de hex-launcher (Inno Setup 6) — compilé par tools\make-release.ps1, jamais à la main :
-;   ISCC.exe /DAppVersion=0.4.0 /DSourceDir=<dossier préparé> /DOutputDir=<dist> hex-launcher.iss
+;   ISCC.exe /DAppVersion=0.4.0 /DSourceDir=<dossier préparé> /DOutputDir=<dist> /DWizardImage=<png> hex-launcher.iss
 ;
 ; Sans droits administrateur : installe dans %LOCALAPPDATA%\Programs\hex-launcher, comme Blitz ou DPM. Le lanceur refuse
 ; le mode administrateur, Program Files lui est donc fermé. Les données (config.json, journal, icônes composées) vivent
@@ -12,6 +12,9 @@
 #endif
 #ifndef SourceDir
   #error Passer /DSourceDir=<dossier préparé par make-release>
+#endif
+#ifndef WizardImage
+  #error Passer /DWizardImage=<png du logo HL> (tools\make-release.ps1 l'extrait de l'icône)
 #endif
 #ifndef OutputDir
   #define OutputDir "..\..\dist"
@@ -35,7 +38,10 @@ DisableReadyPage=yes
 UsePreviousAppDir=yes
 OutputDir={#OutputDir}
 OutputBaseFilename=hex-launcher-setup-{#AppVersion}
-SetupIconFile={#SourceDir}\app\ico\hex-launcher-setup.ico
+; Logo HL nu, sans pastille, centré : icône du fichier d'installation et de sa fenêtre (image de l'assistant tirée du
+; même .ico par make-release)
+SetupIconFile=installer-logo.ico
+WizardSmallImageFile={#WizardImage}
 UninstallDisplayIcon={app}\app\ico\hex-launcher-setup.ico
 UninstallDisplayName=Hex Launcher
 LicenseFile={#SourceDir}\LICENSE
@@ -60,17 +66,21 @@ ja.OpenSetup=Hex Launcher のアシスタントを開く
 ; Une mise à jour repart d'un app\ propre : un fichier retiré d'une version ne traîne pas dans la suivante.
 ; Sans risque : aucune donnée n'y est écrite à l'usage.
 Type: filesandordirs; Name: "{app}\app"
+; Jusqu'à 0.4.x, « Hex Launcher » était seul à la racine du menu Démarrer : il rejoint le dossier des raccourcis de jeu
+Type: files; Name: "{userprograms}\Hex Launcher.lnk"
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
 
 [Icons]
-Name: "{userprograms}\Hex Launcher"; Filename: "{app}\setup.bat"; WorkingDir: "{app}"; IconFilename: "{app}\app\ico\hex-launcher-setup.ico"; Flags: runminimized
+; Dans le dossier « Hex Launcher » du menu Démarrer, à côté des raccourcis de jeu posés par l'assistant
+Name: "{userprograms}\Hex Launcher\Hex Launcher"; Filename: "{app}\setup.bat"; WorkingDir: "{app}"; IconFilename: "{app}\app\ico\hex-launcher-setup.ico"; Flags: runminimized
 
 [Run]
 ; Pas d'assistant après une mise à jour silencieuse : le lancement du jeu reprend de lui-même
 Filename: "{app}\setup.bat"; WorkingDir: "{app}"; Description: "{cm:OpenSetup}"; Flags: postinstall nowait skipifsilent shellexec runminimized
 
 [UninstallRun]
-; Retire les raccourcis de jeu et « Hex Launcher » du Bureau : sans le lanceur, ils ne mèneraient plus nulle part
+; Retire les raccourcis de jeu et « Hex Launcher » du Bureau et du menu Démarrer : sans le lanceur, ils ne mèneraient
+; plus nulle part
 Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""{app}\app\remove-shortcuts.ps1"""; Flags: runhidden waituntilterminated; RunOnceId: "RemoveShortcuts"

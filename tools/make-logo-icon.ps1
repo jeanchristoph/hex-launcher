@@ -10,11 +10,14 @@
     Le jeu logo-badges n'a pas de drapeau : create-shortcuts.ps1 pose sur cette icône la pastille pays et la pastille
     compagnon (icon-source.json, source « set-base »).
 
+    L'installeur prend le même logo, centré : tools\installer\installer-logo.ico (icône du .exe, image de l'assistant).
+
     Prérequis (outil de développement, hors release) : resvg dans le PATH — `scoop install resvg`.
 
 .EXAMPLE
     powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-logo-icon.ps1
     powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-logo-icon.ps1 -Placement centered -PreviewDir tmp\preview
+    powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-logo-icon.ps1 -Placement centered -OutDir tools\installer -FileName installer-logo.ico
 #>
 param(
     # bottom (défaut, choix utilisateur) : calé en bas, la place libre en haut reçoit la pastille pays ; centered : centré
@@ -23,6 +26,9 @@ param(
 
     # Dossier de sortie (défaut : app\ico\logo-badges)
     [string]$OutDir,
+
+    # Nom du .ico écrit (défaut : hex-launcher.ico, l'icône de base du jeu)
+    [string]$FileName = 'hex-launcher.ico',
 
     # Logo vectoriel (défaut : tools\logo\hex-launcher-logo.svg)
     [string]$LogoSvg,
@@ -42,7 +48,6 @@ $MeasureSize        = 1024   # rendu de mesure de l'emprise
 $SvgSide            = 256    # côté du viewBox d'origine
 $LogoFill           = 0.98   # part du côté occupée par le logo (marge anti-rognage de l'anticrénelage)
 $OpaqueAlphaMinimum = 8      # alpha au-dessous duquel un pixel ne compte pas dans l'emprise
-$BaseIconFileName   = 'hex-launcher.ico'
 
 # ---------------------------------------------------------------- SVG (fonctions pures)
 
@@ -148,7 +153,7 @@ if ($MyInvocation.InvocationName -ne '.') {
     $svg = Get-LogoOnlySvg $LogoSvg $Placement
     $entries = @($IconSizes | ForEach-Object { [pscustomobject]@{ Size = $_; Bitmap = (ConvertFrom-SvgTextToBitmap $svg $_) } })
     try {
-        $target = Join-Path $OutDir $BaseIconFileName
+        $target = Join-Path $OutDir $FileName
         Write-Ico $entries $target
         if ($PreviewDir) {
             New-Item -ItemType Directory -Force $PreviewDir | Out-Null

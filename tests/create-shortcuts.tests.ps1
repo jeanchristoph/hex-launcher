@@ -557,16 +557,53 @@ Describe 'New-SetupShortcut' {
 Describe 'New-ShortcutWithFallback' {
     Mock Write-Warning {}
 
-    It 'crée dans la destination quand elle accepte l''écriture' {
-        $result = New-ShortcutWithFallback { param([string]$Directory) "créé dans $Directory" }
-        $result | Should Be "créé dans $Destination"
+    It 'crée dans l''emplacement demandé quand il accepte l''écriture' {
+        $target = Join-Path $TestDrive 'bureau'
+        New-Item -ItemType Directory -Path $target -Force | Out-Null
+        $result = New-ShortcutWithFallback $target { param([string]$Directory) "créé dans $Directory" }
+        $result | Should Be "créé dans $target"
         Assert-MockCalled Write-Warning -Scope It -Exactly 0
     }
 
-    It 'replie dans le dossier des données, jamais celui du code, avec un avertissement quand la destination refuse' {
-        $result = New-ShortcutWithFallback { param([string]$Directory) if ($Directory -eq $Destination) { throw 'accès refusé' }; "créé dans $Directory" }
+    It 'crée le dossier du menu Démarrer au premier passage' {
+        $target = Join-Path $TestDrive 'Programs\Hex Launcher'
+        New-ShortcutWithFallback $target { param([string]$Directory) "créé dans $Directory" } | Should Be "créé dans $target"
+        Test-Path $target | Should Be $true
+    }
+
+    It 'replie dans le dossier des données, jamais celui du code, avec un avertissement quand l''emplacement refuse' {
+        $target = Join-Path $TestDrive 'bureau'
+        $result = New-ShortcutWithFallback $target { param([string]$Directory) if ($Directory -eq $target) { throw 'accès refusé' }; "créé dans $Directory" }
         $result | Should Be "créé dans $(Get-AppDataFolder $folder)"
         Assert-MockCalled Write-Warning -Scope It -Exactly 1
+    }
+}
+
+Describe 'Emplacements des raccourcis' {
+    It 'associe le Bureau à -Destination et le menu Démarrer à -StartMenuDestination' {
+        $Destination          = 'C:\Bureau'
+        $StartMenuDestination = 'C:\Programs\Hex Launcher'
+        Get-ShortcutLocationFolder 'desktop' | Should Be 'C:\Bureau'
+        Get-ShortcutLocationFolder 'start_menu' | Should Be 'C:\Programs\Hex Launcher'
+    }
+
+    It 'place le menu Démarrer par défaut dans Programs de l''utilisateur, jamais dans le dossier Démarrage' {
+        $StartMenuDestination | Should Be (Join-Path ([Environment]::GetFolderPath('Programs')) 'Hex Launcher')
+        $StartMenuDestination -match 'Startup|Démarrage' | Should Be $false
+    }
+
+    It 'ne garde que les raccourcis du dossier demandé' {
+        $shortcuts = @([pscustomobject]@{ Path = 'C:\Bureau\League of Legends JP.lnk' }, [pscustomobject]@{ Path = 'C:\Menu\League of Legends JP.lnk' })
+        $kept = @(Select-ShortcutsInFolder $shortcuts 'C:\Menu')
+        $kept.Count | Should Be 1
+        $kept[0].Path | Should Be 'C:\Menu\League of Legends JP.lnk'
+    }
+
+    It 'réunit les raccourcis existants des deux emplacements pour pré-cocher les listes' {
+        $Destination          = 'C:\Bureau'
+        $StartMenuDestination = 'C:\Menu'
+        Mock Get-ExistingLaunchShortcuts { param($Directory) [pscustomobject]@{ Path = "$Directory\League of Legends JP.lnk"; Code = 'ja_JP' } }
+        (@(Get-AllExistingLaunchShortcuts) | ForEach-Object { $_.Path }) -join '|' | Should Be 'C:\Bureau\League of Legends JP.lnk|C:\Menu\League of Legends JP.lnk'
     }
 }
 

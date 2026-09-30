@@ -16,79 +16,17 @@ installe, et on obtient un raccourci par langue × appli compagnon
 
 > **Aucune donnée collectée, aucune télémétrie, aucun compte.** L'outil ne parle qu'au Riot Client de votre PC, ne va sur
 > Internet que pour une appli compagnon que vous avez cochée et pour vérifier s'il existe une nouvelle version
-> (désactivable), refuse le mode administrateur et n'installe rien sans votre clic sur *Appliquer*. `setup.bat` tient en une ligne, tout le code est en clair. Détails : [Confiance](#confiance--ce-que-fait-setupbat-ce-quil-ne-fait-pas).
+> (désactivable), refuse le mode administrateur et n'installe rien sans votre clic sur *Appliquer*. `setup.bat` tient en une ligne, tout le code est en clair. Détails : [Confiance](#confiance).
 
 ## Installer
 
 1. Ouvrez la **[dernière version](https://github.com/jeanchristoph/hex-launcher/releases/latest)**, puis, dans la rubrique *Assets* en bas de la page, téléchargez **`hex-launcher-setup-x.y.z.exe`**.
 2. Double-cliquez dessus. Si Windows affiche « Windows a protégé votre ordinateur » (l'installeur n'est pas signé) : *Informations complémentaires* → *Exécuter quand même*.
-3. À la fin, l'assistant s'ouvre : détection, applis compagnon, raccourcis. Lancez ensuite le jeu depuis les raccourcis « League of Legends XX » du Bureau.
+3. À la fin, l'assistant s'ouvre : détection, applis compagnon, raccourcis. Lancez ensuite le jeu depuis les raccourcis « League of Legends XX » du Bureau ou du menu Démarrer.
 
 **Version portable** (sans installation, par exemple sur une clé USB) : téléchargez **`hex-launcher-portable-x.y.z.zip`**, décompressez-le où vous voulez, puis double-cliquez sur `setup.bat`.
 
 Les mises à jour suivantes se proposent d'elles-mêmes au lancement. Détails : [Mise en route](#mise-en-route-sur-une-nouvelle-machine).
-
-## Contenu du dossier
-
-| Fichier | Rôle |
-|---|---|
-| `setup.bat` | **À double-cliquer** (ex-`install.bat`) : ouvre l'assistant de configuration (une fenêtre : détection, applis compagnon, raccourcis). Version installée : raccourci **Hex Launcher** du menu Démarrer |
-| `data/` | Version portable seulement : les réglages (`config.json`, journal, icônes composées), à côté de `setup.bat`. Version installée : `%LOCALAPPDATA%\hex-launcher\` |
-| `LISEZMOI.txt` | Démarrage rapide en trois lignes (FR/EN) |
-| `app/` | Le moteur — rien à y modifier |
-| `app/setup.ps1` | L'assistant de configuration (fenêtre unique au thème LoL) |
-| `app/locales.json` | Catalogue des langues proposées à l'install (code Riot + libellé affiché) |
-| `app/companion-apps.json` | Catalogue des applis compagnon : comment détecter, installer, désinstaller et lancer chacune, et qui signe ses binaires |
-| `app/launch-lol.ps1` | Le lanceur : ferme le client Riot, force la langue, relance le jeu (+ l'appli compagnon donnée par `-Companion`) |
-| `app/detect-config.ps1` | Appelé par `setup.bat` : détecte Riot et les applis compagnon déjà installées |
-| `app/manage-companion-app.ps1` | Appelé par `setup.bat` : choix des applis compagnon, installation des manquantes, désinstallation sur demande |
-| `app/create-shortcuts.ps1` | Appelé par `setup.bat` : choix des langues et des compagnons, puis un `.lnk` par combinaison sur le Bureau (repli dans le dossier des réglages si le Bureau est inaccessible) |
-| `app/remove-shortcuts.ps1` | Appelé par le désinstalleur : retire du Bureau les raccourcis de cette copie |
-| `app/lib/app-data.lib.ps1` | Dossier des réglages (installée ou portable), nature de la copie, reprise d'un `config.json` laissé dans `app\` par une version antérieure |
-| `app/lib/update.lib.ps1` / `update-prompt.lib.ps1` / `update-install.lib.ps1` | Mises à jour : dernière release GitHub, fenêtre « Mise à jour disponible », téléchargement vérifié par SHA-256 puis installation |
-| `app/lib/companion-app.lib.ps1` | Fonctions partagées : catalogue, détection via le registre (lecture seule), commande de désinstallation, vérification de signature Authenticode |
-| `app/lib/icon.lib.ps1` / `icon-badge.lib.ps1` | Lecture/écriture des `.ico`, icône d'un binaire lue en mémoire, composition des pastilles compagnon et pays |
-| `app/lib/flag.lib.ps1` / `riot-install.lib.ps1` | Drapeaux dessinés en GDI+ (une seule définition pour les icônes et les pastilles pays) ; Riot Client et `LeagueClient.exe` lus dans `RiotClientInstalls.json` |
-| `app/lib/i18n.lib.ps1` / `app/i18n/` | Traductions de l'assistant et de la console : un dictionnaire `fr.json` / `en.json` / `ja.json` par langue, mêmes clés partout |
-| `app/lib/launch-config.lib.ps1` | Fonctions partagées : lecture/écriture de `config.json`, migration de l'ancien format à une seule appli |
-| `app/lib/splash.lib.ps1` | Splash animé partagé (lancement du jeu, installation des applis compagnon) |
-| `app/lib/forced-text.lib.ps1` / `riot-text-files.lib.ps1` / `riot-cdn.lib.ps1` | Texte forcé : pose et restauration des fichiers texte ; lecture de `Game.ok` et `Game.manifest` (lecture seule) et cache ; téléchargement par plages depuis le CDN Riot |
-| `app/lib/zstd.lib.ps1` / `rman-reader.cs` / `native/libzstd.dll` | Décompression zstd (DLL officielle, empreinte vérifiée) et lecture du manifest RMAN du patcher Riot |
-| `app/lib/icon-split.lib.ps1` | Icône coupée en diagonale des raccourcis à texte forcé |
-| `tests/` | Tests Pester (`Invoke-Pester -Path tests`) |
-| `tools/` | Développement uniquement, hors release : `make-release.ps1`, `fetch-libzstd.ps1` (retélécharge `libzstd.dll` depuis la release officielle et vérifie ses empreintes), `make-flag-icons.ps1` (régénère toutes les icônes de `app/ico/` depuis le logo vectoriel), `make-logo-icon.ps1` (régénère l'icône du jeu `logo-badges`), `watch-launch.ps1` (essai réel : lance le jeu et relève les écritures sur les fichiers texte), `logo/make-logo-svg.py` + `logo/hex-launcher-logo-drawing.png` → `logo/hex-launcher-logo.svg` (logo HL original, source de vérité) |
-| `app/ico/` | Jeux d'icônes, un dossier chacun : `flat/` (défaut : drapeau plat derrière le logo HL) et `classic/` (les anciennes icônes en relief) ; chacun contient l'icône de base + une variante drapeau par langue (`hex-launcher-xx.ico`); les icônes drapeau + pastille composées sur ce poste vont dans le dossier des réglages (`icons\<jeu>\companion\`). `original/` et `original-badges/` ne contiennent qu'un marqueur `icon-source.json` : l'icône officielle du jeu, référencée depuis `LeagueClient.exe` installé — nue, ou avec pastilles pays et compagnon composées sur ce poste ; `logo-badges/` : une icône de base seule (logo HL sans cadre ni drapeau), sur laquelle les pastilles pays et compagnon sont composées sur ce poste |
-
-## Confiance — ce que fait `setup.bat`, ce qu'il ne fait pas
-
-Cliquer sur un `.bat` inconnu fait peur, à juste titre. Voici de quoi vérifier par vous-même :
-
-- **Il se lit.** `setup.bat` tient en une ligne — ouvrez-le dans le Bloc-notes : il ouvre `app\setup.ps1`, sans console.
-  Tout le code est dans `app\`, en clair (PowerShell), identique à ce dépôt public.
-- **Aucune donnée collectée, aucune télémétrie, aucun compte, aucun serveur.** Hex Launcher ne parle qu'au Riot Client
-  de *votre* PC (`127.0.0.1`, son API locale) et ne contacte Internet que pour télécharger une appli compagnon *que
-  vous avez cochée*, depuis le site de son éditeur ou winget, et, en mode texte forcé, les fichiers texte de la langue
-  choisie depuis le CDN officiel de Riot, et, pour vérifier les mises à jour (désactivable), l'API publique des releases
-  GitHub. Le journal `launch.log` reste sur votre PC, dans le dossier des réglages.
-- **Jamais administrateur** : lancé « en tant qu'administrateur », il refuse. Registre Windows lu seulement (pour
-  détecter les applis déjà installées), jamais écrit. Il n'écrit que dans son dossier de réglages
-  (`%LOCALAPPDATA%\hex-launcher\`, ou `data\` en portable : `config.json`, journal, icônes composées), sur le Bureau
-  (les raccourcis), le temps d'une installation que vous avez demandée, l'installeur de l'appli compagnon ou de la mise à
-  jour dans le dossier temporaire de Windows et, en mode texte forcé, les deux fichiers texte du jeu et un cache dans
-  `%LOCALAPPDATA%\hex-launcher\`. Le dossier du programme n'est modifié que par une installation ou une mise à jour.
-  L'entrée *Applications installées* est écrite par l'installeur (Inno Setup), pas par les scripts.
-- **Une seule dépendance binaire** : `app\lib\native\libzstd.dll`, la bibliothèque officielle de décompression zstd
-  (Meta, licence BSD, v1.5.7), nécessaire au mode texte forcé. Son empreinte SHA-256 est vérifiée avant chaque
-  chargement ; `tools\fetch-libzstd.ps1` la retélécharge depuis la release officielle.
-- **Rien sans votre clic.** Une appli compagnon n'est installée ou désinstallée qu'après *Appliquer*, la liste exacte
-  des actions étant affichée avant. La page d'accueil ne modifie rien.
-- **Le jeu n'est pas modifié, sauf en mode texte forcé.** La langue change par l'API officielle locale du Riot Client
-  (ce que fait son propre réglage). Aucun fichier de League of Legends n'est touché, sauf si vous activez le mode
-  texte forcé : les fichiers texte de la langue choisie remplacent alors ceux de la langue des voix (voir la section
-  dédiée).
-- **Vérifiable.** Chaque release publie l'empreinte SHA-256 de l'installeur et du zip portable ; comparez avec
-  `Get-FileHash <fichier>` dans PowerShell. La mise à jour automatique refuse tout fichier dont l'empreinte diffère.
-  Le code source est ce dépôt.
 
 ## Mise en route sur une nouvelle machine
 
@@ -116,10 +54,13 @@ Cliquer sur un `.bat` inconnu fait peur, à juste titre. Voici de quoi vérifier
      installées. Une case à part, **décochée par défaut**, permet aussi de désinstaller les applis décochées
      présentes. Une confirmation liste exactement ce qui va se passer ; « Annuler » ne touche à rien ;
    - **[3/3] Raccourcis** — une boîte de dialogue pour cocher les langues (la première fois : JP et la langue choisie en bas à gauche de l'assistant pré-cochées, le français si elle n'a pas de voix LoL ; la liste du texte forcé propose aussi cette langue par défaut) et
-     les applis compagnon à combiner. Un raccourci par langue × appli est créé sur le Bureau
-     (`League of Legends JP - Blitz`) ; sans compagnon coché, simplement `League of Legends JP`. Les raccourcis
-     obsolètes de ce lanceur sont retirés. Si le Bureau est inaccessible (dossier protégé, OneDrive…), ils sont
-     créés dans le dossier des réglages à la place. Un raccourci **Hex Launcher** (icône engrenage) est posé
+     les applis compagnon à combiner. Un raccourci par langue × appli est créé sur le Bureau, dans le menu Démarrer
+     (dossier Hex Launcher) ou aux deux endroits, selon les cases « Emplacement des raccourcis » (les deux par
+     défaut). Décocher un emplacement en retire les raccourcis de ce lanceur. Nom : `League of Legends JP - Blitz` ;
+     sans compagnon coché, simplement `League of Legends JP`. Les raccourcis obsolètes de ce lanceur sont retirés.
+     Si un emplacement est inaccessible (dossier protégé, OneDrive…), ils sont créés dans le dossier des réglages à
+     la place. Dans le menu Démarrer, les raccourcis n'apparaissent que dans « Toutes les applis » et dans la
+     recherche. Pour les épingler : clic droit → Épingler à l'écran de démarrage. Un raccourci **Hex Launcher** (icône engrenage) est posé
      au même endroit : il rouvre cet assistant.
 3. Double-cliquer sur le raccourci de la langue et du compagnon voulus.
 
@@ -153,9 +94,9 @@ rien ne s'affiche. Un clone du dépôt ne vérifie rien.
 
 ## Désinstaller
 
-Version installée : *Paramètres → Applications installées → Hex Launcher → Désinstaller*. Les raccourcis du Bureau sont
-retirés ; les réglages (`%LOCALAPPDATA%\hex-launcher\`) restent, pour une réinstallation. Version portable : supprimer
-le dossier et les raccourcis.
+Version installée : *Paramètres → Applications installées → Hex Launcher → Désinstaller*. Les raccourcis du Bureau et du
+menu Démarrer sont retirés ; les réglages (`%LOCALAPPDATA%\hex-launcher\`) restent, pour une réinstallation. Version
+portable : supprimer les raccourcis du Bureau, le dossier Hex Launcher du menu Démarrer, puis le dossier du lanceur.
 
 ## Applications compagnon
 
@@ -382,13 +323,79 @@ langue) ; après l'étape 3 — ou 4, une fois **Jouer** appuyé — les fichier
 Le lanceur n'a pas de mémoire : le lancement direct est tenté à chaque fois. S'il échoue régulièrement sur votre
 poste, cochez « Démarrage manuel » (section Compatibilité Riot) dans `setup.bat` — le lanceur y passe alors d'emblée.
 
-## Fabriqué avec claude_forge
+## Dépannage
 
-Ce lanceur a été développé avec [Claude Code](https://claude.com/claude-code) et le skill
-**[claude_forge](https://github.com/jeanchristoph/claude_forge)** : un workflow de développement par branche —
-brief validé avant la première ligne de code, plan structuré, journal des décisions tenu en temps réel, tests écrits
-en même temps que le code. Les fichiers de suivi sont dans `.forge/` : chaque branche y garde son brief, son plan et son
-journal, lisibles par n'importe qui.
+- **Le jeu reste dans l'ancienne langue** : le client Riot tournait encore pendant la réécriture.
+  Le lanceur le ferme lui-même, mais si un processus est bloqué, le fermer à la main (zone de
+  notification → Quitter) et relancer.
+- **Rien ne se passe au double-clic** : ouvrir un terminal PowerShell dans le dossier et lancer
+  `.\app\launch-lol.ps1 -Locale ja_JP` pour voir l'erreur (fichier de config introuvable, chemin faux…).
+- **Caractères bizarres dans le splash ou les dialogues** (`Ã©`, `â€¦`) : un `.ps1` a été réenregistré sans BOM.
+  Tous les scripts (`launch-lol.ps1`, `manage-companion-app.ps1`, `create-shortcuts.ps1`, `lib\*.ps1`) doivent
+  être en **UTF-8 avec BOM** (VS Code : barre d'état → encodage → « Enregistrer avec l'encodage »).
+- **Le texte n'est pas dans la langue forcée** : lire les lignes `TEXT` de `launch.log` (dossier des réglages) (hors ligne, patch en
+  cours, langue des voix pas encore installée…).
+- **L'icône du raccourci n'est pas à jour** : cache d'icônes Windows. Clic droit → Actualiser dans le
+  dossier, sinon se déconnecter/reconnecter.
+- **« Ne pas exécuter en tant qu'administrateur »** : `setup.bat` a été lancé élevé. Le lancer normalement.
+- **« winget indisponible »** : App Installer manque sur ce Windows. L'installer depuis le Microsoft Store,
+  ou laisser l'outil ouvrir la page de téléchargement de Blitz dans le navigateur.
+- **« désinstalleur … non signé »** : le désinstalleur trouvé dans le registre n'est pas signé par l'éditeur attendu ;
+  l'outil ne le lance pas. Désinstaller l'appli depuis « Applications installées » de Windows.
+- **L'appli compagnon est toujours là après « Désinstaller »** : le dialogue de l'éditeur a été fermé sans
+  confirmer (Overwolf), ou la désinstallation a pris plus de temps que prévu. Rien d'autre n'a été installé ;
+  relancer `setup.bat`.
+- **Tester sans lancer le jeu** : `.\app\launch-lol.ps1 -Locale ja_JP -DryRun -YamlPath copie.yaml`
+  affiche le splash et réécrit la copie, sans fermer ni lancer quoi que ce soit.
+  `app\manage-companion-app.ps1 -DryRun` affiche les actions appli compagnon sans les exécuter.
+
+## Confiance
+
+- **Code ouvert.** Tout le code est en clair (PowerShell) dans `app\`, identique à ce dépôt ; `setup.bat` tient en une ligne.
+- **Rien ne sort de votre PC.** Ni compte, ni télémétrie, ni serveur. Internet ne sert qu'à télécharger une appli
+  compagnon que vous avez cochée, les fichiers texte du mode texte forcé (CDN officiel de Riot) et à vérifier les
+  mises à jour sur GitHub (désactivable).
+- **Jamais administrateur.** Le registre Windows est lu, jamais écrit. L'outil n'écrit que ses réglages
+  (`%LOCALAPPDATA%\hex-launcher\` ou `data\`), les raccourcis (Bureau, menu Démarrer) et, en mode texte forcé, deux
+  fichiers texte du jeu.
+- **Rien sans votre clic.** Une appli compagnon n'est installée ou désinstallée qu'après *Appliquer*, et la liste des
+  actions est affichée avant.
+- **Le jeu n'est pas modifié**, sauf en mode texte forcé : la langue passe par l'API locale du Riot Client, comme son
+  propre réglage.
+- **Vérifiable.** L'empreinte SHA-256 de l'installeur et du zip est publiée à chaque release, et la mise à jour
+  automatique refuse tout fichier qui ne correspond pas. Seule dépendance binaire : `libzstd.dll` officielle, dont
+  l'empreinte est vérifiée avant chargement.
+
+## Contenu du dossier
+
+| Fichier | Rôle |
+|---|---|
+| `setup.bat` | **À double-cliquer** (ex-`install.bat`) : ouvre l'assistant de configuration (une fenêtre : détection, applis compagnon, raccourcis). Version installée : raccourci **Hex Launcher** du menu Démarrer |
+| `data/` | Version portable seulement : les réglages (`config.json`, journal, icônes composées), à côté de `setup.bat`. Version installée : `%LOCALAPPDATA%\hex-launcher\` |
+| `LISEZMOI.txt` | Démarrage rapide en trois lignes (FR/EN) |
+| `app/` | Le moteur — rien à y modifier |
+| `app/setup.ps1` | L'assistant de configuration (fenêtre unique au thème LoL) |
+| `app/locales.json` | Catalogue des langues proposées à l'install (code Riot + libellé affiché) |
+| `app/companion-apps.json` | Catalogue des applis compagnon : comment détecter, installer, désinstaller et lancer chacune, et qui signe ses binaires |
+| `app/launch-lol.ps1` | Le lanceur : ferme le client Riot, force la langue, relance le jeu (+ l'appli compagnon donnée par `-Companion`) |
+| `app/detect-config.ps1` | Appelé par `setup.bat` : détecte Riot et les applis compagnon déjà installées |
+| `app/manage-companion-app.ps1` | Appelé par `setup.bat` : choix des applis compagnon, installation des manquantes, désinstallation sur demande |
+| `app/create-shortcuts.ps1` | Appelé par `setup.bat` : choix des langues et des compagnons, puis un `.lnk` par combinaison sur le Bureau et/ou dans le menu Démarrer (repli dans le dossier des réglages si un emplacement est inaccessible) |
+| `app/remove-shortcuts.ps1` | Appelé par le désinstalleur : retire du Bureau et du menu Démarrer les raccourcis de cette copie |
+| `app/lib/app-data.lib.ps1` | Dossier des réglages (installée ou portable), nature de la copie, reprise d'un `config.json` laissé dans `app\` par une version antérieure |
+| `app/lib/update.lib.ps1` / `update-prompt.lib.ps1` / `update-install.lib.ps1` | Mises à jour : dernière release GitHub, fenêtre « Mise à jour disponible », téléchargement vérifié par SHA-256 puis installation |
+| `app/lib/companion-app.lib.ps1` | Fonctions partagées : catalogue, détection via le registre (lecture seule), commande de désinstallation, vérification de signature Authenticode |
+| `app/lib/icon.lib.ps1` / `icon-badge.lib.ps1` | Lecture/écriture des `.ico`, icône d'un binaire lue en mémoire, composition des pastilles compagnon et pays |
+| `app/lib/flag.lib.ps1` / `riot-install.lib.ps1` | Drapeaux dessinés en GDI+ (une seule définition pour les icônes et les pastilles pays) ; Riot Client et `LeagueClient.exe` lus dans `RiotClientInstalls.json` |
+| `app/lib/i18n.lib.ps1` / `app/i18n/` | Traductions de l'assistant et de la console : un dictionnaire `fr.json` / `en.json` / `ja.json` par langue, mêmes clés partout |
+| `app/lib/launch-config.lib.ps1` | Fonctions partagées : lecture/écriture de `config.json`, migration de l'ancien format à une seule appli |
+| `app/lib/splash.lib.ps1` | Splash animé partagé (lancement du jeu, installation des applis compagnon) |
+| `app/lib/forced-text.lib.ps1` / `riot-text-files.lib.ps1` / `riot-cdn.lib.ps1` | Texte forcé : pose et restauration des fichiers texte ; lecture de `Game.ok` et `Game.manifest` (lecture seule) et cache ; téléchargement par plages depuis le CDN Riot |
+| `app/lib/zstd.lib.ps1` / `rman-reader.cs` / `native/libzstd.dll` | Décompression zstd (DLL officielle, empreinte vérifiée) et lecture du manifest RMAN du patcher Riot |
+| `app/lib/icon-split.lib.ps1` | Icône coupée en diagonale des raccourcis à texte forcé |
+| `tests/` | Tests Pester (`Invoke-Pester -Path tests`) |
+| `tools/` | Développement uniquement, hors release : `make-release.ps1`, `fetch-libzstd.ps1` (retélécharge `libzstd.dll` depuis la release officielle et vérifie ses empreintes), `make-flag-icons.ps1` (régénère toutes les icônes de `app/ico/` depuis le logo vectoriel), `make-logo-icon.ps1` (régénère l'icône du jeu `logo-badges`), `watch-launch.ps1` (essai réel : lance le jeu et relève les écritures sur les fichiers texte), `logo/make-logo-svg.py` + `logo/hex-launcher-logo-drawing.png` → `logo/hex-launcher-logo.svg` (logo HL original, source de vérité) |
+| `app/ico/` | Jeux d'icônes, un dossier chacun : `flat/` (défaut : drapeau plat derrière le logo HL) et `classic/` (les anciennes icônes en relief) ; chacun contient l'icône de base + une variante drapeau par langue (`hex-launcher-xx.ico`); les icônes drapeau + pastille composées sur ce poste vont dans le dossier des réglages (`icons\<jeu>\companion\`). `original/` et `original-badges/` ne contiennent qu'un marqueur `icon-source.json` : l'icône officielle du jeu, référencée depuis `LeagueClient.exe` installé — nue, ou avec pastilles pays et compagnon composées sur ce poste ; `logo-badges/` : une icône de base seule (logo HL sans cadre ni drapeau), sur laquelle les pastilles pays et compagnon sont composées sur ce poste |
 
 ## Développer
 
@@ -416,28 +423,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-Pester -Path test
 ```
 Installeurs, désinstalleurs, réseau et registre sont mockés : les tests ne touchent jamais à la machine.
 
-## Dépannage
+## Fabriqué avec claude_forge
 
-- **Le jeu reste dans l'ancienne langue** : le client Riot tournait encore pendant la réécriture.
-  Le lanceur le ferme lui-même, mais si un processus est bloqué, le fermer à la main (zone de
-  notification → Quitter) et relancer.
-- **Rien ne se passe au double-clic** : ouvrir un terminal PowerShell dans le dossier et lancer
-  `.\app\launch-lol.ps1 -Locale ja_JP` pour voir l'erreur (fichier de config introuvable, chemin faux…).
-- **Caractères bizarres dans le splash ou les dialogues** (`Ã©`, `â€¦`) : un `.ps1` a été réenregistré sans BOM.
-  Tous les scripts (`launch-lol.ps1`, `manage-companion-app.ps1`, `create-shortcuts.ps1`, `lib\*.ps1`) doivent
-  être en **UTF-8 avec BOM** (VS Code : barre d'état → encodage → « Enregistrer avec l'encodage »).
-- **Le texte n'est pas dans la langue forcée** : lire les lignes `TEXT` de `launch.log` (dossier des réglages) (hors ligne, patch en
-  cours, langue des voix pas encore installée…).
-- **L'icône du raccourci n'est pas à jour** : cache d'icônes Windows. Clic droit → Actualiser dans le
-  dossier, sinon se déconnecter/reconnecter.
-- **« Ne pas exécuter en tant qu'administrateur »** : `setup.bat` a été lancé élevé. Le lancer normalement.
-- **« winget indisponible »** : App Installer manque sur ce Windows. L'installer depuis le Microsoft Store,
-  ou laisser l'outil ouvrir la page de téléchargement de Blitz dans le navigateur.
-- **« désinstalleur … non signé »** : le désinstalleur trouvé dans le registre n'est pas signé par l'éditeur attendu ;
-  l'outil ne le lance pas. Désinstaller l'appli depuis « Applications installées » de Windows.
-- **L'appli compagnon est toujours là après « Désinstaller »** : le dialogue de l'éditeur a été fermé sans
-  confirmer (Overwolf), ou la désinstallation a pris plus de temps que prévu. Rien d'autre n'a été installé ;
-  relancer `setup.bat`.
-- **Tester sans lancer le jeu** : `.\app\launch-lol.ps1 -Locale ja_JP -DryRun -YamlPath copie.yaml`
-  affiche le splash et réécrit la copie, sans fermer ni lancer quoi que ce soit.
-  `app\manage-companion-app.ps1 -DryRun` affiche les actions appli compagnon sans les exécuter.
+Ce lanceur a été développé avec [Claude Code](https://claude.com/claude-code) et le skill
+**[claude_forge](https://github.com/jeanchristoph/claude_forge)** : un workflow de développement par branche —
+brief validé avant la première ligne de code, plan structuré, journal des décisions tenu en temps réel, tests écrits
+en même temps que le code. Les fichiers de suivi sont dans `.forge/` : chaque branche y garde son brief, son plan et son
+journal, lisibles par n'importe qui.

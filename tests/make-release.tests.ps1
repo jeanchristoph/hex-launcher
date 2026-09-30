@@ -127,10 +127,33 @@ Describe 'New-ReleaseStaging et New-ReleaseArchive' {
     Remove-Item $parent -Recurse -Force -ErrorAction SilentlyContinue
 }
 
+Describe 'Export-InstallerWizardImage' {
+    It 'extrait la plus grande image du logo HL en PNG, à côté du dossier préparé et non dedans' {
+        $staging = Join-Path $TestDrive 'hex-launcher-0.4.0'
+        $path = Export-InstallerWizardImage $ProjectRoot $staging
+        $path | Should Be "$staging-wizard-image.png"
+        $image = [System.Drawing.Image]::FromFile($path)
+        try { $image.Width | Should Be 256 } finally { $image.Dispose() }
+    }
+
+    It 'pose le logo en petit au centre, entouré d''une marge transparente' {
+        $logo = New-Object System.Drawing.Bitmap(100, 100)
+        $g = [System.Drawing.Graphics]::FromImage($logo); $g.Clear([System.Drawing.Color]::Gold); $g.Dispose()
+        $canvas = New-InstallerWizardCanvas $logo
+        try {
+            $canvas.Width | Should Be 100
+            foreach ($point in @(@(24, 50), @(76, 50), @(50, 24), @(50, 76))) { $canvas.GetPixel($point[0], $point[1]).A | Should Be 0 }
+            foreach ($point in @(@(26, 26), @(73, 73), @(50, 50))) { $canvas.GetPixel($point[0], $point[1]).A | Should Be 255 }
+        }
+        finally { $canvas.Dispose(); $logo.Dispose() }
+    }
+}
+
 Describe 'New-ReleaseInstaller' {
     It 'passe la version, le dossier préparé et la sortie en définitions au script Inno Setup' {
-        $arguments = Get-InstallerCompilerArguments 'C:\staging' '0.4.0' 'C:\dist'
+        $arguments = Get-InstallerCompilerArguments 'C:\staging' '0.4.0' 'C:\dist' 'C:\staging-wizard-image.png'
         $arguments -contains '/DAppVersion=0.4.0' | Should Be $true
+        $arguments -contains '/DWizardImage=C:\staging-wizard-image.png' | Should Be $true
         $arguments -contains '/DSourceDir=C:\staging' | Should Be $true
         $arguments -contains '/DOutputDir=C:\dist' | Should Be $true
         $arguments[-1] | Should Match 'installer\\hex-launcher\.iss$'
@@ -161,8 +184,20 @@ Describe 'hex-launcher.iss' {
         $iss | Should Match '(?m)^AppId=\{\{C11135E5-D99E-446B-BD28-78A06332E927\}'
     }
 
-    It 'retire les raccourcis du Bureau à la désinstallation, par un script livré' {
+    It 'retire les raccourcis du Bureau et du menu Démarrer à la désinstallation, par un script livré' {
         $iss | Should Match 'remove-shortcuts\.ps1'
         Test-Path (Join-Path $ProjectRoot 'app\remove-shortcuts.ps1') | Should Be $true
+    }
+
+    It 'prend le logo HL nu, sans pastille, pour l''installeur et l''image de son assistant' {
+        $iss | Should Match '(?m)^SetupIconFile=installer-logo\.ico'
+        $iss | Should Match '(?m)^WizardSmallImageFile=\{#WizardImage\}'
+        $InstallerLogoIcon | Should Be 'tools\installer\installer-logo.ico'
+        Test-Path (Join-Path $ProjectRoot 'tools\installer\installer-logo.ico') | Should Be $true
+    }
+
+    It 'pose « Hex Launcher » dans le dossier du menu Démarrer des raccourcis de jeu et retire celui de la racine (0.4.x)' {
+        $iss | Should Match '(?m)^Name: "\{userprograms\}\\Hex Launcher\\Hex Launcher"; Filename: "\{app\}\\setup\.bat"'
+        $iss | Should Match '(?m)^Type: files; Name: "\{userprograms\}\\Hex Launcher\.lnk"'
     }
 }

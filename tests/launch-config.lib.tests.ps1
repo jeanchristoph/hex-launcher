@@ -193,6 +193,36 @@ Describe 'Save-LaunchForcedTextLocale' {
     }
 }
 
+Describe 'Save-LaunchShortcutLocations' {
+    AfterEach { Remove-TestTempFiles }
+
+    It 'retient le Bureau et le menu Démarrer quand le poste n''a jamais choisi' {
+        (Get-LaunchShortcutLocations (Read-LaunchConfig (New-TempConfig))) -join ',' | Should Be 'desktop,start_menu'
+    }
+
+    It 'retombe sur les deux emplacements quand la liste enregistrée est vide ou inconnue' {
+        (Get-LaunchShortcutLocations ([pscustomobject]@{ shortcutLocations = @() })) -join ',' | Should Be 'desktop,start_menu'
+        (Get-LaunchShortcutLocations ([pscustomobject]@{ shortcutLocations = @('startup') })) -join ',' | Should Be 'desktop,start_menu'
+    }
+
+    It 'écarte une valeur inconnue et rend les emplacements dans l''ordre d''affichage' {
+        (Get-LaunchShortcutLocations ([pscustomobject]@{ shortcutLocations = @('start_menu', 'startup', 'desktop') })) -join ',' | Should Be 'desktop,start_menu'
+    }
+
+    It 'écrit config.json quand le choix change, et le relit tel quel' {
+        $path = New-TempConfig
+        $config = Read-LaunchConfig $path
+        Save-LaunchShortcutLocations $config $path @('start_menu') | Should Be $true
+        (Get-LaunchShortcutLocations (Read-LaunchConfig $path)) -join ',' | Should Be 'start_menu'
+    }
+
+    It 'n''écrit rien quand le choix est celui du poste, défaut compris' {
+        $path = New-TempConfig
+        $config = Read-LaunchConfig $path
+        Save-LaunchShortcutLocations $config $path @('desktop', 'start_menu') | Should Be $false
+    }
+}
+
 Describe 'ConvertTo-LaunchPathValue' {
     It 'retire les guillemets d''un chemin collé depuis l''Explorateur et les espaces autour' {
         ConvertTo-LaunchPathValue '  "C:\Riot Games\Riot Client\RiotClientServices.exe"  ' | Should Be 'C:\Riot Games\Riot Client\RiotClientServices.exe'

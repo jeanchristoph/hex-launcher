@@ -618,6 +618,17 @@ Describe 'Get-CompletionSummaryLines' {
     }
 }
 
+Describe 'Get-SetupSummaryLabelHeight' {
+    It 'garde deux lignes pour une ligne courte du résumé' {
+        Get-SetupSummaryLabelHeight (New-ThemedLabel 'Applis compagnon retenues : Blitz' 0 0 520 46 'Cream') | Should Be 46
+    }
+
+    It 'grandit quand les chemins du Bureau et du menu Démarrer débordent de deux lignes' {
+        $text = 'Raccourcis : 6 créés dans C:\Users\joueur\OneDrive\Bureau, C:\Users\joueur\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Hex Launcher'
+        Get-SetupSummaryLabelHeight (New-ThemedLabel $text 0 0 520 46 'Cream') | Should BeGreaterThan 46
+    }
+}
+
 # ---------------------------------------------------------------- Journal et sûreté
 
 Describe 'Write-SetupLog' {
@@ -772,10 +783,13 @@ Describe 'Invoke-SetupCompanionActions' {
 
 Describe 'Invoke-SetupShortcutsStep' {
     $config = New-TestLaunchConfig @(New-TestCompanionEntry 'blitz' 'Blitz')
+    $config | Add-Member -NotePropertyName shortcutLocations -NotePropertyValue @('desktop')
     Mock Write-SetupLog {}
     Mock New-SetupShortcutWithFallback { 'C:\Bureau\Hex Launcher.lnk' }
     Mock New-SetupShortcuts { @('C:\Bureau\League of Legends JP - Blitz.lnk') }
     Mock Remove-ObsoleteShortcuts { 'Retiré : C:\Bureau\League of Legends FR.lnk' }
+    Mock Remove-OwnShortcuts {}
+    Mock Remove-EmptyShortcutFolder { $false }
     Mock Select-IconSetForConfig { @{ Name = 'classic'; Path = 'C:\x\classic' } }
 
     It 'reste sur la page sans rien créer quand aucune langue n''est cochée' {
@@ -828,7 +842,7 @@ Describe 'New-SetupConfigurationShortcut' {
     It 'rend une chaîne vide et journalise l''avertissement quand la création échoue partout : l''étape continue' {
         Reset-SetupTestState
         Mock New-SetupShortcutWithFallback { throw 'Bureau et dossier du lanceur en lecture seule' }
-        New-SetupConfigurationShortcut | Should Be ''
+        New-SetupConfigurationShortcut 'C:\Bureau' | Should Be ''
         Assert-MockCalled -Scope It Write-SetupLog -Exactly -Times 1 -ParameterFilter { $Text -match 'lecture seule' }
     }
 }
@@ -839,13 +853,13 @@ Describe 'New-SetupShortcuts' {
     It 'journalise chaque raccourci créé et rend leurs chemins' {
         Mock New-LaunchShortcutWithFallback { param($Combination) "C:\Bureau\$($Combination.Name).lnk" }
         $combinations = Get-ShortcutCombinations @('ja_JP', 'fr_FR') @()
-        $paths = @(New-SetupShortcuts $combinations)
+        $paths = @(New-SetupShortcuts $combinations 'C:\Bureau')
         $paths -join '|' | Should Be 'C:\Bureau\League of Legends JP.lnk|C:\Bureau\League of Legends FR.lnk'
         Assert-MockCalled -Scope It Write-SetupLog -Exactly -Times 2 -ParameterFilter { $Text -match '^Créé : ' }
     }
 
     It 'rend une liste vide sans combinaison' {
-        @(New-SetupShortcuts @()).Count | Should Be 0
+        @(New-SetupShortcuts @() 'C:\Bureau').Count | Should Be 0
     }
 }
 
@@ -1051,17 +1065,17 @@ Describe 'New-SetupLegacyLaunchBox' {
 }
 
 Describe 'Section « Compatibilité Riot » de la page Raccourcis' {
-    $section = Get-SetupRiotCompatibilityLayout 350
+    $section = Get-SetupRiotCompatibilityLayout $SetupRiotCompatibilityTop
 
     It 'empile le titre, la case puis la note, le journal en dessous' {
-        $section.TitleTop | Should Be 350
+        $section.TitleTop | Should Be $SetupRiotCompatibilityTop
         $section.BoxTop   | Should BeGreaterThan ($section.TitleTop + 21)
         $section.HintTop  | Should BeGreaterThan ($section.BoxTop + 25)
         $section.LogTop   | Should BeGreaterThan ($section.HintTop + $section.HintHeight - 1)
     }
 
     It 'laisse au journal au moins deux lignes dans la fenêtre de l''assistant' {
-        $layout = Get-SetupLayout 784 641
+        $layout = Get-SetupLayout 784 663
         $layout.ContentHeight - $section.LogTop | Should BeGreaterThan 40
     }
 
@@ -1172,17 +1186,118 @@ Describe 'Invoke-SetupDetectStep' {
 }
 
 Describe 'Texte forcé de la page Raccourcis : mise en page' {
-    $forced = Get-SetupForcedTextLayout 94 $SetupRiotCompatibilityTop
+    $forced = Get-SetupForcedTextLayout $SetupShortcutColumnsTop $SetupLocationRowTop
 
     It 'empile case, liste et avertissement sous la liste des langues' {
-        $forced.BoxTop     | Should BeGreaterThan (94 + $forced.LocaleListHeight - 1)
+        $forced.BoxTop     | Should BeGreaterThan ($SetupShortcutColumnsTop + $forced.LocaleListHeight - 1)
         $forced.ListTop    | Should BeGreaterThan ($forced.BoxTop + 25)
         $forced.WarningTop | Should BeGreaterThan ($forced.ListTop + 27)
     }
 
-    It 'laisse à l''avertissement rouge quatre lignes au moins, sans empiéter sur la section Compatibilité Riot' {
+    It 'laisse à l''avertissement rouge quatre lignes au moins, sans empiéter sur la ligne des emplacements' {
         $forced.WarningHeight | Should BeGreaterThan 51
-        ($forced.WarningTop + $forced.WarningHeight) | Should BeLessThan ($SetupRiotCompatibilityTop + 1)
+        ($forced.WarningTop + $forced.WarningHeight) | Should BeLessThan ($SetupLocationRowTop + 1)
+    }
+}
+
+Describe 'Emplacement des raccourcis de la page Raccourcis' {
+    It 'pose une case Bureau puis une case Menu Démarrer, côte à côte à droite du titre' {
+        $boxes = New-SetupLocationBoxes @('desktop', 'start_menu') $SetupLocationRowTop
+        @($boxes.Keys) -join ',' | Should Be 'desktop,start_menu'
+        $boxes['desktop'].Text | Should Be 'Bureau'
+        $boxes['start_menu'].Text | Should Be 'Menu Démarrer'
+        $boxes['desktop'].Left | Should Be $SetupLocationBoxesLeft
+        $boxes['start_menu'].Left | Should BeGreaterThan ($boxes['desktop'].Left + $boxes['desktop'].Width - 1)
+    }
+
+    It 'ne coche que les emplacements présélectionnés' {
+        $boxes = New-SetupLocationBoxes @('start_menu') 0
+        $boxes['desktop'].Checked | Should Be $false
+        $boxes['start_menu'].Checked | Should Be $true
+        (Get-SetupCheckedLocations $boxes) -join ',' | Should Be 'start_menu'
+    }
+
+    It 'se place sous les colonnes, juste au-dessus de la section Compatibilité Riot' {
+        $iconNoteBottom = $SetupShortcutColumnsTop + 110 + 12 + 24 + (5 * 17 + 4) + 2 + 28
+        $SetupLocationRowTop | Should BeGreaterThan ($iconNoteBottom - 1)
+        ($SetupLocationRowTop + 26) | Should BeLessThan ($SetupRiotCompatibilityTop + 1)
+    }
+
+    It 'relève les cases pour le redessin de la page' {
+        Reset-SetupTestState
+        $script:InstallState.Controls.LocationBoxes = New-SetupLocationBoxes @('desktop') 0
+        (Get-SetupPageSelection).ShortcutLocations -join ',' | Should Be 'desktop'
+    }
+
+    It 'prend la saisie de la page, sinon les emplacements de config.json' {
+        $config = New-TestLaunchConfig
+        (Get-SetupSelectedLocations $config @{ Locations = @('start_menu') }) -join ',' | Should Be 'start_menu'
+        (Get-SetupSelectedLocations $config @{}) -join ',' | Should Be 'desktop,start_menu'
+    }
+
+    It 'a un titre et deux cases traduits' {
+        try {
+            foreach ($language in @('fr', 'en', 'ja')) {
+                Initialize-Translation $language | Out-Null
+                foreach ($key in @('setup.shortcuts.locations', 'setup.shortcuts.location.desktop', 'setup.shortcuts.location.startMenu', 'setup.shortcuts.noLocation')) {
+                    Get-Text $key | Should Not Be $key
+                }
+            }
+        }
+        finally { Initialize-Translation 'fr' | Out-Null }
+    }
+}
+
+Describe 'Invoke-SetupShortcutsStep, emplacements' {
+    $config = New-TestLaunchConfig
+    $Destination          = 'C:\Bureau'
+    $StartMenuDestination = 'C:\Programs\Hex Launcher'
+    Mock Write-SetupLog {}
+    Mock Select-IconSetForConfig { $null }
+    Mock Save-LaunchShortcutLocations { $true }
+    Mock New-SetupShortcuts { param($Combinations, $Directory) "$Directory\League of Legends JP.lnk" }
+    Mock New-SetupShortcutWithFallback { param($Directory) "$Directory\Hex Launcher.lnk" }
+    Mock Remove-ObsoleteShortcuts {}
+    Mock Remove-OwnShortcuts { param($Directory) "$Directory\League of Legends JP.lnk" }
+    Mock Remove-EmptyShortcutFolder { $true }
+
+    It 'reste sur la page sans rien créer ni enregistrer quand aucun emplacement n''est coché' {
+        Reset-SetupTestState @{ Config = $config }
+        Mock Get-SetupShortcutSelection { @{ Codes = @('ja_JP'); CompanionIds = @(); Locations = @() } }
+        Invoke-SetupShortcutsStep | Should Be $false
+        Assert-MockCalled -Scope It New-SetupShortcuts -Exactly -Times 0
+        Assert-MockCalled -Scope It Save-LaunchShortcutLocations -Exactly -Times 0
+        Assert-MockCalled -Scope It Write-SetupLog -Exactly -Times 1 -ParameterFilter { $Text -match 'Aucun emplacement coché' }
+    }
+
+    It 'pose raccourcis de jeu et de configuration dans les deux emplacements et mémorise le choix' {
+        Reset-SetupTestState @{ Config = $config }
+        Mock Get-SetupShortcutSelection { @{ Codes = @('ja_JP'); CompanionIds = @(); Locations = @('desktop', 'start_menu') } }
+        Invoke-SetupShortcutsStep | Should Be $true
+        Assert-MockCalled -Scope It Save-LaunchShortcutLocations -Exactly -Times 1 -ParameterFilter { ($Locations -join ',') -eq 'desktop,start_menu' }
+        $script:InstallState.ShortcutPaths -join '|' | Should Be 'C:\Bureau\League of Legends JP.lnk|C:\Programs\Hex Launcher\League of Legends JP.lnk'
+        $script:InstallState.SetupShortcutPath | Should Be 'C:\Bureau\Hex Launcher.lnk, C:\Programs\Hex Launcher\Hex Launcher.lnk'
+        Assert-MockCalled -Scope It Remove-OwnShortcuts -Exactly -Times 0
+    }
+
+    It 'retire les raccourcis de ce lanceur de l''emplacement décoché, puis le dossier du menu Démarrer vide' {
+        Reset-SetupTestState @{ Config = $config }
+        Mock Get-SetupShortcutSelection { @{ Codes = @('ja_JP'); CompanionIds = @(); Locations = @('desktop') } }
+        Invoke-SetupShortcutsStep | Should Be $true
+        Assert-MockCalled -Scope It New-SetupShortcuts -Exactly -Times 1 -ParameterFilter { $Directory -eq 'C:\Bureau' }
+        Assert-MockCalled -Scope It Remove-OwnShortcuts -Exactly -Times 1 -ParameterFilter { $Directory -eq 'C:\Programs\Hex Launcher' }
+        Assert-MockCalled -Scope It Write-SetupLog -Exactly -Times 1 -ParameterFilter { $Text -eq 'Retiré : C:\Programs\Hex Launcher\League of Legends JP.lnk' }
+        Assert-MockCalled -Scope It Remove-EmptyShortcutFolder -Exactly -Times 1 -ParameterFilter { $Directory -eq 'C:\Programs\Hex Launcher' }
+    }
+
+    It 'ne retire les obsolètes que parmi les raccourcis du même dossier' {
+        Reset-SetupTestState @{ Config = $config; ExistingShortcuts = @(
+            [pscustomobject]@{ Path = 'C:\Bureau\League of Legends FR.lnk' }
+            [pscustomobject]@{ Path = 'C:\Programs\Hex Launcher\League of Legends KR.lnk' }) }
+        Mock Get-SetupShortcutSelection { @{ Codes = @('ja_JP'); CompanionIds = @(); Locations = @('desktop', 'start_menu') } }
+        Invoke-SetupShortcutsStep | Should Be $true
+        Assert-MockCalled -Scope It Remove-ObsoleteShortcuts -Exactly -Times 1 -ParameterFilter { @($Existing).Count -eq 1 -and $Existing[0].Path -eq 'C:\Bureau\League of Legends FR.lnk' }
+        Assert-MockCalled -Scope It Remove-ObsoleteShortcuts -Exactly -Times 1 -ParameterFilter { @($Existing).Count -eq 1 -and $Existing[0].Path -eq 'C:\Programs\Hex Launcher\League of Legends KR.lnk' }
     }
 }
 
@@ -1306,10 +1421,13 @@ Describe 'Texte forcé de la page Raccourcis : saisie' {
 
 Describe 'Invoke-SetupShortcutsStep, texte forcé' {
     $config = New-TestLaunchConfig
+    $config | Add-Member -NotePropertyName shortcutLocations -NotePropertyValue @('desktop')
     Mock Write-SetupLog {}
     Mock New-SetupShortcutWithFallback { 'C:\Bureau\Hex Launcher.lnk' }
     Mock New-SetupShortcuts { @('C:\Bureau\League of Legends JP-FR.lnk') }
     Mock Remove-ObsoleteShortcuts {}
+    Mock Remove-OwnShortcuts {}
+    Mock Remove-EmptyShortcutFolder { $false }
     Mock Select-IconSetForConfig { $null }
     Mock Save-LaunchForcedTextLocale { $true }
 

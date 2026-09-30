@@ -33,6 +33,12 @@ param(
     [string]$NotesFile = ''
 )
 
+. (Join-Path (Split-Path $PSScriptRoot -Parent) 'app\lib\icon.lib.ps1')
+
+# Logo HL nu, sans pastille, centré (tools\make-logo-icon.ps1 -Placement centered) — icône de l'installeur et image de
+# son assistant ; outil de construction, jamais livré dans app\
+$InstallerLogoIcon = 'tools\installer\installer-logo.ico'
+
 $ReleaseRootFiles = @('setup.bat', 'LISEZMOI.txt', 'LICENSE', 'README.md', 'README.fr.md', 'README.ja.md')
 # Garde-fou : ces données vivent hors de app\ depuis la 0.4.0, mais un poste de développement plus ancien peut encore
 # les y avoir — elles ne doivent jamais partir dans une release
@@ -92,18 +98,45 @@ function Find-InnoSetupCompiler {
     return $null
 }
 
-# Arguments de ISCC : version, dossier préparé et dossier de sortie passés en définitions au script .iss
-function Get-InstallerCompilerArguments([string]$Staging, [string]$Version, [string]$DistDir) {
+# Arguments de ISCC : version, dossier préparé, dossier de sortie et image de l'assistant passés en définitions au .iss
+function Get-InstallerCompilerArguments([string]$Staging, [string]$Version, [string]$DistDir, [string]$WizardImage) {
     $script = Join-Path $PSScriptRoot 'installer\hex-launcher.iss'
-    return @('/Q', "/DAppVersion=$Version", "/DSourceDir=$Staging", "/DOutputDir=$DistDir", $script)
+    return @('/Q', "/DAppVersion=$Version", "/DSourceDir=$Staging", "/DOutputDir=$DistDir", "/DWizardImage=$WizardImage", $script)
+}
+
+# Plus grande image du logo HL nu, en PNG (Inno Setup 6 l'accepte), à côté du dossier préparé — jamais dedans,
+# elle serait installée avec le reste. Inno étire l'image jusqu'au bord droit de la fenêtre : le logo, qui touche les
+# bords de son icône, est posé en petit au centre d'une marge transparente.
+function Export-InstallerWizardImage([string]$Root, [string]$Staging) {
+    $entries = @(Read-IcoEntries (Join-Path $Root $InstallerLogoIcon))
+    $largest = $entries | Sort-Object Size -Descending | Select-Object -First 1
+    $path    = "$Staging-wizard-image.png"
+    $canvas  = New-InstallerWizardCanvas $largest.Bitmap
+    $canvas.Save($path, [System.Drawing.Imaging.ImageFormat]::Png)
+    $canvas.Dispose()
+    $entries | ForEach-Object { $_.Bitmap.Dispose() }
+    return $path
+}
+
+# Canevas carré de la taille du logo : logo réduit à 50 %, centré
+function New-InstallerWizardCanvas([System.Drawing.Bitmap]$Logo) {
+    $size   = $Logo.Width
+    $scaled = [int]($size * 0.50)
+    $offset = [int](($size - $scaled) / 2)
+    $canvas = New-Object System.Drawing.Bitmap($size, $size, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+    $g = [System.Drawing.Graphics]::FromImage($canvas)
+    $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+    $g.DrawImage($Logo, $offset, $offset, $scaled, $scaled)
+    $g.Dispose()
+    return $canvas
 }
 
 # hex-launcher-setup-<version>.exe, compilé depuis le dossier préparé (sans marqueur portable)
-function New-ReleaseInstaller([string]$Staging, [string]$Version, [string]$DistDir) {
+function New-ReleaseInstaller([string]$Staging, [string]$Version, [string]$DistDir, [string]$WizardImage) {
     $compiler = Find-InnoSetupCompiler
     if (-not $compiler) { throw 'Inno Setup 6 introuvable (ISCC.exe) — installer : winget install --id JRSoftware.InnoSetup --exact' }
     New-Item -ItemType Directory -Path $DistDir -Force | Out-Null
-    & $compiler (Get-InstallerCompilerArguments $Staging $Version $DistDir)
+    & $compiler (Get-InstallerCompilerArguments $Staging $Version $DistDir $WizardImage)
     if ($LASTEXITCODE -ne 0) { throw "ISCC a échoué (code $LASTEXITCODE)" }
     return Join-Path $DistDir "hex-launcher-setup-$Version.exe"
 }
@@ -168,9 +201,10 @@ if ($MyInvocation.InvocationName -ne '.') {
     $root    = Get-ProjectRoot
     $version = Get-ReleaseVersion $root
     $staging = New-ReleaseStaging $root $version $env:TEMP
+    $wizardImage = Export-InstallerWizardImage $root $staging
     try {
         $dist      = Join-Path $root 'dist'
-        $installer = New-ReleaseInstaller $staging $version $dist
+        $installer = New-ReleaseInstaller $staging $version $dist $wizardImage
         Add-PortableMarker $staging | Out-Null
         $zip       = New-ReleaseArchive $staging $version $dist
         foreach ($asset in @($installer, $zip)) {
@@ -178,5 +212,8 @@ if ($MyInvocation.InvocationName -ne '.') {
         }
         if ($Publish) { "Release publiée : $(Publish-Release $version @($installer, $zip) (Read-ReleaseNotes $Notes $NotesFile))" }
     }
-    finally { Remove-Item $staging -Recurse -Force -ErrorAction SilentlyContinue }
+    finally {
+        Remove-Item $staging -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item $wizardImage -Force -ErrorAction SilentlyContinue
+    }
 }

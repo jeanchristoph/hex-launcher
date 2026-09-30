@@ -8,7 +8,7 @@
     (leur bloc Main est ignoré) et l'assistant n'orchestre que leurs fonctions :
         detect-config.ps1        → config.json (généré s'il manque, jamais écrasé ; chemins Riot corrigeables sur la page 1)
         manage-companion-app.ps1 → choix, installation et désinstallation des applis compagnon
-        create-shortcuts.ps1     → un raccourci par langue × appli compagnon dans la destination
+        create-shortcuts.ps1     → un raccourci par langue × appli compagnon sur le Bureau et/ou dans le menu Démarrer
 
     La navigation repose sur une machine à états pure (Get-NextInstallStep, Test-CanGoBack…) testée sans fenêtre ;
     les étapes du moteur et ses avertissements sont détournés vers le journal de la fenêtre (aucun splash séparé).
@@ -25,6 +25,9 @@ param(
     # Dossier où créer les raccourcis (défaut : Bureau de l'utilisateur courant)
     [string]$Destination = [Environment]::GetFolderPath('Desktop'),
 
+    # Dossier du menu Démarrer (défaut : Programs\Hex Launcher de l'utilisateur courant)
+    [string]$StartMenuDestination = (Join-Path ([Environment]::GetFolderPath('Programs')) 'Hex Launcher'),
+
     # Langue de l'assistant : fr, en ou ja (défaut : langue de Windows, sinon anglais)
     [string]$Language
 )
@@ -33,7 +36,7 @@ param(
 . (Join-Path $PSScriptRoot 'lib\theme.lib.ps1')
 . (Join-Path $PSScriptRoot 'detect-config.ps1')
 . (Join-Path $PSScriptRoot 'manage-companion-app.ps1')
-. (Join-Path $PSScriptRoot 'create-shortcuts.ps1') -Destination $Destination
+. (Join-Path $PSScriptRoot 'create-shortcuts.ps1') -Destination $Destination -StartMenuDestination $StartMenuDestination
 . (Join-Path $PSScriptRoot 'lib\app-data.lib.ps1')
 . (Join-Path $PSScriptRoot 'lib\update-prompt.lib.ps1')
 . (Join-Path $PSScriptRoot 'lib\update-install.lib.ps1')
@@ -444,13 +447,12 @@ function Register-SetupCompanionUi {
 function New-SetupSidebar([int]$Height) {
     $panel      = New-ThemedPanel 0 0 230 $Height
     $panel.Dock = 'Left'
-    $panel.Controls.Add((New-ThemedLabel "HEX`r`nLAUNCHER" 20 24 200 66 'Gold' 15 'Bold'))
-    $panel.Controls.Add((New-ThemedLabel 'League of Legends' 20 92 200 24 'Muted' 10))
-    $script:InstallState.Controls.VersionLabel = New-ThemedLabel '' 20 116 200 20 'Muted' 9
+    $panel.Controls.Add((New-ThemedLabel 'HEX LAUNCHER' 20 24 200 30 'Gold' 13 'Bold'))
+    $script:InstallState.Controls.VersionLabel = New-ThemedLabel '' 20 56 200 20 'Muted' 9
     $panel.Controls.Add($script:InstallState.Controls.VersionLabel)
     $labels = @{}
     for ($i = 0; $i -lt $SetupSteps.Count; $i++) {
-        $label = New-ThemedLabel '' 20 (150 + 36 * $i) 200 28 'Muted' 10
+        $label = New-ThemedLabel '' 20 (96 + 36 * $i) 200 28 'Muted' 10
         $labels[$SetupSteps[$i]] = $label
         $panel.Controls.Add($label)
     }
@@ -485,9 +487,9 @@ function New-SetupFooter($Layout) {
 
 function New-SetupWindow {
     $state    = $script:InstallState
-    # 680 px de haut : la section « Compatibilité Riot » (titre, case, note) tient au-dessus du journal, et la
-    # fenêtre reste dans un écran 768 px
-    $form     = New-ThemedForm (Get-SetupWindowTitle) 800 680 (Get-SetupWindowIconPath)
+    # 702 px de haut : la ligne « Emplacement des raccourcis » et la section « Compatibilité Riot » (titre, case,
+    # note) tiennent au-dessus du journal, et la fenêtre reste dans un écran 768 px (barre des tâches comprise)
+    $form     = New-ThemedForm (Get-SetupWindowTitle) 800 702 (Get-SetupWindowIconPath)
     $layout   = Get-SetupLayout $form.ClientSize.Width $form.ClientSize.Height
     $controls = $state.Controls
     $controls.PageTitle = New-ThemedTitle '' $layout.ContentLeft 24 $layout.ContentWidth
@@ -591,6 +593,7 @@ function Get-SetupPageSelection {
     if ($null -ne $controls.IconSetList) { $selection.IconSetList = @(Get-SetupSelectedIconSetName $controls.IconSetList) }
     if ($null -ne $controls.UninstallBox) { $selection.UninstallOthers = [bool]$controls.UninstallBox.Checked }
     if ($null -ne $controls.LegacyLaunchBox) { $selection.LegacyLaunchBox = @([string]$controls.LegacyLaunchBox.Checked) }
+    if ($null -ne $controls.LocationBoxes) { $selection.ShortcutLocations = @(Get-SetupCheckedLocations $controls.LocationBoxes) }
     if ($null -ne $controls.UpdateCheckBox) { $selection.UpdateCheckBox = @([string]$controls.UpdateCheckBox.Checked) }
     if ($null -ne $controls.ForcedTextBox) { $selection.ForcedTextBox = @([string]$controls.ForcedTextBox.Checked) }
     if ($null -ne $controls.ForcedTextList) { $selection.ForcedTextList = @([string](Get-ThemedComboBoxKey $controls.ForcedTextList)) }
@@ -848,33 +851,36 @@ function New-SetupShortcutsControls {
     $rightColumn   = $columnWidth + 20
     $companionRows = [Math]::Max(1, $companionApps.Count)
     $companionHeight = [Math]::Min(110, 24 * $companionRows + 8)
-    # L'intro tient sur 3 lignes (le chemin du Bureau est long) ; les deux colonnes commencent dessous
-    $columnsTop      = 94
+    # L'intro tient sur 2 lignes, les deux colonnes dessous ; « Emplacement des raccourcis » puis « Compatibilité Riot »
+    # en pleine largeur sous les colonnes
+    $columnsTop      = $SetupShortcutColumnsTop
     $iconSetsTop     = $columnsTop + $companionHeight + 12
     $previewSize     = 64
     $iconListHeight  = 5 * 17 + 4   # les cinq jeux livrés visibles sans défilement
-    $forcedText      = Get-SetupForcedTextLayout $columnsTop $SetupRiotCompatibilityTop
+    $forcedText      = Get-SetupForcedTextLayout $columnsTop $SetupLocationRowTop
     $controls.LocaleList    = New-SetupCheckedList (Get-LocaleListItems $state.Locales) (Get-SetupPreselection 'LocaleList' (Get-PreselectedCodes $state.Locales $state.ExistingShortcuts (Get-UiLanguage))) 0 $columnsTop $columnWidth $forcedText.LocaleListHeight
     $controls.CompanionList = New-SetupCheckedList (Get-ShortcutCompanionListItems $companionApps) (Get-SetupPreselection 'CompanionList' (Get-PreselectedShortcutCompanionIds $companionApps $state.ExistingShortcuts)) $rightColumn $columnsTop $columnWidth $companionHeight
     $controls.IconSetList   = New-SetupIconSetList $state.IconSets (Get-SetupPreselectedIconSetName $state) $rightColumn ($iconSetsTop + 24) ($columnWidth - $previewSize - 12) $iconListHeight
     $controls.IconSetPreview = New-ThemedPicture ($rightColumn + $columnWidth - $previewSize) ($iconSetsTop + 24) $previewSize
     # Section « Compatibilité Riot » en pleine largeur sous les deux colonnes, le journal dessous
     $compatibility  = Get-SetupRiotCompatibilityLayout $SetupRiotCompatibilityTop
-    # Note sous la liste des jeux (jeux externes), dans l'espace qui reste au-dessus de la section
+    # Note sous la liste des jeux (jeux externes), dans l'espace qui reste au-dessus de la ligne des emplacements
     $noteTop        = $iconSetsTop + 24 + $iconListHeight + 2
-    $controls.IconSetNote   = New-ThemedLabel '' $rightColumn $noteTop $columnWidth ([Math]::Max(28, $compatibility.TitleTop - $noteTop)) 'Muted' 8.25
+    $controls.IconSetNote   = New-ThemedLabel '' $rightColumn $noteTop $columnWidth ([Math]::Max(28, $SetupLocationRowTop - $noteTop)) 'Muted' 8.25
     $controls.LegacyLaunchBox = New-SetupLegacyLaunchBox $state 0 $compatibility.BoxTop $layout.ContentWidth
+    $controls.LocationBoxes   = New-SetupLocationBoxes (Get-SetupPreselection 'ShortcutLocations' (Get-LaunchShortcutLocations $state.Config)) $SetupLocationRowTop
     $controls.ForcedTextBox     = New-SetupForcedTextBox (Get-SetupPreselectedForcedText $state) 0 $forcedText.BoxTop $columnWidth
     $controls.ForcedTextList    = New-ThemedComboBox (Get-LocaleListItems $state.Locales) (Get-SetupPreselectedForcedTextList $state) 0 $forcedText.ListTop $columnWidth
     $controls.ForcedTextWarning = New-ThemedLabel (Get-Text 'setup.shortcuts.forcedTextWarning') 0 $forcedText.WarningTop $columnWidth $forcedText.WarningHeight 'Danger' 8.25
     $controls.Log           = New-SetupLog 0 $compatibility.LogTop $layout.ContentWidth ($layout.ContentHeight - $compatibility.LogTop)
-    $controls.Inputs        = @($controls.LocaleList, $controls.CompanionList, $controls.IconSetList, $controls.ForcedTextBox, $controls.ForcedTextList)
+    $controls.Inputs        = @($controls.LocaleList, $controls.CompanionList, $controls.IconSetList, $controls.ForcedTextBox, $controls.ForcedTextList) + @($controls.LocationBoxes.Values)
     $controls.IconSetList.Add_SelectedIndexChanged({ Invoke-SetupSafely { Update-SetupIconSetPreview } })
     $controls.ForcedTextBox.Add_CheckedChanged({ Invoke-SetupSafely { Update-SetupForcedTextControls } })
     Update-SetupIconSetPreview
     Update-SetupForcedTextControls
     return @(
-        (New-ThemedLabel (Get-Text 'setup.shortcuts.intro' $Destination) 0 0 $layout.ContentWidth 66 'Muted')
+        (New-ThemedLabel (Get-Text 'setup.shortcuts.intro') 0 0 $layout.ContentWidth 44 'Muted')
+        (New-ThemedLabel (Get-Text 'setup.shortcuts.locations') 0 ($SetupLocationRowTop + 3) $SetupLocationBoxesLeft 22 'Gold' 10 'Bold')
         (New-ThemedLabel (Get-Text 'shortcuts.languages') 0 ($columnsTop - 24) $columnWidth 22 'Gold' 10 'Bold')
         (New-ThemedLabel (Get-Text 'setup.shortcuts.companions') $rightColumn ($columnsTop - 24) $columnWidth 22 'Gold' 10 'Bold')
         (New-ThemedLabel (Get-Text 'setup.shortcuts.iconSet') $rightColumn $iconSetsTop $columnWidth 22 'Gold' 10 'Bold')
@@ -888,6 +894,7 @@ function New-SetupShortcutsControls {
         $controls.IconSetNote
         (New-ThemedLabel (Get-Text 'setup.shortcuts.riotCompatibility') 0 $compatibility.TitleTop $layout.ContentWidth 22 'Gold' 10 'Bold')
         $controls.LegacyLaunchBox
+        @($controls.LocationBoxes.Values)
         (New-ThemedLabel (Get-Text 'setup.shortcuts.legacyLaunchHint') 0 $compatibility.HintTop $layout.ContentWidth $compatibility.HintHeight 'Muted' 8.25)
         $controls.Log
     )
@@ -916,10 +923,43 @@ function New-SetupLegacyLaunchBox($State, [int]$Left, [int]$Top, [int]$Width) {
     return $box
 }
 
+# ---------------------------------------------------------------- Emplacement des raccourcis (page 3)
+
+# Colonnes sous l'intro (2 lignes) ; puis, en pleine largeur, la ligne des emplacements (titre doré à gauche, une case
+# par emplacement à droite), placée sous la note des jeux d'icônes même avec quatre compagnons ou plus (liste à 110 px)
+$SetupShortcutColumnsTop = 72
+$SetupLocationRowTop     = 340
+$SetupLocationBoxesLeft  = 220
+$SetupLocationBoxWidth   = 150
+$SetupLocationLabelKeys  = @{ desktop = 'setup.shortcuts.location.desktop'; start_menu = 'setup.shortcuts.location.startMenu' }
+
+# Une case par emplacement de $LaunchShortcutLocations, dans l'ordre, cochée si présélectionnée ; clé = emplacement
+function New-SetupLocationBoxes([string[]]$Preselected, [int]$Top) {
+    $boxes = [ordered]@{}
+    $left  = $SetupLocationBoxesLeft
+    foreach ($location in $LaunchShortcutLocations) {
+        $box = New-ThemedCheckBox (Get-Text $SetupLocationLabelKeys[$location]) $left $Top $SetupLocationBoxWidth
+        $box.Checked = $Preselected -contains $location
+        $boxes[$location] = $box
+        $left += $SetupLocationBoxWidth
+    }
+    return $boxes
+}
+
+function Get-SetupCheckedLocations($Boxes) {
+    return @($Boxes.Keys | Where-Object { $Boxes[$_].Checked })
+}
+
+# Emplacements de la saisie ; sans cases sur la page, ceux de config.json
+function Get-SetupSelectedLocations($Config, [hashtable]$Selection) {
+    if ($null -ne $Selection.Locations) { return @($Selection.Locations) }
+    return @(Get-LaunchShortcutLocations $Config)
+}
+
 # ---------------------------------------------------------------- Texte forcé (page 3)
 
 # Haut de la section « Compatibilité Riot », en pleine largeur sous les deux colonnes
-$SetupRiotCompatibilityTop = 350
+$SetupRiotCompatibilityTop = 372
 
 # Colonne de gauche sous la liste des langues : la case, la liste déroulante pleine largeur (« Português (Brasil) »
 # ne tient pas à côté de la case dans une demi-colonne de 250 px), puis l'avertissement rouge jusqu'à la section Riot
@@ -1010,7 +1050,7 @@ function Update-SetupIconSetPreview {
 function Show-SetupShortcutsPage {
     $state = $script:InstallState
     $state.Locales           = @(Read-LocaleCatalog $localesPath)
-    $state.ExistingShortcuts = @(Get-ExistingLaunchShortcuts $Destination)
+    $state.ExistingShortcuts = @(Get-AllExistingLaunchShortcuts)
     $state.IconSets          = @(Get-IconSets $icoRoot)
     Add-SetupContent (New-SetupShortcutsControls)
 }
@@ -1022,26 +1062,34 @@ function Get-SetupShortcutSelection {
         CompanionIds = @(Get-SetupCheckedKeys $controls.CompanionList)
         IconSet      = Get-SetupSelectedIconSetName $controls.IconSetList
         UseLocalApi  = -not [bool]$controls.LegacyLaunchBox.Checked
+        Locations    = @(Get-SetupCheckedLocations $controls.LocationBoxes)
         TextCode     = Get-SetupForcedTextCode ([bool]$controls.ForcedTextBox.Checked) ([string](Get-ThemedComboBoxKey $controls.ForcedTextList))
     }
 }
 
-function New-SetupShortcuts([object[]]$Combinations) {
+function New-SetupShortcuts([object[]]$Combinations, [string]$Directory) {
     $created = foreach ($combination in $Combinations) {
-        $path = Invoke-SetupLogged { New-LaunchShortcutWithFallback $combination }
+        $path = Invoke-SetupLogged { New-LaunchShortcutWithFallback $combination $Directory }
         Write-SetupLog (Get-Text 'shortcuts.created' $path)
         $path
     }
     return @($created | Where-Object { $_ })
 }
 
-# Rend vrai si des raccourcis ont été créés ; sans langue cochée, on reste sur la page
+# Rend vrai si des raccourcis ont été créés ; sans langue ou sans emplacement coché, on reste sur la page
 function Invoke-SetupShortcutsStep {
     $state     = $script:InstallState
     $selection = Get-SetupShortcutSelection
     if ($selection.Codes.Count -eq 0) {
         Write-SetupLog (Get-Text 'setup.shortcuts.noLanguage')
         return $false
+    }
+    if ($null -ne $selection.Locations) {
+        if (@($selection.Locations).Count -eq 0) {
+            Write-SetupLog (Get-Text 'setup.shortcuts.noLocation')
+            return $false
+        }
+        Save-LaunchShortcutLocations $state.Config $SetupConfigPath $selection.Locations | Out-Null
     }
     $iconSet = Select-IconSetForConfig $state.Config $SetupConfigPath $selection.IconSet
     if ($iconSet) { Write-SetupLog (Get-Text 'setup.shortcuts.iconSetChosen' (Get-IconSetLabel $iconSet)) }
@@ -1054,16 +1102,37 @@ function Invoke-SetupShortcutsStep {
         Write-SetupLog $(if ($selection.TextCode) { Get-Text 'setup.shortcuts.forcedTextChosen' $selection.TextCode } else { Get-Text 'setup.shortcuts.forcedTextOff' })
     }
     $combinations = Get-ShortcutCombinations $selection.Codes (Resolve-ShortcutCompanions $state.Config $selection.CompanionIds) ([string]$selection.TextCode)
-    $state.ShortcutPaths = @(New-SetupShortcuts $combinations)
-    foreach ($line in @(Remove-ObsoleteShortcuts $state.ExistingShortcuts $combinations)) { Write-SetupLog $line }
-    $state.SetupShortcutPath = New-SetupConfigurationShortcut
+    Update-SetupShortcutLocations $combinations (Get-SetupSelectedLocations $state.Config $selection)
     return $true
 }
 
+# Dans chaque emplacement retenu : raccourcis de jeu, retrait des obsolètes, raccourci de configuration.
+# Un emplacement décoché perd les raccourcis de ce lanceur ; le dossier du menu Démarrer part s'il est vide.
+function Update-SetupShortcutLocations([object[]]$Combinations, [string[]]$Locations) {
+    $state      = $script:InstallState
+    $created    = @()
+    $setupPaths = @()
+    foreach ($location in $LaunchShortcutLocations) {
+        $directory = Get-ShortcutLocationFolder $location
+        if ($Locations -notcontains $location) { Remove-SetupLocationShortcuts $directory; continue }
+        $created += @(New-SetupShortcuts $Combinations $directory)
+        foreach ($line in @(Remove-ObsoleteShortcuts (Select-ShortcutsInFolder $state.ExistingShortcuts $directory) $Combinations)) { Write-SetupLog $line }
+        $setupPaths += New-SetupConfigurationShortcut $directory
+    }
+    Remove-EmptyShortcutFolder $StartMenuDestination | Out-Null
+    $state.ShortcutPaths     = $created
+    $state.SetupShortcutPath = @($setupPaths | Where-Object { $_ }) -join ', '
+}
+
+function Remove-SetupLocationShortcuts([string]$Directory) {
+    # Virgule : le tableau des chemins traverse Invoke-SetupLogged d'un bloc, qui ne garde que la dernière sortie
+    foreach ($path in @(Invoke-SetupLogged { ,@(Remove-OwnShortcuts $Directory) })) { Write-SetupLog (Get-Text 'shortcuts.removed' $path) }
+}
+
 # Le raccourci vers setup.bat : toujours recréé (il suit un déplacement du dossier) ; un échec ne bloque pas l'étape
-function New-SetupConfigurationShortcut {
+function New-SetupConfigurationShortcut([string]$Directory) {
     try {
-        $path = Invoke-SetupLogged { New-SetupShortcutWithFallback }
+        $path = Invoke-SetupLogged { New-SetupShortcutWithFallback $Directory }
         Write-SetupLog (Get-Text 'shortcuts.created' $path)
         return [string]$path
     } catch {
@@ -1074,6 +1143,13 @@ function New-SetupConfigurationShortcut {
 
 # ---------------------------------------------------------------- Page 4 : terminé
 
+# Deux lignes au moins ; plus quand les chemins du Bureau et du menu Démarrer se suivent et débordent
+function Get-SetupSummaryLabelHeight($Label) {
+    $bounds = New-Object System.Drawing.Size($Label.Width, 0)
+    $size   = [System.Windows.Forms.TextRenderer]::MeasureText($Label.Text, $Label.Font, $bounds, [System.Windows.Forms.TextFormatFlags]::WordBreak)
+    return [Math]::Max(46, $size.Height + 4)
+}
+
 function Show-SetupDonePage {
     $state = $script:InstallState
     $width = $state.Layout.ContentWidth
@@ -1081,8 +1157,10 @@ function Show-SetupDonePage {
     $controls = @(New-ThemedLabel (Get-Text 'setup.done.title') 0 0 $width 26 'Accent' 11 'Bold')
     $top = 44
     foreach ($line in Get-CompletionSummaryLines $state.Config $SetupConfigPath $state.ShortcutPaths $state.SetupShortcutPath) {
-        $controls += New-ThemedLabel $line 0 $top $width 46 'Cream'
-        $top += 52
+        $label = New-ThemedLabel $line 0 $top $width 46 'Cream'
+        $label.Height = Get-SetupSummaryLabelHeight $label
+        $controls += $label
+        $top += $label.Height + 6
     }
     foreach ($line in Get-MissingRiotPathLines $state.Config) {
         $controls += New-ThemedLabel $line 0 $top $width 46 'Danger'

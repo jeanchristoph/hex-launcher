@@ -52,3 +52,5 @@ mot de passe, endpoint de lancement de produit). Le bouton Play reste un repli f
   matin, 4 en 3 min l'après-midi, 5 en 5 min avec fermeture API à 17:30). C'est la cadence des connexions Vanguard
   qui compte. Les tests Pester restent unitaires, tout est moqué.
 - Aucune écriture de journal, aucun chemin périmé, aucun recul d'horloge ne doit faire échouer un lancement.
+- Raccourcis posés uniquement dans des dossiers de l'utilisateur (Bureau, menu Démarrer `Programs\Hex Launcher\`) —
+  jamais dans le dossier Démarrage (Startup) ni dans All Users (2026-09-30).

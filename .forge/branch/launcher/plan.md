@@ -403,11 +403,26 @@ exécutable introuvable ; tests réécrits ; notes de release : Known limits 1 r
 **Files:** `tools/make-release.ps1`, `tests/make-release.tests.ps1`
 **Description:** Les notes de la release 0.2.0 sont parties tronquées (558 caractères sur 5 900) : passées en argument
 `--notes "<texte>"`, PowerShell 5.1 coupe au premier guillemet double. Réparé à la main (`gh release edit --notes-file`).
-`Publish-Release` écrit désormais les notes formatées dans `distelease-notes-v<version>.md` (UTF-8 sans BOM, LF,
+`Publish-Release` écrit désormais les notes formatées dans `dist
+elease-notes-v<version>.md` (UTF-8 sans BOM, LF,
 conservé à côté du zip) et appelle `gh release create … --notes-file`. Nouveau `-NotesFile <chemin>` (prioritaire sur
 `-Notes`). Tests : fichier écrit avec guillemets et retours intacts, lecture du fichier, `gh` reçoit `--notes-file`.
 [x] 2026-09-20 — `Read-ReleaseNotes`, `Write-ReleaseNotesFile`, `--notes-file` ; 4 tests ; archive reconstruite sans
 publier (SHA-256 identique) ; 719 verts.
+
+### T35 — Raccourcis de jeu dans le menu Démarrer
+**Effort:** M
+**Files:** `app/create-shortcuts.ps1`, `app/remove-shortcuts.ps1`, `app/setup.ps1`, `app/lib/launch-config.lib.ps1`, `tools/installer/hex-launcher.iss`, `app/i18n/{fr,en,ja}.json`, `tests/`, `README*.md`
+**Description:** Dossier « Hex Launcher » du menu Démarrer de l'utilisateur (`Programs\Hex Launcher\`) : raccourcis de
+jeu + raccourci de configuration « Hex Launcher » (aujourd'hui seul à la racine — sinon deux entrées homonymes). Page
+Raccourcis de l'assistant : deux cases « Bureau » / « Menu Démarrer » sous « Emplacement des raccourcis », cochées par
+défaut, mémorisées dans `config.json`, au moins une cochée ; décocher un emplacement y retire nos raccourcis (règle des
+raccourcis obsolètes). Désinstallation : `remove-shortcuts.ps1` nettoie Bureau et dossier du menu (supprimé s'il est
+vide) ; `.iss` : raccourci de configuration dans le dossier, ancien raccourci racine (0.4.x) retiré. Portable : même
+comportement, retrait documenté. Textes FR validés avant traduction.
+[x] 2026-09-30 — `shortcutLocations` (config), `Get-ShortcutLocationFolder` / `-StartMenuDestination`, retrait déplacé dans
+create-shortcuts (`Remove-OwnShortcuts`, `Remove-EmptyShortcutFolder`), ligne de cases sur la page Raccourcis (fenêtre
+688 px), résumé de la page Terminé à hauteur mesurée, `.iss` ; README ×3, LISEZMOI ; rendu fr/en/ja vérifié par capture.
 
 ## Risks
 - Endpoint non documenté par Riot : relevé sur `swagger/v3/openapi.json` à l'exécution, et le repli rend l'échec non bloquant.
@@ -454,4 +469,5 @@ None
 | T32 — Croix de fermeture sur le splash | S | [x] |
 | T33 — Réveil de Riot sans limite, relance périodique | S | [x] |
 | T34 — make-release : notes par fichier | S | [x] |
+| T35 — Raccourcis dans le menu Démarrer | M | [x] |
 | **Total** | **~L (5-8 h)** | |

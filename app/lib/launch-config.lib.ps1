@@ -152,6 +152,25 @@ function Save-LaunchForcedTextLocale($Config, [string]$ConfigPath, [string]$Loca
     return $true
 }
 
+# Emplacements des raccourcis (cases de setup.bat), dans l'ordre d'affichage
+$LaunchShortcutLocations = @('desktop', 'start_menu')
+
+# Emplacements retenus, dans l'ordre de $LaunchShortcutLocations ; absent, vide ou sans valeur connue → tous
+function Get-LaunchShortcutLocations($Config) {
+    $saved = @($Config.shortcutLocations | ForEach-Object { [string]$_ })
+    $known = @($LaunchShortcutLocations | Where-Object { $saved -contains $_ })
+    if ($known.Count -eq 0) { return $LaunchShortcutLocations }
+    return $known
+}
+
+# N'écrit config.json que si le choix a changé ; rend vrai dans ce cas
+function Save-LaunchShortcutLocations($Config, [string]$ConfigPath, [string[]]$Locations) {
+    if ((@(Get-LaunchShortcutLocations $Config) -join ',') -eq (@($Locations) -join ',')) { return $false }
+    $Config | Add-Member -NotePropertyName shortcutLocations -NotePropertyValue ([string[]]@($Locations)) -Force
+    Write-LaunchConfig $Config $ConfigPath
+    return $true
+}
+
 function Get-LaunchIconSetName($Config) {
     if ($null -ne $Config.iconSet) { return [string]$Config.iconSet }
     return ''

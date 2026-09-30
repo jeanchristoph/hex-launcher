@@ -5,7 +5,7 @@ Hex Launcher — lanceur League of Legends multi-langue + applis compagnon (Wind
      Version portable : double-cliquez sur  setup.bat  — vos réglages restent dans  data\, à côté.
      Jamais « en tant qu'administrateur ».
   2. Suivez l'assistant : détection, applis compagnon, raccourcis.
-  3. Lancez le jeu depuis les raccourcis « League of Legends XX » créés sur le Bureau.
+  3. Lancez le jeu depuis les raccourcis « League of Legends XX » créés sur le Bureau et dans le menu Démarrer.
 
 Le dossier  app\  contient le moteur (scripts, icônes, catalogues) : rien à y toucher.
 Pour changer de langue ou d'appli compagnon plus tard : relancez l'assistant (Hex Launcher ou setup.bat).
@@ -28,7 +28,7 @@ Projet non affilié à Riot Games — voir la mention légale dans les README.
 -----------------------------------------------------------------------------------
 EN — Installed version: start Hex Launcher from the Start menu. Portable version: double-click
 setup.bat — your settings stay in data\, next to it. Never as administrator. Follow the wizard,
-then use the "League of Legends XX" desktop shortcuts. The app\ folder is the engine: nothing to edit there.
+then use the "League of Legends XX" shortcuts (desktop and Start menu). The app\ folder is the engine: nothing to edit there.
 Updates: a new version is offered at launch (Install / Later) — can be turned off in the wizard.
 The wizard follows the Windows language (FR / EN / JA) — selector at the bottom left.
 Trust: setup.bat is one line (open it in Notepad), all code is plain text in app\. No data collected, no

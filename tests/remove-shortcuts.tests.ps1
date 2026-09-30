@@ -47,6 +47,13 @@ Describe 'Remove-OwnShortcuts' {
         @(Remove-OwnShortcuts (Join-Path $TestDrive 'absent')).Count | Should Be 0
     }
 
+    It 'retire du menu Démarrer le raccourci « Hex Launcher » posé par l''installeur vers ce setup.bat' {
+        $startMenu = New-TestDesktop
+        $setup = New-TestShortcut $startMenu 'Hex Launcher' $setupBatch
+        @(Remove-OwnShortcuts $startMenu).Count | Should Be 1
+        Test-Path $setup | Should Be $false
+    }
+
     It 'signale un raccourci verrouillé sans interrompre le retrait des autres' {
         $desktop = New-TestDesktop
         New-TestShortcut $desktop 'League of Legends JP' $powershell "-File `"$launcher`" -Locale ja_JP" | Out-Null
@@ -54,5 +61,42 @@ Describe 'Remove-OwnShortcuts' {
         Mock Write-Warning {}
         @(Remove-OwnShortcuts $desktop).Count | Should Be 0
         Assert-MockCalled Write-Warning -Exactly 1 -Scope It
+    }
+}
+
+Describe 'Remove-AllOwnShortcuts' {
+    It 'nettoie le Bureau et le menu Démarrer, puis retire le dossier du menu devenu vide' {
+        $Destination          = New-TestDesktop
+        $StartMenuDestination = New-TestDesktop
+        New-TestShortcut $Destination 'League of Legends JP' $powershell "-File `"$launcher`" -Locale ja_JP" | Out-Null
+        New-TestShortcut $StartMenuDestination 'League of Legends JP' $powershell "-File `"$launcher`" -Locale ja_JP" | Out-Null
+        New-TestShortcut $StartMenuDestination 'Hex Launcher' $setupBatch | Out-Null
+        @(Remove-AllOwnShortcuts).Count | Should Be 3
+        Test-Path $StartMenuDestination | Should Be $false
+        Test-Path $Destination | Should Be $true
+    }
+
+    It 'garde le dossier du menu Démarrer quand un raccourci d''une autre copie y reste' {
+        $Destination          = New-TestDesktop
+        $StartMenuDestination = New-TestDesktop
+        New-TestShortcut $StartMenuDestination 'League of Legends FR' $powershell '-File "D:\portable\app\launch-lol.ps1" -Locale fr_FR' | Out-Null
+        @(Remove-AllOwnShortcuts).Count | Should Be 0
+        Test-Path $StartMenuDestination | Should Be $true
+    }
+}
+
+Describe 'Remove-EmptyShortcutFolder' {
+    It 'retire un dossier vide et laisse un dossier qui contient encore un fichier' {
+        $empty = New-TestDesktop
+        $full  = New-TestDesktop
+        New-Item -ItemType File -Path (Join-Path $full 'autre.lnk') | Out-Null
+        Remove-EmptyShortcutFolder $empty | Should Be $true
+        Remove-EmptyShortcutFolder $full | Should Be $false
+        Test-Path $empty | Should Be $false
+        Test-Path $full | Should Be $true
+    }
+
+    It 'ne fait rien sur un dossier absent' {
+        Remove-EmptyShortcutFolder (Join-Path $TestDrive 'absent') | Should Be $false
     }
 }

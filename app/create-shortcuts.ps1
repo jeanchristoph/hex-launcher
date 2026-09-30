@@ -1,6 +1,6 @@
 ﻿<#
 .SYNOPSIS
-    Crée les raccourcis « League of Legends XX » sur le Bureau — un par langue × appli compagnon choisies — avec les chemins de CETTE machine.
+    Crée les raccourcis « League of Legends XX » sur le Bureau et dans le menu Démarrer — un par langue × appli compagnon choisies — avec les chemins de CETTE machine.
 
 .DESCRIPTION
     Les .lnk contiennent des chemins absolus : après une copie du dossier sur un autre poste
@@ -13,6 +13,10 @@
     langue cochée reste celle des voix et le texte en jeu est forcé : « League of Legends JP-FR - Blitz ».
     Les raccourcis obsolètes (combinaisons décochées) sont retirés de la destination, pour qu'elle
     reflète toujours le dernier choix.
+
+    Emplacements : Bureau (-Destination) et dossier « Hex Launcher » du menu Démarrer de l'utilisateur
+    (-StartMenuDestination), selon shortcutLocations de config.json (cases de l'assistant, les deux par défaut).
+    Un emplacement non retenu perd les raccourcis de ce lanceur ; le dossier du menu Démarrer est retiré s'il est vide.
 
     Un raccourci avec compagnon reçoit l'icône drapeau surmontée de la pastille du compagnon (couleur + lettre
     déclarées dans companion-apps.json), composée dans icons\<jeu>\companion\ à chaque exécution. Sans pastille ou en
@@ -46,6 +50,9 @@ param(
 
     # Dossier où créer les raccourcis (défaut : Bureau de l'utilisateur courant)
     [string]$Destination = [Environment]::GetFolderPath('Desktop'),
+
+    # Dossier du menu Démarrer (défaut : Programs\Hex Launcher de l'utilisateur courant — jamais All Users ni Démarrage)
+    [string]$StartMenuDestination = (Join-Path ([Environment]::GetFolderPath('Programs')) 'Hex Launcher'),
 
     # Jeu d'icônes : nom d'un sous-dossier de ico\ (défaut : iconSet de config.json, sinon le jeu par défaut). Mémorisé dans config.json.
     [string]$IconSet,
@@ -448,7 +455,8 @@ function New-PickerButton([string]$Text, [int]$Left, [int]$Top, [string]$DialogR
 # Retourne @{ Codes = [langues cochées]; CompanionIds = [compagnons cochés] } ou $null si annulé
 function Show-ShortcutPicker([object[]]$Catalog, [string[]]$PreselectedCodes, [object[]]$CompanionApps, [string[]]$PreselectedCompanionIds) {
     $companionRows = [Math]::Max(1, $CompanionApps.Count)
-    $companionsTop = 56 + 24 + 300 + 12
+    $listsTop      = 76   # sous l'aide, sur trois lignes
+    $companionsTop = $listsTop + 24 + 300 + 12
     $buttonsTop    = $companionsTop + 24 + 24 * $companionRows + 20
 
     $form                 = New-Object System.Windows.Forms.Form
@@ -463,9 +471,9 @@ function Show-ShortcutPicker([object[]]$Catalog, [string[]]$PreselectedCodes, [o
     $hint          = New-Object System.Windows.Forms.Label
     $hint.Text     = Get-Text 'shortcuts.pickerHint'
     $hint.Location = New-Object System.Drawing.Point(12, 12)
-    $hint.Size     = New-Object System.Drawing.Size(360, 40)
+    $hint.Size     = New-Object System.Drawing.Size(360, 60)
 
-    $locales    = New-PickerList (Get-Text 'shortcuts.languages') 56 300 @($Catalog | ForEach-Object { $_.code }) @($Catalog | ForEach-Object { "$($_.code)   $($_.label)" }) $PreselectedCodes
+    $locales    = New-PickerList (Get-Text 'shortcuts.languages') $listsTop 300 @($Catalog | ForEach-Object { $_.code }) @($Catalog | ForEach-Object { "$($_.code)   $($_.label)" }) $PreselectedCodes
     $companions = New-PickerList (Get-Text 'shortcuts.pickerCompanions') $companionsTop (24 * $companionRows) @($CompanionApps | ForEach-Object { $_.id }) @($CompanionApps | ForEach-Object { $_.name }) $PreselectedCompanionIds
     $ok     = New-PickerButton (Get-Text 'shortcuts.button.install') 180 $buttonsTop 'OK'
     $cancel = New-PickerButton (Get-Text 'common.cancel')            282 $buttonsTop 'Cancel'
@@ -547,21 +555,39 @@ function Get-ForcedTextShortcutDescription($Combination) {
     return Get-Text 'shortcuts.descriptionForcedText' $Combination.Code, $Combination.TextCode
 }
 
-# Bureau en priorité ; si l'écriture y échoue (dossier protégé, OneDrive verrouillé, chemin absent),
-# repli dans le dossier des données (jamais celui du code) pour que l'installation aboutisse quand même.
-# $Create reçoit le dossier.
-function New-ShortcutWithFallback([scriptblock]$Create) {
+# ---------------------------------------------------------------- Emplacements
+
+# Dossier d'un emplacement de $LaunchShortcutLocations (launch-config.lib.ps1)
+function Get-ShortcutLocationFolder([string]$Location) {
+    if ($Location -eq 'start_menu') { return $StartMenuDestination }
+    return $Destination
+}
+
+# Raccourcis de notre lanceur dans tous les emplacements, retenus ou non : ils servent à pré-cocher les listes
+function Get-AllExistingLaunchShortcuts {
+    return @($LaunchShortcutLocations | ForEach-Object { Get-ExistingLaunchShortcuts (Get-ShortcutLocationFolder $_) })
+}
+
+function Select-ShortcutsInFolder([object[]]$Shortcuts, [string]$Directory) {
+    return @($Shortcuts | Where-Object { (Split-Path $_.Path -Parent) -eq $Directory })
+}
+
+# Emplacement voulu en priorité (créé s'il manque : le dossier du menu Démarrer n'existe pas avant le premier
+# passage) ; si l'écriture y échoue (dossier protégé, OneDrive verrouillé), repli dans le dossier des données
+# (jamais celui du code) pour que l'installation aboutisse quand même. $Create reçoit le dossier.
+function New-ShortcutWithFallback([string]$Directory, [scriptblock]$Create) {
     try {
-        return & $Create $Destination
+        if (-not (Test-Path -LiteralPath $Directory)) { New-Item -ItemType Directory -Path $Directory -ErrorAction Stop | Out-Null }
+        return & $Create $Directory
     } catch {
         $fallback = Get-AppDataFolder $folder
-        Write-Warning (Get-Text 'shortcuts.destinationFallback' $Destination, $_.Exception.Message, $fallback)
+        Write-Warning (Get-Text 'shortcuts.destinationFallback' $Directory, $_.Exception.Message, $fallback)
         return & $Create $fallback
     }
 }
 
-function New-LaunchShortcutWithFallback($Combination) {
-    return New-ShortcutWithFallback { param([string]$Directory) New-LaunchShortcut $Combination $Directory }
+function New-LaunchShortcutWithFallback($Combination, [string]$Directory) {
+    return New-ShortcutWithFallback $Directory { param([string]$Folder) New-LaunchShortcut $Combination $Folder }
 }
 
 # ---------------------------------------------------------------- Raccourci de l'assistant
@@ -582,8 +608,44 @@ function New-SetupShortcut([string]$Directory) {
     return $path
 }
 
-function New-SetupShortcutWithFallback {
-    return New-ShortcutWithFallback { param([string]$Directory) New-SetupShortcut $Directory }
+function New-SetupShortcutWithFallback([string]$Directory) {
+    return New-ShortcutWithFallback $Directory { param([string]$Folder) New-SetupShortcut $Folder }
+}
+
+# ---------------------------------------------------------------- Retrait (emplacement décoché, désinstallation)
+
+# « Hex Launcher.lnk » du dossier, s'il ouvre le setup.bat de ce lanceur ; $null sinon
+function Get-OwnSetupShortcut([string]$Directory) {
+    $path = [IO.Path]::Combine($Directory, "$SetupShortcutName.lnk")
+    if (-not (Test-Path -LiteralPath $path)) { return $null }
+    if ($shell.CreateShortcut($path).TargetPath -ne $setupBatch) { return $null }
+    return $path
+}
+
+# Chemins de tous les raccourcis de ce lanceur dans le dossier — ceux d'une autre copie (portable à côté d'une
+# version installée) n'en font pas partie
+function Get-OwnShortcutPaths([string]$Directory) {
+    $paths = @(Get-ExistingLaunchShortcuts $Directory | ForEach-Object { $_.Path })
+    $setup = Get-OwnSetupShortcut $Directory
+    if ($setup) { $paths += $setup }
+    return $paths
+}
+
+# Un raccourci verrouillé ne bloque jamais le retrait des autres : il est signalé et laissé. Rend les chemins retirés.
+function Remove-OwnShortcuts([string]$Directory) {
+    $removed = foreach ($path in Get-OwnShortcutPaths $Directory) {
+        try { Remove-Item -LiteralPath $path -Force -ErrorAction Stop; $path }
+        catch { Write-Warning "Raccourci non retiré : $path ($($_.Exception.Message))" }
+    }
+    return @($removed)
+}
+
+# Dossier du menu Démarrer retiré quand plus rien n'y reste — jamais appelé sur le Bureau
+function Remove-EmptyShortcutFolder([string]$Directory) {
+    if (-not (Test-Path -LiteralPath $Directory)) { return $false }
+    if (@(Get-ChildItem -LiteralPath $Directory -Force).Count -gt 0) { return $false }
+    Remove-Item -LiteralPath $Directory -Force
+    return $true
 }
 
 # Retire les raccourcis de notre lanceur dont la combinaison n'est plus retenue
@@ -611,7 +673,7 @@ if ($MyInvocation.InvocationName -ne '.') {
     Test-LaunchConfig $config
     Select-IconSetForConfig $config $configPath $IconSet | Out-Null
     $companionApps = @($config.companionApps)
-    $existing      = Get-ExistingLaunchShortcuts $Destination
+    $existing      = Get-AllExistingLaunchShortcuts
 
     if (-not $Locales) {
         $choice = Show-ShortcutPicker $catalog (Get-PreselectedCodes $catalog $existing (Get-UiLanguage)) $companionApps (Get-PreselectedShortcutCompanionIds $companionApps $existing)
@@ -632,8 +694,17 @@ if ($MyInvocation.InvocationName -ne '.') {
     $selectedCompanions = @($Companions | ForEach-Object { Find-LaunchCompanion $config $_ })
     if ($TextLocale -and $TextLocale -notin $catalog.code) { throw (Get-Text 'shortcuts.unknownLocales' $TextLocale) }
     $combinations = Get-ShortcutCombinations $Locales $selectedCompanions $TextLocale
-    foreach ($combination in $combinations) {
-        Get-Text 'shortcuts.created' (New-LaunchShortcutWithFallback $combination)
+    $locations    = @(Get-LaunchShortcutLocations $config)
+    foreach ($location in $LaunchShortcutLocations) {
+        $directory = Get-ShortcutLocationFolder $location
+        if ($locations -notcontains $location) {
+            Remove-OwnShortcuts $directory | ForEach-Object { Get-Text 'shortcuts.removed' $_ }
+            continue
+        }
+        foreach ($combination in $combinations) {
+            Get-Text 'shortcuts.created' (New-LaunchShortcutWithFallback $combination $directory)
+        }
+        Remove-ObsoleteShortcuts (Select-ShortcutsInFolder $existing $directory) $combinations
     }
-    Remove-ObsoleteShortcuts $existing $combinations
+    Remove-EmptyShortcutFolder $StartMenuDestination | Out-Null
 }
