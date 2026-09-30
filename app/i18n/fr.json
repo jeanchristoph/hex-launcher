@@ -4,7 +4,7 @@
   "common.cancel": "Annuler",
   "common.warning": "Avertissement : {0}",
   "common.notElevated": "Ne pas exécuter en tant qu'administrateur : les installeurs sont per-user et les désinstalleurs sont lus dans le registre utilisateur",
-  "setup.windowTitle": "Hex Launcher — configuration",
+  "setup.version": "Version {0}",
   "setup.language": "Langue",
   "setup.page.detect": "Bienvenue",
   "setup.page.apps": "Applis compagnon",

@@ -17,6 +17,7 @@
 #>
 
 . (Join-Path $PSScriptRoot 'theme.lib.ps1')
+. (Join-Path $PSScriptRoot 'app-data.lib.ps1')   # Get-InstalledVersion
 
 function New-SplashLabel([string]$Text, [System.Drawing.Font]$Font, [string]$ColorName, [string]$Dock, [int]$Height) {
     $label           = New-Object System.Windows.Forms.Label
@@ -80,9 +81,26 @@ function New-SplashWindow([string]$Subtitle, [string]$Title = 'LEAGUE OF LEGENDS
     $form.ShowInTaskbar   = $false
 
     Add-SplashControls $form ([pscustomobject]@{ Title = $Title; Subtitle = $Subtitle; Warning = $Warning })
+    Add-SplashVersion $form (Get-InstalledVersion (Split-Path $PSScriptRoot -Parent)) | Out-Null
     $form.Show()
     Invoke-SplashTick
     return $form
+}
+
+# « v0.4.0 » en haut à gauche, en miroir de la croix : en haut, il ne bouge pas quand le bouton du bas apparaît.
+# Version inconnue → rien
+$SplashVersionControlName = 'SplashVersion'
+
+function Add-SplashVersion($Form, [string]$Version) {
+    if (-not $Version) { return $null }
+    $label           = New-SplashLabel "v$Version" (New-ThemeFont 8) 'Muted' 'None' 0
+    $label.Name      = $SplashVersionControlName
+    $label.AutoSize  = $true
+    $label.Location  = New-Object System.Drawing.Point(8, 6)
+    $label.BackColor = [System.Drawing.Color]::Transparent
+    $Form.Controls.Add($label)
+    $label.BringToFront()
+    return $label
 }
 
 function Invoke-SplashTick {

@@ -44,8 +44,9 @@ Initialize-Translation (Resolve-UiLanguage $Language (Get-UICulture).Name) | Out
 $SetupConfigPath  = Get-AppDataFilePath $PSScriptRoot 'config.json'
 $SetupCatalogPath = Join-Path $PSScriptRoot 'companion-apps.json'
 
+# « Hex Launcher 0.4.0 », identique dans toutes les langues ; sans version lisible, « Hex Launcher »
 function Get-SetupWindowTitle {
-    return Get-Text 'setup.windowTitle'
+    return "Hex Launcher $(Get-InstalledVersion $PSScriptRoot)".Trim()
 }
 
 # Même icône que le raccourci « Hex Launcher » : l'engrenage ; repli sur l'icône du projet s'il manque
@@ -445,6 +446,8 @@ function New-SetupSidebar([int]$Height) {
     $panel.Dock = 'Left'
     $panel.Controls.Add((New-ThemedLabel "HEX`r`nLAUNCHER" 20 24 200 66 'Gold' 15 'Bold'))
     $panel.Controls.Add((New-ThemedLabel 'League of Legends' 20 92 200 24 'Muted' 10))
+    $script:InstallState.Controls.VersionLabel = New-ThemedLabel '' 20 116 200 20 'Muted' 9
+    $panel.Controls.Add($script:InstallState.Controls.VersionLabel)
     $labels = @{}
     for ($i = 0; $i -lt $SetupSteps.Count; $i++) {
         $label = New-ThemedLabel '' 20 (150 + 36 * $i) 200 28 'Muted' 10
@@ -509,6 +512,15 @@ function Update-SetupSidebar([string]$CurrentId) {
     }
     $languageLabel = $script:InstallState.Controls.LanguageLabel
     if ($null -ne $languageLabel) { $languageLabel.Text = Get-Text 'setup.language' }
+    $versionLabel = $script:InstallState.Controls.VersionLabel
+    if ($null -ne $versionLabel) { $versionLabel.Text = Get-SetupVersionText }
+}
+
+# « Version 0.4.0 » dans la langue de l'assistant ; '' sans version lisible
+function Get-SetupVersionText {
+    $version = Get-InstalledVersion $PSScriptRoot
+    if (-not $version) { return '' }
+    return Get-Text 'setup.version' $version
 }
 
 function Update-SetupNavigation {

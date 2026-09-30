@@ -946,13 +946,13 @@ Describe 'Set-SetupLanguage' {
     $appItems = @(@{ Key = 'blitz'; Label = 'Blitz' }, @{ Key = 'opgg'; Label = 'OP.GG' })
     AfterEach { Initialize-Translation 'fr' | Out-Null }
 
-    It 'change la langue, retitre la fenêtre et redessine la page courante avec la saisie relevée' {
+    It 'change la langue, garde le titre versionné et redessine la page courante avec la saisie relevée' {
         $form = New-FakeForm
         Reset-SetupTestState @{ StepId = 'apps'; Form = $form }
         $script:InstallState.Controls.AppList = New-SetupCheckedList $appItems @('opgg') 0 0 200 100
         Set-SetupLanguage 'en' | Should Be $true
         Get-UiLanguage | Should Be 'en'
-        $form.Text | Should Be 'Hex Launcher — setup'
+        $form.Text | Should Be (Get-SetupWindowTitle)
         $script:InstallState.PendingSelection.AppList -join ',' | Should Be 'opgg'
         Assert-MockCalled -Scope It Show-SetupPage -Exactly -Times 1 -ParameterFilter { $StepId -eq 'apps' }
     }
@@ -1423,5 +1423,23 @@ Describe 'Start-SetupWizard et mise à jour' {
         }
         Start-SetupWizard | Out-Null
         $script:shown | Should Be $true
+    }
+}
+
+Describe 'Numéro de version de l''assistant' {
+    It 'titre la fenêtre « Hex Launcher <version> », sans « configuration »' {
+        Mock Get-InstalledVersion { '0.4.1' }
+        Get-SetupWindowTitle | Should Be 'Hex Launcher 0.4.1'
+    }
+
+    It 'garde « Hex Launcher » seul quand la version est illisible' {
+        Mock Get-InstalledVersion { '' }
+        Get-SetupWindowTitle | Should Be 'Hex Launcher'
+        Get-SetupVersionText | Should Be ''
+    }
+
+    It 'affiche « Version <version> » dans la colonne, dans la langue de l''assistant' {
+        Mock Get-InstalledVersion { '0.4.1' }
+        Get-SetupVersionText | Should Be 'Version 0.4.1'
     }
 }

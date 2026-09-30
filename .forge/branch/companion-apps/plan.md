@@ -203,6 +203,12 @@
 **Description:** Installation par l'exe ; réseau = api.github.com + applis compagnon, aucune donnée envoyée ; avertissement SmartScreen expliqué.
 [x] README FR validé puis EN/JA (sous-agents), sections Mises à jour et Désinstaller, Confiance, LISEZMOI FR/EN, project.md ; chemins d'icônes composées corrigés dans les 3 README
 
+### T32 — Numéro de version sur l'écran de chargement et l'assistant
+**Effort:** S
+**Files:** `app/lib/splash.lib.ps1`, `app/lib/app-data.lib.ps1`, `app/lib/update.lib.ps1`, `app/setup.ps1`, `app/i18n/*.json`, `tests/`
+**Description:** Splash : « v0.4.0 » petit, gris, en haut à gauche (miroir de la croix). Assistant : titre « Hex Launcher 0.4.0 » (sans « — configuration », demande utilisateur), « Version 0.4.0 » en gris sous « League of Legends ». Get-InstalledVersion déplacée dans app-data.lib, '' si illisible. Sortie en 0.4.1.
+[x] splash « vX » haut-gauche (vu à l'écran), titre « Hex Launcher X » + « Version X » dans la colonne, Get-InstalledVersion dans app-data.lib — 1027 tests
+
 ## Risks
 - Porofessor : `/S` silencieux testé seulement avec Overwolf déjà présent ; Overwolf absent → comportement inconnu (timeout de sonde plus long, message explicite)
 - winget absent (App Installer non installé, comptes restreints) → repli `download`/`browser`
@@ -244,4 +250,5 @@
 | T28 — Vérification des mises à jour | M | [x] |
 | T29 — Installation de la mise à jour | L | [x] |
 | T30 — README ×3, Confiance, LISEZMOI, project.md | S | [x] |
+| T32 — Numéro de version (splash, assistant) | S | [x] |
 | **Total** | **~5 j** | |

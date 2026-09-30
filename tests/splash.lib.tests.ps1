@@ -211,3 +211,22 @@ Describe 'Wait-WithAnimation' {
         Assert-MockCalled -Scope It Invoke-SplashTick -Times 0
     }
 }
+
+Describe 'Add-SplashVersion' {
+    It 'affiche « v » + la version en haut à gauche, au premier plan' {
+        $form = New-Object System.Windows.Forms.Form
+        $label = Add-SplashVersion $form '0.4.1'
+        $label.Text | Should Be 'v0.4.1'
+        $label.Location.X | Should BeLessThan 20
+        $label.Location.Y | Should BeLessThan 20
+        $form.Controls.GetChildIndex($label) | Should Be 0
+        $form.Dispose()
+    }
+
+    It 'n''ajoute rien quand la version est inconnue' {
+        $form = New-Object System.Windows.Forms.Form
+        Add-SplashVersion $form '' | Should BeNullOrEmpty
+        $form.Controls.Count | Should Be 0
+        $form.Dispose()
+    }
+}

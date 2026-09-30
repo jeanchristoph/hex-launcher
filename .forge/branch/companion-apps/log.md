@@ -1,3 +1,5 @@
+- [2026-09-30] Release v0.4.1 (T32) : notes FR validées puis EN (output/20260930-release-notes-0-4-1.md) ; launcher fusionnée dans dev et master avant publication.
+- [2026-09-30] T32 faite : version sur le splash et l'assistant ; titre sans « — configuration » (demande utilisateur), clé setup.windowTitle remplacée par setup.version. DrawToBitmap dessine les contrôles en ordre inverse : vérifier le splash par capture d'écran réelle.
 - [2026-09-30] Release v0.4.0 : notes FR validées puis EN (output/20260930-release-notes-0-4-0.md) ; launcher fusionnée dans dev et master avant publication.
 - [2026-09-30] Paquets de test gardés : dist\hex-launcher-setup-0.3.2.exe et hex-launcher-portable-0.3.2.zip (code 362d95b, version 0.3.2 avec mise à jour auto) pour tester la mise à jour vers 0.4.0.
 - [2026-09-30] Gravé 362d95b sur launcher (branche active, poussée à la demande de l'utilisateur) ; companion-apps reste à 63307db. Passage en 0.4.0 au moment du test final de validation.

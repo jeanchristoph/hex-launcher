@@ -18,6 +18,8 @@
     proposée à nouveau.
 #>
 
+. (Join-Path $PSScriptRoot 'app-data.lib.ps1')   # Get-InstalledVersion
+
 $UpdateRepository      = 'jeanchristoph/hex-launcher'
 $UpdateLatestApiUrl    = "https://api.github.com/repos/$UpdateRepository/releases/latest"
 $UpdateCheckTimeoutMs  = 2000
@@ -25,10 +27,6 @@ $UpdateStateFileName   = 'update-state.json'
 $UpdateUserAgent       = 'hex-launcher'
 
 # ---------------------------------------------------------------- Versions
-
-function Get-InstalledVersion([string]$AppRoot) {
-    return (Get-Content -Path (Join-Path $AppRoot 'version.txt') -Raw).Trim()
-}
 
 # 'v0.4.0' → '0.4.0' ; tag qui n'est pas une version x.y.z → ''
 function ConvertTo-ReleaseVersion([string]$Tag) {

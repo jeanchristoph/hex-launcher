@@ -108,3 +108,15 @@ Describe 'Move-LegacyAppDataFile' {
         Assert-MockCalled Write-Warning -Exactly 1 -Scope It
     }
 }
+
+Describe 'Get-InstalledVersion' {
+    It 'lit la version de la copie dans app\version.txt' {
+        $app = New-TestAppRoot
+        Set-Content (Join-Path $app 'version.txt') "0.4.1`r`n"
+        Get-InstalledVersion $app | Should Be '0.4.1'
+    }
+
+    It 'rend vide sans version.txt, sans erreur' {
+        Get-InstalledVersion (New-TestAppRoot) | Should Be ''
+    }
+}

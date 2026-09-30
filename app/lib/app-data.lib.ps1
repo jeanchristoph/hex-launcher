@@ -38,6 +38,12 @@ function Get-DistributionKind([string]$AppRoot) {
     return 'source'
 }
 
+# Version de cette copie, lue dans app\version.txt ; '' si le fichier manque ou est illisible (rien à afficher)
+function Get-InstalledVersion([string]$AppRoot) {
+    try { return (Get-Content -LiteralPath (Join-Path $AppRoot 'version.txt') -Raw -ErrorAction Stop).Trim() }
+    catch { return '' }
+}
+
 function Get-AppDataFolder([string]$AppRoot) {
     if (Test-PortableInstall $AppRoot) { return Join-Path (Split-Path $AppRoot -Parent) $PortableDataFolderName }
     return Join-Path $env:LOCALAPPDATA $AppDataFolderName

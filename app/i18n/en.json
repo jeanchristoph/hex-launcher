@@ -4,7 +4,7 @@
   "common.cancel": "Cancel",
   "common.warning": "Warning: {0}",
   "common.notElevated": "Do not run as administrator: installers are per-user and uninstallers are read from the user registry",
-  "setup.windowTitle": "Hex Launcher — setup",
+  "setup.version": "Version {0}",
   "setup.language": "Language",
   "setup.page.detect": "Welcome",
   "setup.page.apps": "Companion apps",

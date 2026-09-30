@@ -4,7 +4,7 @@
   "common.cancel": "キャンセル",
   "common.warning": "警告：{0}",
   "common.notElevated": "管理者として実行しないでください：インストーラーはユーザーごとに動作し、アンインストーラーはユーザーのレジストリから読み取られます",
-  "setup.windowTitle": "Hex Launcher — セットアップ",
+  "setup.version": "バージョン {0}",
   "setup.language": "言語",
   "setup.page.detect": "ようこそ",
   "setup.page.apps": "コンパニオンアプリ",
