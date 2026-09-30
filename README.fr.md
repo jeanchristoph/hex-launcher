@@ -18,6 +18,16 @@ installe, et on obtient un raccourci par langue × appli compagnon
 > Internet que pour une appli compagnon que vous avez cochée et pour vérifier s'il existe une nouvelle version
 > (désactivable), refuse le mode administrateur et n'installe rien sans votre clic sur *Appliquer*. `setup.bat` tient en une ligne, tout le code est en clair. Détails : [Confiance](#confiance--ce-que-fait-setupbat-ce-quil-ne-fait-pas).
 
+## Installer
+
+1. Ouvrez la **[dernière version](https://github.com/jeanchristoph/hex-launcher/releases/latest)**, puis, dans la rubrique *Assets* en bas de la page, téléchargez **`hex-launcher-setup-x.y.z.exe`**.
+2. Double-cliquez dessus. Si Windows affiche « Windows a protégé votre ordinateur » (l'installeur n'est pas signé) : *Informations complémentaires* → *Exécuter quand même*.
+3. À la fin, l'assistant s'ouvre : détection, applis compagnon, raccourcis. Lancez ensuite le jeu depuis les raccourcis « League of Legends XX » du Bureau.
+
+**Version portable** (sans installation, par exemple sur une clé USB) : téléchargez **`hex-launcher-portable-x.y.z.zip`**, décompressez-le où vous voulez, puis double-cliquez sur `setup.bat`.
+
+Les mises à jour suivantes se proposent d'elles-mêmes au lancement. Détails : [Mise en route](#mise-en-route-sur-une-nouvelle-machine).
+
 ## Contenu du dossier
 
 | Fichier | Rôle |

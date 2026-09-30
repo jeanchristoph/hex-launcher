@@ -1,0 +1,15 @@
+🔧 **Hex Launcher 0.4.1 est dispo !**
+
+Fini le zip à décompresser à la main : il y a maintenant un **vrai installeur**. Il s'installe sans droits admin, arrive dans le menu Démarrer et se désinstalle depuis les paramètres Windows. Tu préfères tout garder sur une clé USB ? La **version portable** est toujours là, avec tes réglages rangés dans son dossier.
+
+Et surtout : **plus besoin de revenir ici à chaque version**. Au lancement, Hex Launcher te prévient quand une mise à jour sort. Un clic sur *Installer* et il se met à jour tout seul, puis lance ta partie. Pas le moment ? *Plus tard*, ou « Ne plus me demander » jusqu'à la suivante. La version s'affiche aussi sur l'écran de chargement.
+
+**Comment l'installer** (en bas de la page de la release, rubrique *Assets*) :
+• **Installeur** (conseillé) : télécharge `hex-launcher-setup-0.4.1.exe`, double-clique dessus et laisse-le ouvrir l'assistant à la fin.
+• **Portable** : télécharge `hex-launcher-portable-0.4.1.zip`, décompresse-le où tu veux (ou par-dessus ton ancien dossier si tu es en 0.3), puis double-clique sur `setup.bat`.
+En 0.3, c'est la dernière fois que tu fais ça à la main.
+
+⚠️ L'installeur n'est pas signé : Windows peut afficher « Windows a protégé votre ordinateur ». Clique sur *Informations complémentaires* → *Exécuter quand même*.
+
+Gratuit, open source, Windows.
+👉 https://github.com/jeanchristoph/hex-launcher/releases/tag/v0.4.1

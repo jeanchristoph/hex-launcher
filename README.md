@@ -18,6 +18,16 @@ they get installed for you, and you get one shortcut per language × companion a
 > a companion app you ticked and to check whether a new version exists (can be turned off), refuses to run as
 > administrator and installs nothing without your click on *Apply*. `setup.bat` is one line; all the code is plain text. Details: [Trust](#trust--what-setupbat-does-and-does-not-do).
 
+## Install
+
+1. Open the **[latest release](https://github.com/jeanchristoph/hex-launcher/releases/latest)**, then, in the *Assets* section at the bottom of the page, download **`hex-launcher-setup-x.y.z.exe`**.
+2. Double-click it. If Windows shows "Windows protected your PC" (the installer is not signed): *More info* → *Run anyway*.
+3. At the end, the assistant opens: detection, companion apps, shortcuts. Then start the game from the "League of Legends XX" desktop shortcuts.
+
+**Portable version** (no installation, for instance on a USB stick): download **`hex-launcher-portable-x.y.z.zip`**, unzip it wherever you like, then double-click `setup.bat`.
+
+Later updates are offered automatically at launch. Details: [Setting up on a new machine](#setting-up-on-a-new-machine).
+
 ## Folder contents
 
 | File | Role |
