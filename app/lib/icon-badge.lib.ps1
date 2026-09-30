@@ -265,7 +265,7 @@ function Assert-StackedBadge($Badge) {
 }
 
 # Icône d'un binaire (lue en mémoire, jamais copiée) + pastilles → icône de destination : le seul fichier dérivé,
-# local au poste (ico\<jeu>\companion, hors dépôt et hors release)
+# local au poste (icons\<jeu>\companion, hors dépôt et hors release)
 function Add-StackedBadgesToExecutableIcon([string]$ExecutablePath, [string[]]$Codes, $Badge, [string]$DestinationIco, $Style = $BadgeDefaultStyle) {
     Assert-StackedBadge $Badge
     return Write-StackedBadgesIco @(Read-ExecutableIconEntries $ExecutablePath) $Codes $Badge $DestinationIco $Style

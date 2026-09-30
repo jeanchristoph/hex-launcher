@@ -1333,3 +1333,95 @@ Describe 'Invoke-SetupShortcutsStep, texte forcé' {
         Assert-MockCalled -Scope It New-SetupShortcuts -Exactly -Times 1 -ParameterFilter { $Combinations[0].Name -eq 'League of Legends JP' }
     }
 }
+
+Describe 'Case « Vérifier les mises à jour au lancement »' {
+    It 'est cochée par défaut, config.json sans réglage' {
+        Reset-SetupTestState @{ Config = (New-TestLaunchConfig) }
+        (New-SetupUpdateCheckBox $script:InstallState 0 0 400).Checked | Should Be $true
+    }
+
+    It 'reprend le choix enregistré dans config.json' {
+        $config = New-TestLaunchConfig
+        $config | Add-Member -NotePropertyName checkForUpdates -NotePropertyValue $false
+        Reset-SetupTestState @{ Config = $config }
+        (New-SetupUpdateCheckBox $script:InstallState 0 0 400).Checked | Should Be $false
+    }
+
+    It 'enregistre le choix en passant à l''étape suivante, et le journalise' {
+        Reset-SetupTestState @{ Config = (New-TestLaunchConfig) }
+        Mock Save-LaunchCheckForUpdates { $true }
+        Mock Write-SetupLog {}
+        $script:InstallState.Controls.UpdateCheckBox = New-SetupUpdateCheckBox $script:InstallState 0 0 400
+        $script:InstallState.Controls.UpdateCheckBox.Checked = $false
+        Invoke-SetupDetectStep | Should Be $true
+        Assert-MockCalled -Scope It Save-LaunchCheckForUpdates -Exactly -Times 1 -ParameterFilter { $ConfigPath -eq $SetupConfigPath -and -not $CheckForUpdates }
+        Assert-MockCalled -Scope It Write-SetupLog -Exactly -Times 1 -ParameterFilter { $Text -eq 'Mises à jour : non vérifiées' }
+    }
+}
+
+Describe 'Request-SetupUpdate' {
+    $release = [pscustomobject]@{ Version = '9.9.9'; PageUrl = 'https://example'; Assets = @() }
+    Mock Get-DistributionKind { 'installed' }
+
+    Context 'copie source' {
+        It 'n''interroge pas GitHub depuis une copie source (dépôt de développement)' {
+            Mock Get-DistributionKind { 'source' }
+            Mock Start-LatestReleaseRequest { throw 'ne doit pas être appelé' }
+            Request-SetupUpdate | Should BeNullOrEmpty
+        }
+    }
+
+    It 'n''interroge pas GitHub quand la vérification est décochée' {
+        $config = New-TestLaunchConfig
+        $config | Add-Member -NotePropertyName checkForUpdates -NotePropertyValue $false
+        Mock Read-SetupConfigIfPresent { $config }
+        Mock Start-LatestReleaseRequest { throw 'ne doit pas être appelé' }
+        Request-SetupUpdate | Should BeNullOrEmpty
+    }
+
+    It 'vérifie au premier lancement, config.json pas encore créé, et rend la release acceptée' {
+        Mock Read-SetupConfigIfPresent { $null }
+        Mock Start-LatestReleaseRequest { @{} }
+        Mock Get-OfferedUpdate { $release }
+        Mock Confirm-UpdateInstall { $true }
+        (Request-SetupUpdate).Version | Should Be '9.9.9'
+    }
+
+    It 'rend $null quand l''utilisateur reporte' {
+        Mock Read-SetupConfigIfPresent { $null }
+        Mock Start-LatestReleaseRequest { @{} }
+        Mock Get-OfferedUpdate { $release }
+        Mock Confirm-UpdateInstall { $false }
+        Request-SetupUpdate | Should BeNullOrEmpty
+    }
+}
+
+Describe 'Start-SetupWizard et mise à jour' {
+    It 'relance l''assistant de la nouvelle version quand la mise à jour est installée' {
+        Mock Test-CompanionElevated { $false }
+        Mock Request-SetupUpdate { [pscustomobject]@{ Version = '9.9.9' } }
+        Mock Install-SetupUpdate { $true }
+        Mock Start-UpdatedSetup {}
+        Mock New-SetupWindow { throw 'ne doit pas être appelé' }
+        Start-SetupWizard | Should Be 0
+        Assert-MockCalled Start-UpdatedSetup -Scope It -Exactly 1
+    }
+
+    It 'ouvre l''assistant actuel quand la mise à jour échoue' {
+        Mock Test-CompanionElevated { $false }
+        Mock Request-SetupUpdate { [pscustomobject]@{ Version = '9.9.9' } }
+        Mock Install-SetupUpdate { $false }
+        Mock Start-UpdatedSetup { throw 'ne doit pas être appelé' }
+        Mock Register-SetupCompanionUi {}
+        Mock Show-SetupPage {}
+        $script:shown = $false
+        Mock New-SetupWindow {
+            $fake = [pscustomobject]@{}
+            $fake | Add-Member ScriptMethod ShowDialog { $script:shown = $true }
+            $fake | Add-Member ScriptMethod Dispose {}
+            $fake
+        }
+        Start-SetupWizard | Out-Null
+        $script:shown | Should Be $true
+    }
+}

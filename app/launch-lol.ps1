@@ -33,7 +33,11 @@
     la partie, sinon les overlays entrent en conflit), puis lance celle demandée par -Companion (Porofessor,
     Blitz…) si elle figure dans la liste companionApps.
 
-    Les chemins machine (Riot, yaml, applications compagnon) sont lus dans config.json, à côté de ce script.
+    Les chemins machine (Riot, yaml, applications compagnon) sont lus dans config.json, dans le dossier des données
+    (%LOCALAPPDATA%\hex-launcher\, ou data\ pour la version portable).
+
+    Au lancement, une mise à jour publiée sur GitHub est proposée (réglage de setup.bat) ; acceptée, elle est
+    installée puis la nouvelle version reprend ce lancement avec les mêmes arguments.
     Voir README.md pour l'adapter à un autre poste.
 
 .EXAMPLE
@@ -54,7 +58,7 @@ param(
     # Identifiant de l'appli compagnon à lancer après le jeu (companionApps de config.json). Absent → aucune.
     [string]$Companion,
 
-    # Par défaut : config.json à côté de ce script
+    # Par défaut : config.json du dossier des données
     [string]$ConfigPath,
 
     # Ignore le chemin du yaml de config.json (utilisé pour tester sur une copie)
@@ -67,9 +71,13 @@ param(
     [switch]$DryRun
 )
 
+. (Join-Path $PSScriptRoot 'lib\i18n.lib.ps1')
 . (Join-Path $PSScriptRoot 'lib\splash.lib.ps1')
+. (Join-Path $PSScriptRoot 'lib\update-prompt.lib.ps1')
+. (Join-Path $PSScriptRoot 'lib\update-install.lib.ps1')
 . (Join-Path $PSScriptRoot 'lib\launch-config.lib.ps1')
 . (Join-Path $PSScriptRoot 'lib\launch-log.lib.ps1')
+. (Join-Path $PSScriptRoot 'lib\app-data.lib.ps1')
 . (Join-Path $PSScriptRoot 'lib\riot-client-api.lib.ps1')
 . (Join-Path $PSScriptRoot 'lib\riot-window.lib.ps1')
 . (Join-Path $PSScriptRoot 'lib\riot-install.lib.ps1')
@@ -645,17 +653,79 @@ function Start-CompanionApp($App) {
     return $true
 }
 
+# ---------------------------------------------------------------- Mise à jour
+
+# Requête partie dès le début du lancement, pour que GitHub réponde pendant la lecture de config.json et le splash ;
+# aucune requête si l'utilisateur a décoché la vérification dans setup.bat, ni pour une copie source (dépôt)
+function Start-LaunchUpdateCheck($Config, [string]$AppDataFolder) {
+    $isUpdatable = (Get-DistributionKind $PSScriptRoot) -ne 'source'
+    $request = if ($isUpdatable -and (Get-LaunchCheckForUpdates $Config)) { Start-LatestReleaseRequest } else { $null }
+    return @{
+        Request          = $request
+        InstalledVersion = Get-InstalledVersion $PSScriptRoot
+        StatePath        = Join-Path $AppDataFolder $UpdateStateFileName
+    }
+}
+
+# Propose la mise à jour, splash masqué le temps de la question ; rend la release acceptée, $null sinon
+function Request-LaunchUpdate($Splash, [hashtable]$Check) {
+    if (-not $Check.Request) { return $null }
+    $release = Get-OfferedUpdate $Check
+    if (-not $release) { return $null }
+    Write-LaunchLogLine 'UPDATE' ('{0} proposée (installée : {1})' -f $release.Version, $Check.InstalledVersion) | Out-Null
+    Set-SplashVisible $Splash $false
+    try     { $isAccepted = Confirm-UpdateInstall $release $Check.InstalledVersion $Check.StatePath }
+    finally { Set-SplashVisible $Splash $true }
+    Write-LaunchLogLine 'UPDATE' $(if ($isAccepted) { 'acceptée' } else { 'reportée' }) | Out-Null
+    if ($isAccepted) { return $release }
+    return $null
+}
+
+# Rend 'installed', 'read_only' ou 'failed' ; chaque issue est journalisée
+function Invoke-LaunchUpdate($Splash, $Release) {
+    return Invoke-SplashUpdate @{
+        Release = $Release
+        AppRoot = $PSScriptRoot
+        Splash  = $Splash
+        OnLog   = { param([string]$Text) Write-LaunchLogLine 'UPDATE' $Text | Out-Null }
+    }
+}
+
+# Mêmes arguments que ce lancement, pour la nouvelle version du lanceur (même chemin : remplacée sur place)
+function Get-LauncherRelaunchArguments([System.Collections.IDictionary]$BoundParameters) {
+    $arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', ('"{0}"' -f (Join-Path $PSScriptRoot 'launch-lol.ps1')))
+    foreach ($name in @($BoundParameters.Keys | Sort-Object)) {
+        $value = $BoundParameters[$name]
+        if ($value -is [System.Management.Automation.SwitchParameter]) {
+            if ($value.IsPresent) { $arguments += "-$name" }
+            continue
+        }
+        $arguments += "-$name"
+        $arguments += ('"{0}"' -f $value)
+    }
+    return $arguments -join ' '
+}
+
+function Start-UpdatedLauncher([System.Collections.IDictionary]$BoundParameters) {
+    $powershell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    Start-Process -FilePath $powershell -ArgumentList (Get-LauncherRelaunchArguments $BoundParameters) -WorkingDirectory $PSScriptRoot -WindowStyle Hidden
+}
+
 # ---------------------------------------------------------------- Main (ignoré quand le script est dot-sourcé par les tests)
 
 if ($MyInvocation.InvocationName -ne '.') {
     if (-not $Locale) { throw "-Locale est requis (ex. ja_JP)." }
+    Initialize-Translation (Resolve-UiLanguage '' (Get-UICulture).Name) | Out-Null
 
-    if (-not $ConfigPath) { $ConfigPath = Join-Path $PSScriptRoot 'config.json' }
+    $appDataFolder = Initialize-AppDataFolder $PSScriptRoot
+    $launchLogPath = Join-Path $appDataFolder $LaunchLogFileName
+    if (-not $ConfigPath) { $ConfigPath = Join-Path $appDataFolder 'config.json' }
     $config = Read-LaunchConfig $ConfigPath
     if (-not $YamlPath) { $YamlPath = $config.productSettingsPath }
+    $updateCheck = Start-LaunchUpdateCheck $config $appDataFolder
 
     # Le journal est ouvert après tous les dot-sourcings : recharger une lib remettrait son chemin à vide
-    Set-LaunchLogPath (Join-Path $PSScriptRoot $LaunchLogFileName)
+    Set-LaunchLogPath $launchLogPath
 
     $launchLock = Enter-LaunchLock
     if (-not $launchLock) {
@@ -684,9 +754,19 @@ if ($MyInvocation.InvocationName -ne '.') {
     $localesPath = Join-Path $PSScriptRoot 'locales.json'
     $textLabel   = $(if ($isForcedText) { Get-LocaleLabel $TextLocale $localesPath } else { '' })
     $splash = New-SplashWindow -Subtitle (Get-LocaleLabel $Locale $localesPath) -Warning (Get-LaunchSplashWarning $textLabel)
-    if (Test-LaunchBurst (Join-Path $PSScriptRoot $LaunchLogFileName)) {
+    if (Test-LaunchBurst $launchLogPath) {
         Update-SplashStatus $splash $LaunchBurstWarningMessage
         Wait-WithAnimation $LaunchBurstWarningSeconds
+    }
+
+    # Avant les actions du splash : le bouton du bas peut servir au lien de téléchargement (copie non modifiable).
+    # Mise à jour installée → la nouvelle version reprend ce lancement, verrou libéré pour elle.
+    $acceptedUpdate = Request-LaunchUpdate $splash $updateCheck
+    if ($acceptedUpdate -and (Invoke-LaunchUpdate $splash $acceptedUpdate) -eq 'installed') {
+        Close-SplashWindow $splash
+        Exit-LaunchLock $launchLock
+        Start-UpdatedLauncher $PSBoundParameters
+        return
     }
 
     # « Forcer en démarrage manuel » : le clic, pompé par le tick de l'attente en cours, ne fait que lever un drapeau ;

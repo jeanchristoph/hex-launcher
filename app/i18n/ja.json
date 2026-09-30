@@ -131,5 +131,22 @@
   "detect.missingMark": "  [見つかりません]",
   "detect.missingLolMark": "  [見つかりません — LoL はインストールされていますか？]",
   "detect.noCompanion": "検出なし — 次のステップで選択できます",
-  "detect.companionIgnored": "コンパニオンアプリを無視しました：{0}"
+  "detect.companionIgnored": "コンパニオンアプリを無視しました：{0}",
+  "setup.detect.checkUpdates": "起動時にアップデートを確認する",
+  "setup.detect.checkUpdatesHint": "起動のたびに GitHub（api.github.com）へ 1 回だけ問い合わせます。データは一切送信しません。ネットワークがない場合は何も表示されません。",
+  "setup.detect.checkUpdatesOn": "アップデート：起動時に確認",
+  "setup.detect.checkUpdatesOff": "アップデート：確認しない",
+  "update.title": "アップデートがあります",
+  "update.message": "Hex Launcher {0} が利用可能です（現在のバージョン：{1}）。インストールしますか？",
+  "update.releaseNotes": "新機能を見る",
+  "update.skipVersion": "次のバージョンまで表示しない",
+  "update.install": "インストール",
+  "update.later": "後で",
+  "update.downloading": "アップデート {0} をダウンロード中…",
+  "update.installing": "アップデート {0} をインストール中…",
+  "update.installed": "アップデート完了 — ゲームを起動します",
+  "update.failed": "アップデートできませんでした（{0}）— 現在のバージョンで起動します",
+  "update.readOnly": "Hex Launcher のフォルダーを変更できません — GitHub からバージョン {0} をダウンロードしてください",
+  "update.openPage": "ページを開く",
+  "update.tampered": "ダウンロードしたファイルが破損しています"
 }

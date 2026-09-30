@@ -25,7 +25,7 @@
         league-client : le binaire installé de League of Legends (LeagueClient.exe, référencée, jamais copiée dans
                         le projet ; dossier sans aucun .ico) — jeux livrés original (nue) et original-badges ;
         set-base      : l'icône de base du jeu lui-même (hex-launcher.ico), sans drapeau — jeu livré logo-badges.
-    badges → pastilles pays et compagnon composées dessus, dans ico\<jeu>\companion (fichier dérivé local au poste,
+    badges → pastilles pays et compagnon composées dessus, dans icons\<jeu>\companion (fichier dérivé local au poste,
     hors dépôt et hors release).
 #>
 

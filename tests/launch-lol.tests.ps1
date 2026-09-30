@@ -1186,3 +1186,81 @@ Describe 'Wait-ForcedTextWindow' {
         }
     }
 }
+
+Describe 'Start-LaunchUpdateCheck' {
+    It 'n''interroge pas GitHub quand la vérification est décochée dans setup.bat' {
+        Mock Start-LatestReleaseRequest { throw 'ne doit pas être appelé' }
+        $check = Start-LaunchUpdateCheck ([pscustomobject]@{ checkForUpdates = $false }) $TestDrive
+        $check.Request | Should BeNullOrEmpty
+    }
+
+    It 'lance la requête par défaut et range l''état dans le dossier des données' {
+        Mock Get-DistributionKind { 'installed' }
+        Mock Start-LatestReleaseRequest { @{ Fake = $true } }
+        $check = Start-LaunchUpdateCheck ([pscustomobject]@{}) $TestDrive
+        $check.Request.Fake | Should Be $true
+        $check.StatePath | Should Be (Join-Path $TestDrive 'update-state.json')
+        $check.InstalledVersion | Should Match '^\d+\.\d+\.\d+$'
+    }
+}
+
+Describe 'Start-LaunchUpdateCheck sur une copie source' {
+    It 'n''interroge pas GitHub depuis le dépôt de développement, qui ne sait pas se mettre à jour' {
+        Mock Get-DistributionKind { 'source' }
+        Mock Start-LatestReleaseRequest { throw 'ne doit pas être appelé' }
+        (Start-LaunchUpdateCheck ([pscustomobject]@{}) $TestDrive).Request | Should BeNullOrEmpty
+    }
+}
+
+Describe 'Get-LauncherRelaunchArguments' {
+    It 'reprend le lanceur à son chemin, avec les arguments de ce lancement' {
+        $arguments = Get-LauncherRelaunchArguments @{ Locale = 'ja_JP'; Companion = 'blitz'; TextLocale = 'fr_FR' }
+        $arguments | Should Match '-WindowStyle Hidden -File "[^"]+\\launch-lol\.ps1"'
+        $arguments | Should Match '-Locale "ja_JP"'
+        $arguments | Should Match '-Companion "blitz"'
+        $arguments | Should Match '-TextLocale "fr_FR"'
+    }
+
+    It 'garde les options activées et ignore les options désactivées' {
+        $arguments = Get-LauncherRelaunchArguments @{ Locale = 'ja_JP'; NoLocalApi = [switch]$true; DryRun = [switch]$false }
+        $arguments | Should Match '-NoLocalApi'
+        $arguments | Should Not Match '-DryRun'
+    }
+
+    It 'garde entier un chemin avec espaces' {
+        Get-LauncherRelaunchArguments @{ ConfigPath = 'C:\Mes documents\config.json' } | Should Match '-ConfigPath "C:\\Mes documents\\config\.json"'
+    }
+}
+
+Describe 'Request-LaunchUpdate' {
+    $release = [pscustomobject]@{ Version = '9.9.9'; PageUrl = 'https://example'; Assets = @() }
+    $check   = @{ Request = @{}; InstalledVersion = '0.3.2'; StatePath = (Join-Path $TestDrive 'update-state.json') }
+    Mock Set-SplashVisible {}
+    Mock Write-LaunchLogLine { $true }
+
+    It 'ne demande rien sans requête (vérification décochée)' {
+        Mock Get-OfferedUpdate { throw 'ne doit pas être appelé' }
+        Request-LaunchUpdate $null @{ Request = $null } | Should BeNullOrEmpty
+    }
+
+    It 'ne demande rien sans mise à jour à proposer' {
+        Mock Get-OfferedUpdate { $null }
+        Mock Confirm-UpdateInstall { throw 'ne doit pas être appelé' }
+        Request-LaunchUpdate $null $check | Should BeNullOrEmpty
+    }
+
+    It 'masque le splash le temps de la question, le réaffiche et rend la release acceptée' {
+        Mock Get-OfferedUpdate { $release }
+        Mock Confirm-UpdateInstall { $true }
+        (Request-LaunchUpdate 'splash' $check).Version | Should Be '9.9.9'
+        Assert-MockCalled Set-SplashVisible -Scope It -Exactly 1 -ParameterFilter { -not $Visible }
+        Assert-MockCalled Set-SplashVisible -Scope It -Exactly 1 -ParameterFilter { $Visible }
+    }
+
+    It 'rend $null et journalise le report quand l''utilisateur choisit Plus tard' {
+        Mock Get-OfferedUpdate { $release }
+        Mock Confirm-UpdateInstall { $false }
+        Request-LaunchUpdate 'splash' $check | Should BeNullOrEmpty
+        Assert-MockCalled Write-LaunchLogLine -Scope It -ParameterFilter { $Detail -eq 'reportée' }
+    }
+}

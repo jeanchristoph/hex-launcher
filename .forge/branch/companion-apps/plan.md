@@ -163,6 +163,46 @@
 **Description:** Appli desktop DPM (dpm.lol, Electron, NSIS assisté) : `download` `https://app.dpm.lol/releases/nsis/win32/x64/DPM-Setup-x64.exe` en `/S /currentuser`, signataire `DPMLOL SAS`/FR (certificat EV DigiCert), détection `^DPM(\s|$)` + `%LOCALAPPDATA%\Programs\DPM\DPM.exe`, désinstallation silencieuse (`QuietUninstallString` HKCU), pastille D `#7989EC` sur blanc. Cycle réel sur autorisation.
 [x] install 12 s (code 0, appli non lancée), clé HKCU DisplayName « DPM », uninstall 5 s via la lib (désinstalleur signé), résidu `%LOCALAPPDATA%\dpmlol-app-updater` — 907 tests
 
+### T26 — Séparation code / données
+**Effort:** M
+**Files:** `app/lib/app-data.lib.ps1` (nouveau), `app/lib/launch-config.lib.ps1`, `app/lib/launch-log.lib.ps1`, `app/detect-config.ps1`, `app/create-shortcuts.ps1`, `app/launch-lol.ps1`, `app/setup.ps1`, `tools/make-release.ps1`, `tests/`, `README.md`, `README.fr.md`, `README.ja.md`
+**Description:** `app-data.lib.ps1` rend `<dossier>\data\` si le marqueur portable est présent, sinon `%LOCALAPPDATA%\hex-launcher\` ; y vont `config.json`, `launch.log`, les icônes composées (`icons\<jeu>\companion\`) et `update-state.json`. Migration au premier lancement : un `app\config.json` existant est repris. `make-release` n'a plus rien à exclure. Tests Pester, README ×3.
+[x] app-data.lib.ps1 + 10 tests, 5 scripts branchés, repli des raccourcis vers les données, exclusions make-release gardées en garde-fou ; README reportés en T30 (FR validé d'abord) — 931 tests
+
+### T27 — Installeur par utilisateur (Inno Setup)
+**Effort:** M
+**Files:** `tools/installer/hex-launcher.iss` (nouveau), `tools/make-release.ps1`, `tests/make-release.tests.ps1`
+**Description:** Sans droits admin (`PrivilegesRequired=lowest`), installe dans `%LOCALAPPDATA%\Programs\hex-launcher` ; raccourci Menu Démarrer « Hex Launcher » → assistant ; désinstallation depuis « Applications installées » : garde les données, supprime les raccourcis de jeu. `make-release` produit l'exe + le zip et leurs SHA-256. Prérequis : Inno Setup installé par l'utilisateur sur le poste de dev (`winget JRSoftware.InnoSetup`) ; essai réel d'installation par l'utilisateur.
+[x] .iss (AppId fixe, InstallDelete app\, [UninstallRun] remove-shortcuts.ps1), make-release exe + zip + SHA-256 chacun, Inno Setup 6.7.3 installé (winget, autorisé), compilation OK 8,3 Mo non signé — essai réel utilisateur : dist\hex-launcher-setup-0.4.0-test.exe
+
+### T31 — Version portable (zip)
+**Effort:** S
+**Files:** `app/portable.json` (généré par make-release), `app/lib/app-data.lib.ps1`, `tools/make-release.ps1`, `tests/`, `README.md`, `README.fr.md`, `README.ja.md`
+**Description:** Dépend de T26. Le zip de la release = version portable : décompressée où l'on veut, `setup.bat`, sans installation. Marqueur `app\portable.json` (absent de l'installeur) → données dans `data\` à côté de `setup.bat`. Ni Menu Démarrer ni « Applications installées » ; raccourcis de jeu du Bureau inchangés. `make-release` publie `hex-launcher-portable-x.y.z.zip` et `hex-launcher-setup-x.y.z.exe`. Tests, README ×3.
+[x] data\ via app\portable.json (make-release le pose après la compilation de l'installeur), hex-launcher-portable-x.y.z.zip, /data/ gitignoré — 944 tests
+
+### T28 — Vérification des mises à jour
+**Effort:** M
+**Files:** `app/lib/update.lib.ps1` (nouveau), `app/launch-lol.ps1`, `app/setup.ps1`, `app/i18n/*.json`, `tests/update.lib.tests.ps1`
+**Description:** `releases/latest` de l'API GitHub (timeout 2 s, en tâche de fond pendant le splash), comparaison avec `version.txt`, version refusée mémorisée dans `update-state.json`. Pop-up au thème LoL « Une mise à jour est disponible » : [Installer] / [Plus tard], case « Ne plus me demander jusqu'à la prochaine version », lien vers les nouveautés. Branchée sur `launch-lol.ps1` et `setup.ps1`. Réglage « Vérifier les mises à jour au lancement » dans l'assistant, activé par défaut. Pas de réseau / erreur API → silencieux, le lancement continue.
+[x] update.lib (WebClient asynchrone, 2 s, digest SHA-256) + update-prompt.lib, config checkForUpdates, case page 1 de l'assistant, branché lanceur (pendant le splash) et assistant (avant la fenêtre) ; requête réelle 329 ms ; textes FR validés + EN/JA — 989 tests
+
+### T29 — Installation de la mise à jour
+**Effort:** L
+**Files:** `app/lib/update.lib.ps1`, `app/launch-lol.ps1`, `app/setup.ps1`, `tests/update.lib.tests.ps1`
+**Description:** Version installée : téléchargement de l'installeur dans le dossier temporaire, vérification du SHA-256 publié par GitHub (asset `digest`), exécution silencieuse (`/VERYSILENT /CURRENTUSER`), puis reprise du lancement depuis la nouvelle version. Version portable : téléchargement du zip portable, SHA-256 vérifié, `app\` remplacé fichier par fichier sur place, `data\` jamais touché ; dossier en lecture seule → message avec le lien de téléchargement, le jeu se lance quand même. Pas de bascule zip → installée. Échec → le jeu se lance avec la version actuelle, erreur dans `launch.log`. Décomposée en sous-tâches au démarrage.
+[x] T29.1 — Nature de la copie (app-data.lib) : portable (marqueur), installée (unins000.exe d'Inno à la racine), source (dépôt, ancien zip) → aucune vérification pour une copie source
+[x] T29.2 — update-install.lib : pièce jointe selon la nature, téléchargement asynchrone (splash animé), SHA-256 contre le digest GitHub, installeur /VERYSILENT ou remplacement fichier par fichier de la copie portable (data\ jamais touché, dossier non modifiable → read_only)
+[x] T29.3 — Lanceur : mise à jour avant les actions du splash, relance du nouveau launch-lol.ps1 avec les mêmes arguments après libération du verrou ; échec → version actuelle ; read_only → bouton « Ouvrir la page »
+[x] T29.4 — Assistant : mise à jour avant la fenêtre, avec un splash, relance de setup.bat
+[x] T29.5 — .iss : CloseApplications=no (le Restart Manager fermerait le lanceur en pleine mise à jour) ; essai réel de bout en bout impossible avant une 0.4.1 publiée (à trancher : simulation locale)
+
+### T30 — README ×3, Confiance, LISEZMOI, project.md
+**Effort:** S
+**Files:** `README.md`, `README.fr.md`, `README.ja.md`, `LISEZMOI.txt`, `.forge/project.md`
+**Description:** Installation par l'exe ; réseau = api.github.com + applis compagnon, aucune donnée envoyée ; avertissement SmartScreen expliqué.
+[x] README FR validé puis EN/JA (sous-agents), sections Mises à jour et Désinstaller, Confiance, LISEZMOI FR/EN, project.md ; chemins d'icônes composées corrigés dans les 3 README
+
 ## Risks
 - Porofessor : `/S` silencieux testé seulement avec Overwolf déjà présent ; Overwolf absent → comportement inconnu (timeout de sonde plus long, message explicite)
 - winget absent (App Installer non installé, comptes restreints) → repli `download`/`browser`
@@ -198,4 +238,10 @@
 | T23 — Icône des raccourcis : icône LoL installée (intérim) | XS | [x] |
 | T24 — Rebranchement des icônes drapeau sur les raccourcis | XS | [x] |
 | T25 — DPM au catalogue | S | [x] |
+| T26 — Séparation code / données | M | [x] |
+| T27 — Installeur par utilisateur (Inno Setup) | M | [x] |
+| T31 — Version portable (zip) | S | [x] |
+| T28 — Vérification des mises à jour | M | [x] |
+| T29 — Installation de la mise à jour | L | [x] |
+| T30 — README ×3, Confiance, LISEZMOI, project.md | S | [x] |
 | **Total** | **~5 j** | |

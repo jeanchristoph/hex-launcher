@@ -34,11 +34,14 @@ param(
 . (Join-Path $PSScriptRoot 'detect-config.ps1')
 . (Join-Path $PSScriptRoot 'manage-companion-app.ps1')
 . (Join-Path $PSScriptRoot 'create-shortcuts.ps1') -Destination $Destination
+. (Join-Path $PSScriptRoot 'lib\app-data.lib.ps1')
+. (Join-Path $PSScriptRoot 'lib\update-prompt.lib.ps1')
+. (Join-Path $PSScriptRoot 'lib\update-install.lib.ps1')
 
 # Après les dot-sourcings : chaque moteur recharge la lib i18n, qui remet son état à zéro
 Initialize-Translation (Resolve-UiLanguage $Language (Get-UICulture).Name) | Out-Null
 
-$SetupConfigPath  = Join-Path $PSScriptRoot 'config.json'
+$SetupConfigPath  = Get-AppDataFilePath $PSScriptRoot 'config.json'
 $SetupCatalogPath = Join-Path $PSScriptRoot 'companion-apps.json'
 
 function Get-SetupWindowTitle {
@@ -576,6 +579,7 @@ function Get-SetupPageSelection {
     if ($null -ne $controls.IconSetList) { $selection.IconSetList = @(Get-SetupSelectedIconSetName $controls.IconSetList) }
     if ($null -ne $controls.UninstallBox) { $selection.UninstallOthers = [bool]$controls.UninstallBox.Checked }
     if ($null -ne $controls.LegacyLaunchBox) { $selection.LegacyLaunchBox = @([string]$controls.LegacyLaunchBox.Checked) }
+    if ($null -ne $controls.UpdateCheckBox) { $selection.UpdateCheckBox = @([string]$controls.UpdateCheckBox.Checked) }
     if ($null -ne $controls.ForcedTextBox) { $selection.ForcedTextBox = @([string]$controls.ForcedTextBox.Checked) }
     if ($null -ne $controls.ForcedTextList) { $selection.ForcedTextList = @([string](Get-ThemedComboBoxKey $controls.ForcedTextList)) }
     if ($null -ne $controls.RiotPathBoxes) { $selection.RiotPaths = Get-SetupRiotPathInputs }
@@ -713,12 +717,37 @@ function Show-SetupDetectPage {
         $top      += $built.Height
     }
     $state.Controls.Inputs = $inputs
+    $state.Controls.UpdateCheckBox = New-SetupUpdateCheckBox $state 0 $top $width
+    $controls += @(
+        $state.Controls.UpdateCheckBox
+        (New-ThemedLabel (Get-Text 'setup.detect.checkUpdatesHint') 20 ($top + 26) ($width - 20) 34 'Muted' 8.25))
     Add-SetupContent $controls
+}
+
+# Case cochée par défaut : décochée, le lanceur n'interroge plus GitHub
+function New-SetupUpdateCheckBox($State, [int]$Left, [int]$Top, [int]$Width) {
+    $box = New-ThemedCheckBox (Get-Text 'setup.detect.checkUpdates') $Left $Top $Width
+    $pending = @(Get-SetupPreselection 'UpdateCheckBox' @())
+    if ($pending.Count -gt 0) {
+        $box.Checked = [bool]($pending[0] -eq 'True')
+    } else {
+        $box.Checked = Get-LaunchCheckForUpdates $State.Config
+    }
+    return $box
+}
+
+function Save-SetupUpdateChoice($State) {
+    $box = $State.Controls.UpdateCheckBox
+    if ($null -eq $box) { return }
+    if (Save-LaunchCheckForUpdates $State.Config $SetupConfigPath ([bool]$box.Checked)) {
+        Write-SetupLog (Get-Text $(if ($box.Checked) { 'setup.detect.checkUpdatesOn' } else { 'setup.detect.checkUpdatesOff' }))
+    }
 }
 
 # Chemins enregistrés seulement s'ils ont changé ; un chemin introuvable n'empêche pas d'avancer, le résumé final le rappelle
 function Invoke-SetupDetectStep {
     $state = $script:InstallState
+    Save-SetupUpdateChoice $state
     if ($null -eq $state.Controls.RiotPathBoxes) { return $true }
     Save-LaunchRiotPaths $state.Config $SetupConfigPath (Get-SetupRiotPathInputs) | Out-Null
     return $true
@@ -1141,10 +1170,54 @@ function Invoke-SetupCancel {
 }
 
 # Rend le code de sortie du script
+# Réglage lu avant la détection : config.json absent (premier lancement) ou illisible → vérification active
+function Read-SetupConfigIfPresent {
+    if (-not (Test-Path -LiteralPath $SetupConfigPath)) { return $null }
+    try { return Read-LaunchConfig $SetupConfigPath } catch { return $null }
+}
+
+# Au démarrage, avant la fenêtre de l'assistant : rend la release acceptée, $null sinon. Une copie source (dépôt)
+# ne sait pas se mettre à jour : aucune requête
+function Request-SetupUpdate {
+    if ((Get-DistributionKind $PSScriptRoot) -eq 'source') { return $null }
+    if (-not (Get-LaunchCheckForUpdates (Read-SetupConfigIfPresent))) { return $null }
+    $check = @{
+        Request          = Start-LatestReleaseRequest
+        InstalledVersion = Get-InstalledVersion $PSScriptRoot
+        StatePath        = Get-AppDataFilePath $PSScriptRoot $UpdateStateFileName
+    }
+    $release = Get-OfferedUpdate $check
+    if (-not $release) { return $null }
+    if (Confirm-UpdateInstall $release $check.InstalledVersion $check.StatePath) { return $release }
+    return $null
+}
+
+# Mise à jour acceptée, menée dans un splash ; rend vrai si elle est installée (l'assistant doit alors être relancé)
+function Install-SetupUpdate($Release) {
+    $splash = New-SplashWindow '' 'HEX LAUNCHER'
+    try {
+        $outcome = Invoke-SplashUpdate @{ Release = $Release; AppRoot = $PSScriptRoot; Splash = $splash; OnLog = { param([string]$Text) }; IsGameLaunchNext = $false }
+    } finally {
+        Close-SplashWindow $splash
+    }
+    return $outcome -eq 'installed'
+}
+
+# La nouvelle version de l'assistant, par setup.bat remplacé sur place
+function Start-UpdatedSetup {
+    $setupBatch = Join-Path (Split-Path $PSScriptRoot -Parent) 'setup.bat'
+    Start-Process -FilePath $setupBatch -WorkingDirectory (Split-Path $setupBatch -Parent) -WindowStyle Minimized
+}
+
 function Start-SetupWizard {
     if (Test-CompanionElevated) {
         Show-SetupErrorBox "$(Get-Text 'common.notElevated')`r`n`r`n$(Get-Text 'setup.error.elevatedHint')"
         return 1
+    }
+    $acceptedUpdate = Request-SetupUpdate
+    if ($acceptedUpdate -and (Install-SetupUpdate $acceptedUpdate)) {
+        Start-UpdatedSetup
+        return 0
     }
     Register-SetupCompanionUi
     $form = New-SetupWindow
@@ -1157,6 +1230,6 @@ function Start-SetupWizard {
 # ---------------------------------------------------------------- Main (ignoré quand le script est dot-sourcé par les tests)
 
 if ($MyInvocation.InvocationName -ne '.') {
-    try   { [int]$exitCode = Start-SetupWizard; exit $exitCode }
+    try   { Initialize-AppDataFolder $PSScriptRoot | Out-Null; [int]$exitCode = Start-SetupWizard; exit $exitCode }
     catch { Show-SetupErrorBox (Get-Text 'setup.error.failed' $_.Exception.Message); exit 1 }
 }

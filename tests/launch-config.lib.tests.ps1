@@ -151,6 +151,27 @@ Describe 'Save-LaunchUseLocalApi' {
     }
 }
 
+Describe 'Save-LaunchCheckForUpdates' {
+    AfterEach { Remove-TestTempFiles }
+
+    It 'vérifie les mises à jour par défaut, config.json ancien ou pas encore créé' {
+        Get-LaunchCheckForUpdates (Read-LaunchConfig (New-TempConfig)) | Should Be $true
+        Get-LaunchCheckForUpdates $null | Should Be $true
+    }
+
+    It 'écrit config.json quand le choix change, et le relit tel quel' {
+        $path = New-TempConfig
+        $config = Read-LaunchConfig $path
+        Save-LaunchCheckForUpdates $config $path $false | Should Be $true
+        Get-LaunchCheckForUpdates (Read-LaunchConfig $path) | Should Be $false
+    }
+
+    It 'n''écrit rien quand le choix est déjà celui du fichier' {
+        $path = New-TempConfig
+        Save-LaunchCheckForUpdates (Read-LaunchConfig $path) $path $true | Should Be $false
+    }
+}
+
 Describe 'Save-LaunchForcedTextLocale' {
     AfterEach { Remove-TestTempFiles }
 

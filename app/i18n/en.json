@@ -131,5 +131,22 @@
   "detect.missingMark": "  [NOT FOUND]",
   "detect.missingLolMark": "  [NOT FOUND — is LoL installed?]",
   "detect.noCompanion": "none detected — you can choose at the next step",
-  "detect.companionIgnored": "Companion apps ignored: {0}"
+  "detect.companionIgnored": "Companion apps ignored: {0}",
+  "setup.detect.checkUpdates": "Check for updates at launch",
+  "setup.detect.checkUpdatesHint": "A single request to GitHub (api.github.com) at each launch, with no data sent. Without a network, nothing is shown.",
+  "setup.detect.checkUpdatesOn": "Updates: checked at launch",
+  "setup.detect.checkUpdatesOff": "Updates: not checked",
+  "update.title": "Update available",
+  "update.message": "Hex Launcher {0} is available (you have {1}). Do you want to install it?",
+  "update.releaseNotes": "See what's new",
+  "update.skipVersion": "Don't ask me again until the next version",
+  "update.install": "Install",
+  "update.later": "Later",
+  "update.downloading": "Downloading update {0}…",
+  "update.installing": "Installing update {0}…",
+  "update.installed": "Update installed — launching the game",
+  "update.failed": "Update failed ({0}) — launching with the current version",
+  "update.readOnly": "The Hex Launcher folder can't be modified — download version {0} from GitHub",
+  "update.openPage": "Open the page",
+  "update.tampered": "downloaded file is corrupted"
 }

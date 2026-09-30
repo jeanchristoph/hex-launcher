@@ -131,5 +131,22 @@
   "detect.missingMark": "  [INTROUVABLE]",
   "detect.missingLolMark": "  [INTROUVABLE — LoL est-il installé ?]",
   "detect.noCompanion": "aucune détectée — choix possible à l'étape suivante",
-  "detect.companionIgnored": "Applis compagnon ignorées : {0}"
+  "detect.companionIgnored": "Applis compagnon ignorées : {0}",
+  "setup.detect.checkUpdates": "Vérifier les mises à jour au lancement",
+  "setup.detect.checkUpdatesHint": "Une seule requête à GitHub (api.github.com) à chaque lancement, sans aucune donnée envoyée. Sans réseau, rien ne s'affiche.",
+  "setup.detect.checkUpdatesOn": "Mises à jour : vérifiées au lancement",
+  "setup.detect.checkUpdatesOff": "Mises à jour : non vérifiées",
+  "update.title": "Mise à jour disponible",
+  "update.message": "Hex Launcher {0} est disponible (vous avez la {1}). Voulez-vous l'installer ?",
+  "update.releaseNotes": "Voir les nouveautés",
+  "update.skipVersion": "Ne plus me demander jusqu'à la prochaine version",
+  "update.install": "Installer",
+  "update.later": "Plus tard",
+  "update.downloading": "Téléchargement de la mise à jour {0}…",
+  "update.installing": "Installation de la mise à jour {0}…",
+  "update.installed": "Mise à jour installée — lancement du jeu",
+  "update.failed": "Mise à jour impossible ({0}) — lancement avec la version actuelle",
+  "update.readOnly": "Le dossier de Hex Launcher n'est pas modifiable — téléchargez la version {0} depuis GitHub",
+  "update.openPage": "Ouvrir la page",
+  "update.tampered": "fichier téléchargé altéré"
 }

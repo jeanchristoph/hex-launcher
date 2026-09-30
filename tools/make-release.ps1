@@ -1,6 +1,8 @@
 ﻿<#
 .SYNOPSIS
-    Construit l'archive de distribution hex-launcher-<version>.zip et, sur demande, publie la release GitHub.
+    Construit l'installeur hex-launcher-setup-<version>.exe (Inno Setup 6, tools\installer\hex-launcher.iss) et
+    la version portable hex-launcher-portable-<version>.zip (marqueur app\portable.json : données dans data\, à côté
+    de setup.bat) puis, sur demande, publie la release GitHub avec les deux.
 
 .DESCRIPTION
     L'archive contient exactement ce qu'un joueur doit télécharger : setup.bat, LISEZMOI.txt, LICENSE,
@@ -32,8 +34,10 @@ param(
 )
 
 $ReleaseRootFiles = @('setup.bat', 'LISEZMOI.txt', 'LICENSE', 'README.md', 'README.fr.md', 'README.ja.md')
+# Garde-fou : ces données vivent hors de app\ depuis la 0.4.0, mais un poste de développement plus ancien peut encore
+# les y avoir — elles ne doivent jamais partir dans une release
 $ReleaseExcluded     = @('config.json', 'launch.log')
-$ReleaseExcludedDirs = @('ico\*\companion')   # icônes drapeau + pastille composées sur chaque poste par create-shortcuts.ps1, dans chaque jeu
+$ReleaseExcludedDirs = @('ico\*\companion')   # icônes composées par une version antérieure à la 0.4.0
 
 function Get-ProjectRoot {
     return Split-Path $PSScriptRoot -Parent
@@ -76,25 +80,62 @@ function New-ReleaseStaging([string]$Root, [string]$Version, [string]$StagingPar
     return $staging
 }
 
+# ISCC.exe d'Inno Setup 6 : installation machine, par utilisateur (winget), sinon le PATH ; $null si absent
+function Find-InnoSetupCompiler {
+    $candidates = @(
+        (Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'),
+        (Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe'),
+        (Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 6\ISCC.exe'))
+    foreach ($candidate in $candidates) { if (Test-Path -LiteralPath $candidate) { return $candidate } }
+    $command = Get-Command 'ISCC.exe' -ErrorAction SilentlyContinue
+    if ($command) { return $command.Source }
+    return $null
+}
+
+# Arguments de ISCC : version, dossier préparé et dossier de sortie passés en définitions au script .iss
+function Get-InstallerCompilerArguments([string]$Staging, [string]$Version, [string]$DistDir) {
+    $script = Join-Path $PSScriptRoot 'installer\hex-launcher.iss'
+    return @('/Q', "/DAppVersion=$Version", "/DSourceDir=$Staging", "/DOutputDir=$DistDir", $script)
+}
+
+# hex-launcher-setup-<version>.exe, compilé depuis le dossier préparé (sans marqueur portable)
+function New-ReleaseInstaller([string]$Staging, [string]$Version, [string]$DistDir) {
+    $compiler = Find-InnoSetupCompiler
+    if (-not $compiler) { throw 'Inno Setup 6 introuvable (ISCC.exe) — installer : winget install --id JRSoftware.InnoSetup --exact' }
+    New-Item -ItemType Directory -Path $DistDir -Force | Out-Null
+    & $compiler (Get-InstallerCompilerArguments $Staging $Version $DistDir)
+    if ($LASTEXITCODE -ne 0) { throw "ISCC a échoué (code $LASTEXITCODE)" }
+    return Join-Path $DistDir "hex-launcher-setup-$Version.exe"
+}
+
+# Marqueur de la version portable (app\portable.json) : ses données vivront dans data\, à côté de setup.bat.
+# Posé après la compilation de l'installeur, qui ne doit jamais le contenir.
+function Add-PortableMarker([string]$Staging) {
+    $path = Join-Path $Staging 'app\portable.json'
+    [IO.File]::WriteAllText($path, "{ `"portable`": true }`r`n", (New-Object Text.UTF8Encoding($false)))
+    return $path
+}
+
+# hex-launcher-portable-<version>.zip : la version portable, à décompresser où l'on veut
 function New-ReleaseArchive([string]$Staging, [string]$Version, [string]$DistDir) {
     New-Item -ItemType Directory -Path $DistDir -Force | Out-Null
-    $zip = Join-Path $DistDir "hex-launcher-$Version.zip"
+    $zip = Join-Path $DistDir "hex-launcher-portable-$Version.zip"
     if (Test-Path $zip) { Remove-Item $zip -Force }
     Compress-Archive -Path $Staging -DestinationPath $zip
     return $zip
 }
 
-# Empreinte SHA-256 du zip, en minuscules — celle que rend Get-FileHash chez l'utilisateur
-function Get-ReleaseChecksum([string]$Zip) {
-    return (Get-FileHash -Path $Zip -Algorithm SHA256).Hash.ToLowerInvariant()
+# Empreinte SHA-256 d'un fichier livré, en minuscules — celle que rend Get-FileHash chez l'utilisateur
+function Get-ReleaseChecksum([string]$Path) {
+    return (Get-FileHash -Path $Path -Algorithm SHA256).Hash.ToLowerInvariant()
 }
 
-# Notes de release : le texte fourni, puis l'empreinte du zip et comment la vérifier
-function Format-ReleaseNotes([string]$Notes, [string]$Zip) {
+# Notes de release : le texte fourni, puis l'empreinte de chaque fichier livré et comment la vérifier
+function Format-ReleaseNotes([string]$Notes, [string[]]$Assets) {
     $lines = @()
     if (-not [string]::IsNullOrWhiteSpace($Notes)) { $lines += $Notes.TrimEnd(); $lines += '' }
-    $lines += "SHA-256 of ``$(Split-Path $Zip -Leaf)``: ``$(Get-ReleaseChecksum $Zip)``"
-    $lines += 'Verify in PowerShell: `Get-FileHash <the zip> -Algorithm SHA256`'
+    foreach ($asset in $Assets) { $lines += "SHA-256 of ``$(Split-Path $asset -Leaf)``: ``$(Get-ReleaseChecksum $asset)``" }
+    $lines += 'Verify in PowerShell: `Get-FileHash <the file> -Algorithm SHA256`'
     return ($lines -join "`n")
 }
 
@@ -107,16 +148,16 @@ function Read-ReleaseNotes([string]$Notes, [string]$NotesFile) {
 
 # Les notes formatées, écrites à côté du zip : c'est ce fichier que gh publie, jamais un argument de ligne de
 # commande (troncature au premier guillemet sous PowerShell 5.1). UTF-8 sans BOM, fins de ligne LF : GitHub les rend tels quels
-function Write-ReleaseNotesFile([string]$ReleaseNotes, [string]$Zip, [string]$Version) {
-    $path = Join-Path (Split-Path $Zip -Parent) "release-notes-v$Version.md"
-    [IO.File]::WriteAllText($path, (Format-ReleaseNotes $ReleaseNotes $Zip) + "`n", (New-Object Text.UTF8Encoding($false)))
+function Write-ReleaseNotesFile([string]$ReleaseNotes, [string[]]$Assets, [string]$Version) {
+    $path = Join-Path (Split-Path $Assets[0] -Parent) "release-notes-v$Version.md"
+    [IO.File]::WriteAllText($path, (Format-ReleaseNotes $ReleaseNotes $Assets) + "`n", (New-Object Text.UTF8Encoding($false)))
     return $path
 }
 
-function Publish-Release([string]$Version, [string]$Zip, [string]$ReleaseNotes) {
+function Publish-Release([string]$Version, [string[]]$Assets, [string]$ReleaseNotes) {
     $tag = "v$Version"
-    $notesFile = Write-ReleaseNotesFile $ReleaseNotes $Zip $Version
-    & gh release create $tag $Zip --title "Hex Launcher $tag" --notes-file $notesFile
+    $notesFile = Write-ReleaseNotesFile $ReleaseNotes $Assets $Version
+    & gh release create $tag @Assets --title "Hex Launcher $tag" --notes-file $notesFile
     if ($LASTEXITCODE -ne 0) { throw "gh release create a échoué (code $LASTEXITCODE)" }
     return $tag
 }
@@ -128,10 +169,14 @@ if ($MyInvocation.InvocationName -ne '.') {
     $version = Get-ReleaseVersion $root
     $staging = New-ReleaseStaging $root $version $env:TEMP
     try {
-        $zip = New-ReleaseArchive $staging $version (Join-Path $root 'dist')
-        "Archive : $zip ($([math]::Round((Get-Item $zip).Length / 1KB)) Ko)"
-        "SHA-256 : $(Get-ReleaseChecksum $zip)"
-        if ($Publish) { "Release publiée : $(Publish-Release $version $zip (Read-ReleaseNotes $Notes $NotesFile))" }
+        $dist      = Join-Path $root 'dist'
+        $installer = New-ReleaseInstaller $staging $version $dist
+        Add-PortableMarker $staging | Out-Null
+        $zip       = New-ReleaseArchive $staging $version $dist
+        foreach ($asset in @($installer, $zip)) {
+            "$(Split-Path $asset -Leaf) : $([math]::Round((Get-Item $asset).Length / 1KB)) Ko, SHA-256 $(Get-ReleaseChecksum $asset)"
+        }
+        if ($Publish) { "Release publiée : $(Publish-Release $version @($installer, $zip) (Read-ReleaseNotes $Notes $NotesFile))" }
     }
     finally { Remove-Item $staging -Recurse -Force -ErrorAction SilentlyContinue }
 }

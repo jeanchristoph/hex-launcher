@@ -1,6 +1,10 @@
 # Configuration propre à chaque machine (générée par install.bat / detect-config.ps1)
 config.json
 
+# Données de la version portable (config.json, journal, icônes composées), à côté de setup.bat
+/data/
+app/portable.json
+
 # Journal du lanceur (trace horodatée de chaque lancement, pour le support)
 launch.log
 

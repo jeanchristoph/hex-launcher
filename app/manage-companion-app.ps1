@@ -51,6 +51,7 @@ param(
 
 . (Join-Path $PSScriptRoot 'lib\i18n.lib.ps1')
 . (Join-Path $PSScriptRoot 'lib\companion-app.lib.ps1')
+. (Join-Path $PSScriptRoot 'lib\app-data.lib.ps1')
 . (Join-Path $PSScriptRoot 'lib\splash.lib.ps1')
 
 $NoCompanionId              = 'none'
@@ -470,7 +471,7 @@ if ($MyInvocation.InvocationName -ne '.') {
         UninstallOthers = [bool]$UninstallOthers
         Force           = [bool]$Force
         DryRun          = [bool]$DryRun
-        ConfigPath      = if ($ConfigPath)  { $ConfigPath }  else { Join-Path $PSScriptRoot 'config.json' }
+        ConfigPath      = if ($ConfigPath)  { $ConfigPath }  else { Join-Path (Initialize-AppDataFolder $PSScriptRoot) 'config.json' }
         CatalogPath     = if ($CatalogPath) { $CatalogPath } else { Join-Path $PSScriptRoot 'companion-apps.json' }
     }
     try   { [int]$exitCode = Invoke-CompanionManagement $options; exit $exitCode }

@@ -15,24 +15,27 @@ Windows 向け League of Legends 起動アシスタント：デスクトップ�
 （`League of Legends JP - Blitz`、`League of Legends JP - Porofessor` など）。
 
 > **データ収集なし、テレメトリなし、アカウントなし。** このツールが通信するのはあなたの PC 上の Riot Client だけで、
-> インターネットに接続するのはあなたがチェックした補助アプリのためだけです。管理者としての実行は拒否し、「適用」を
-> クリックしない限り何もインストールしません。`setup.bat` は 1 行、コードはすべて平文です。詳細：[安心して使うために](#安心して使うために--setupbat-がすることしないこと)。
+> インターネットに接続するのはあなたがチェックした補助アプリのためと、新しいバージョンがあるかを確認するため
+> （無効化できます）だけです。管理者としての実行は拒否し、「適用」をクリックしない限り何もインストールしません。`setup.bat` は 1 行、コードはすべて平文です。詳細：[安心して使うために](#安心して使うために--setupbat-がすることしないこと)。
 
 ## フォルダーの内容
 
 | ファイル | 役割 |
 |---|---|
-| `setup.bat` | **これをダブルクリック**（旧 `install.bat`）：セットアップアシスタントを開きます（1 つのウィンドウ：検出、補助アプリ、ショートカット） |
+| `setup.bat` | **これをダブルクリック**（旧 `install.bat`）：セットアップアシスタントを開きます（1 つのウィンドウ：検出、補助アプリ、ショートカット）。インストール版：スタートメニューの **Hex Launcher** ショートカット |
+| `data/` | ポータブル版のみ：設定（`config.json`、ログ、合成したアイコン）を `setup.bat` の隣に保存します。インストール版：`%LOCALAPPDATA%\hex-launcher\` |
 | `LISEZMOI.txt` | 3 行のクイックスタート（仏／英） |
 | `app/` | エンジン — 編集不要 |
 | `app/setup.ps1` | セットアップアシスタント（LoL テーマの単一ウィンドウ） |
-| `app/config.json` | Riot のパスと補助アプリの一覧。`setup.bat` が生成。Riot のパスはその「ようこそ」ページで修正（入力または「参照…」）、手動編集は不要 |
 | `app/locales.json` | インストール時に選べる言語のカタログ（Riot のコード＋表示名） |
 | `app/companion-apps.json` | 補助アプリのカタログ：各アプリの検出・インストール・アンインストール・起動方法と、バイナリの署名者 |
 | `app/launch-lol.ps1` | ランチャー本体：Riot Client を終了し、言語を強制設定し、ゲームを再起動（＋ `-Companion` で指定した補助アプリ） |
 | `app/detect-config.ps1` | `setup.bat` から呼ばれる：Riot と既にインストール済みの補助アプリを検出 |
 | `app/manage-companion-app.ps1` | `setup.bat` から呼ばれる：補助アプリの選択、不足分のインストール、要求時のアンインストール |
-| `app/create-shortcuts.ps1` | `setup.bat` から呼ばれる：言語と補助アプリの選択ダイアログを表示し、組み合わせごとに `.lnk` をデスクトップに作成（デスクトップに書き込めない場合はこのフォルダーに作成） |
+| `app/create-shortcuts.ps1` | `setup.bat` から呼ばれる：言語と補助アプリの選択ダイアログを表示し、組み合わせごとに `.lnk` をデスクトップに作成（デスクトップに書き込めない場合は設定フォルダーに作成） |
+| `app/remove-shortcuts.ps1` | アンインストーラーから呼ばれる：このコピーのショートカットをデスクトップから削除 |
+| `app/lib/app-data.lib.ps1` | 設定フォルダー（インストール版またはポータブル版）、コピーの種類の判定、以前のバージョンが `app\` に残した `config.json` の引き継ぎ |
+| `app/lib/update.lib.ps1` / `update-prompt.lib.ps1` / `update-install.lib.ps1` | アップデート：GitHub の最新リリース、「アップデートがあります」ウィンドウ、SHA-256 で検証したダウンロードとインストール |
 | `app/lib/companion-app.lib.ps1` | 共通関数：カタログ、レジストリによる検出（読み取り専用）、アンインストールコマンド、Authenticode 署名検証 |
 | `app/lib/launch-config.lib.ps1` | 共通関数：`config.json` の読み書き、旧形式（単一アプリ）からの移行 |
 | `app/lib/splash.lib.ps1` | 共通のアニメーション付きスプラッシュ（ゲーム起動、補助アプリのインストール） |
@@ -44,7 +47,7 @@ Windows 向け League of Legends 起動アシスタント：デスクトップ�
 | `app/lib/icon.lib.ps1` / `icon-badge.lib.ps1` | `.ico` の読み書き、実行ファイルのアイコンのメモリ上での読み取り、補助アプリバッジと国バッジの合成 |
 | `app/lib/flag.lib.ps1` / `riot-install.lib.ps1` | GDI+ で描く国旗（アイコンと国バッジで共通の定義）；`RiotClientInstalls.json` から読む Riot Client と `LeagueClient.exe` の場所 |
 | `app/lib/i18n.lib.ps1` / `app/i18n/` | アシスタントとコンソールの翻訳：言語ごとの辞書 `fr.json` / `en.json` / `ja.json`（すべて同じキー） |
-| `app/ico/` | アイコンセット（フォルダーごとに 1 セット）：`flat/`（既定：HL ロゴの背後にフラットな国旗）と `classic/`（以前の立体アイコン）。各セットに基本アイコン＋言語ごとの国旗バージョン（`hex-launcher-xx.ico`）と、この PC で合成された国旗＋バッジのアイコンが入る生成フォルダー `companion/` があります。`original/` と `original-badges/` にはマーカー `icon-source.json` しかありません：インストール済みの `LeagueClient.exe` から参照するゲームの公式アイコンで、そのまま、または国と補助アプリのバッジをこの PC で合成して使います。`logo-badges/` には基本アイコン（枠も国旗もない HL ロゴ）だけが入り、その上に国と補助アプリのバッジをこの PC で合成します |
+| `app/ico/` | アイコンセット（フォルダーごとに 1 セット）：`flat/`（既定：HL ロゴの背後にフラットな国旗）と `classic/`（以前の立体アイコン）。各セットに基本アイコン＋言語ごとの国旗バージョン（`hex-launcher-xx.ico`）が入ります。この PC で合成された国旗＋バッジのアイコンは設定フォルダー（`icons\<セット>\companion\`）に置かれます。`original/` と `original-badges/` にはマーカー `icon-source.json` しかありません：インストール済みの `LeagueClient.exe` から参照するゲームの公式アイコンで、そのまま、または国と補助アプリのバッジをこの PC で合成して使います。`logo-badges/` には基本アイコン（枠も国旗もない HL ロゴ）だけが入り、その上に国と補助アプリのバッジをこの PC で合成します |
 
 ## 安心して使うために — `setup.bat` がすること、しないこと
 
@@ -55,12 +58,16 @@ Windows 向け League of Legends 起動アシスタント：デスクトップ�
 - **データ収集なし、テレメトリなし、アカウントなし、サーバーなし。** Hex Launcher が通信するのは*あなたの* PC 上の
   Riot Client（`127.0.0.1`、ローカル API）だけで、インターネットに接続するのは*あなたがチェックした*補助アプリを
   配布元サイトまたは winget からダウンロードするときと、テキスト強制モードで選んだ言語のテキストファイルを Riot 公式 CDN
-  からダウンロードするときだけです。ログ `app\launch.log` はフォルダーから出ません。
+  からダウンロードするときと、アップデートの確認（無効化できます）で GitHub のリリース公開 API にアクセスするときだけです。
+  ログ `launch.log` はあなたの PC の設定フォルダーから出ません。
 - **管理者としては絶対に実行しません**：「管理者として実行」すると拒否します。Windows レジストリは読み取りのみ
-  （インストール済みアプリの検出）、書き込みは一切しません。書き込むのは自分のフォルダー内（`config.json`、合成した
-  アイコン）、デスクトップ（ショートカット）、あなたが依頼したインストールの間だけ Windows の一時フォルダーに
-  置かれる補助アプリのインストーラー、そしてテキスト強制モードではゲームのテキストファイル 2 つと
-  `%LOCALAPPDATA%\hex-launcher\` のキャッシュです。
+  （インストール済みアプリの検出）、書き込みは一切しません。書き込むのは設定フォルダー
+  （`%LOCALAPPDATA%\hex-launcher\`、ポータブル版では `data\`：`config.json`、ログ、合成したアイコン）、デスクトップ
+  （ショートカット）、あなたが依頼したインストールの間だけ Windows の一時フォルダーに置かれる補助アプリまたは
+  アップデートのインストーラー、そしてテキスト強制モードではゲームのテキストファイル 2 つと
+  `%LOCALAPPDATA%\hex-launcher\` のキャッシュです。プログラムのフォルダーが変更されるのは、インストールまたは
+  アップデートのときだけです。「インストールされているアプリ」の項目を書き込むのはインストーラー（Inno Setup）で、
+  スクリプトではありません。
 - **バイナリ依存はひとつだけ**：`app\lib\native\libzstd.dll`。テキスト強制モードに必要な、zstd 展開の公式ライブラリ
   （Meta、BSD ライセンス、v1.5.7）です。読み込みのたびに SHA-256 ハッシュを検証します。
   `tools\fetch-libzstd.ps1` で公式リリースから再ダウンロードできます。
@@ -69,15 +76,25 @@ Windows 向け League of Legends 起動アシスタント：デスクトップ�
 - **ゲームは変更されません（テキスト強制モードを除く）。** 言語の切り替えには Riot Client 自身のローカル API（本体の
   設定と同じ仕組み）を使います。League of Legends のファイルには触れません。ただしテキスト強制モードを有効にした
   場合は、選んだ言語のテキストファイルがボイス言語のテキストファイルを置き換えます（専用セクションを参照）。
-- **検証できます。** 各リリースは zip の SHA-256 を公開しています。PowerShell の
-  `Get-FileHash hex-launcher-x.y.z.zip` と比較してください。ソースコードはこのリポジトリです。
+- **検証できます。** 各リリースはインストーラーとポータブル版 zip の SHA-256 を公開しています。PowerShell の
+  `Get-FileHash <ファイル>` と比較してください。自動アップデートはハッシュが一致しないファイルをすべて拒否します。
+  ソースコードはこのリポジトリです。
 
 ## 新しい PC でのセットアップ
 
-0. **[最新版をダウンロード](https://github.com/jeanchristoph/hex-launcher/releases/latest)**（`hex-launcher-x.y.z.zip`）して展開するか、リポジトリをクローンします。
-1. このフォルダーを好きな場所にコピーします（例：`Documents\hex-launcher`）。別の PC から持ってきた場合は、
-   検出が正しく動くように **`config.json` を含めない**でください。
-2. **`setup.bat`** をダブルクリックします（「管理者として実行」は不可：ツールは意図的に拒否します）。3 つのステップ：
+0. **[最新版をダウンロード](https://github.com/jeanchristoph/hex-launcher/releases/latest)** します。次のどちらかを選んでください：
+   - **インストーラー** `hex-launcher-setup-x.y.z.exe`（推奨）：管理者権限なしで `%LOCALAPPDATA%\Programs\hex-launcher` に
+     インストールし、スタートメニューに **Hex Launcher** を、「インストールされているアプリ」に項目を追加します。
+     Windows SmartScreen が「Windows によって PC が保護されました」と表示することがあります：インストーラーは署名されていません
+     （コード署名証明書は有料のため）。SHA-256 ハッシュを確認してから、「詳細情報」→「実行」をクリックしてください；
+   - **ポータブル版** `hex-launcher-portable-x.y.z.zip`：好きな場所（ドキュメント、USB メモリ）に展開します。何も
+     インストールされません。設定は `setup.bat` の隣の `data\` に保存され、フォルダーごと持ち運べます。
+
+   またはリポジトリをクローンします。
+1. ポータブル版：フォルダーを好きな場所にコピーします。別の PC から持ってきた場合は、検出が正しく動くように
+   **`data\` フォルダーを含めない**でください。
+2. **`setup.bat`** をダブルクリックするか、スタートメニューの **Hex Launcher**（インストール版）をクリックします —
+   「管理者として実行」は不可：ツールは意図的に拒否します。3 つのステップ：
    - **[1/3] 検出** — Riot Client を検出（Riot 公式のファイル `RiotClientInstalls.json` を使用）し、カタログの補助アプリのうち
      既にインストール済みのものをすべて検出し、`config.json` を書き出します（既に存在する場合は上書きしません：手動設定は保持されます）。
      Riot の 2 つのパスは「参照…」ボタン付きの編集可能な欄に表示されます：間違ったパスはその場で修正でき、「次へ」で保存され、
@@ -88,7 +105,7 @@ Windows 向け League of Legends 起動アシスタント：デスクトップ�
    - **[3/3] ショートカット** — 言語（初回は JP と、ウィザード左下で選んだ言語が選択済み。その言語に LoL の音声がなければフランス語。テキスト強制のリストも既定でその言語を表示）と、組み合わせる補助アプリにチェックするダイアログ。
      言語 × 補助アプリごとに 1 つのショートカットをデスクトップに作成します（`League of Legends JP - Blitz`）。
      補助アプリのチェックがなければ単に `League of Legends JP`。このランチャーの不要になったショートカットは削除されます。
-     デスクトップに書き込めない場合（保護されたフォルダー、OneDrive など）は、代わりにこのフォルダーに作成します。
+     デスクトップに書き込めない場合（保護されたフォルダー、OneDrive など）は、代わりに設定フォルダーに作成します。
      同じ場所に **Hex Launcher**（歯車アイコン）のショートカットも作成され、このウィザードを再び開けます。
 3. 使いたい言語と補助アプリのショートカットをダブルクリックします。
 
@@ -100,9 +117,29 @@ Windows 向け League of Legends 起動アシスタント：デスクトップ�
 `-Language fr|en|ja` があります）。
 
 検出が間違っていた場合は：`setup.bat` を再実行し、「ようこそ」ページでパスを修正してください — `config.json` を開く必要はありません。
-検出をやり直すには：`app\config.json` を削除して再実行してください。
+検出をやり直すには：設定フォルダーの `config.json` を削除して再実行してください。
 
 新しい言語で初めて起動するとき、Riot Client がテキスト＋ボイスパック（数百 MB）をダウンロードします。正常な動作です。
+
+## アップデート
+
+起動するたびに（ゲームのショートカットでもアシスタントでも）、Hex Launcher は GitHub に最新の公開バージョンを問い合わせます：
+`api.github.com` へのリクエスト 1 回だけで、データは一切送信せず、最大 2 秒、読み込み画面の間に行います。より新しい
+バージョンがあれば、ウィンドウ「アップデートがあります」でインストールを提案します。「インストール」はそれをダウンロードし、
+GitHub が公開している SHA-256 ハッシュを検証してインストールし、起動を続けます。「後で」はそのままゲームを起動します。
+チェックボックス「次のバージョンまで表示しない」でそのバージョンの通知は止まり、次のバージョンは改めて提案されます。
+
+インストール版は自身のインストーラーでアップデートされます。ポータブル版は `data\` に触れずにその場でファイルを置き換えます。
+フォルダーに書き込めない場合は、ダウンロードページを開くボタンが表示されます。
+
+確認を一切しないようにするには：「ようこそ」ページで「起動時にアップデートを確認する」のチェックを外してください。
+ネットワークがなければ何も表示されません。リポジトリのクローンは何も確認しません。
+
+## アンインストール
+
+インストール版：「設定 → アプリ → インストールされているアプリ → Hex Launcher → アンインストール」。デスクトップの
+ショートカットは削除されます。設定（`%LOCALAPPDATA%\hex-launcher\`）は再インストールのために残ります。ポータブル版：
+フォルダーとショートカットを削除してください。
 
 ## 補助アプリ
 
@@ -177,7 +214,10 @@ ID：`porofessor`、`blitz`、`opgg`、`mobalytics`、`dpm`、`none`。終了コ
 | `uninstall.dialogProcessNames` | 対話式：待機する発行者ダイアログのプロセス（Overwolf：`OWUninstallMenu`） |
 | `uninstall.notice` | アンインストール前の確認に表示する文（例：Overwolf の注意） |
 
-## `app\config.json`
+## `config.json`
+
+設定フォルダーにあります：`%LOCALAPPDATA%\hex-launcher\config.json`（インストール版）、`data\config.json`
+（ポータブル版）。以前のバージョンは `app\` に保存していました：初回起動時に引き継がれます。
 
 ```json
 {
@@ -203,6 +243,7 @@ ID：`porofessor`、`blitz`、`opgg`、`mobalytics`、`dpm`、`none`。終了コ
 | `companionApps[].name` | スプラッシュに表示される名前。見た目のみ。 |
 | `companionApps[].path` | 起動する実行ファイル。 |
 | `companionApps[].arguments` | 起動引数。なければ空文字 `""`。 |
+| `checkForUpdates` | 起動時のアップデート確認（「ようこそ」ページのチェックボックス）。省略時 → `true`。 |
 | `forcedTextLocale` | `setup.bat` で選んだテキスト強制の言語（例：`fr_FR`）、なければ空。「ショートカット」ページでの事前選択に使います。選択を保持するのはショートカットの方です（`-TextLocale`）。 |
 
 `path` がこの PC に存在しない場合、ランチャーはそれをスキップしてスプラッシュに警告を表示します — ゲームは起動します。
@@ -225,7 +266,7 @@ Riot が提供するすべての言語が `locales.json` にあり、インス�
 新規インストールでは `original-badges` が選択済みです。`flat` は引き続きフォールバック用のセットです（ウィンドウアイコン、
 国旗がない場合、LoL が見つからない場合）。
 補助アプリ付きのショートカットには右上に色付きバッジが加わります — P Porofessor、B Blitz、O OP.GG、M Mobalytics、D DPM —
-インストール時に `app/ico/<セット>/companion/` に合成されます（32 px 未満では文字が省かれ、色だけが残ります）。
+インストール時に 設定フォルダーの `icons\<セット>\companion\` に合成されます（32 px 未満では文字が省かれ、色だけが残ります）。
 バッジの色はカタログのままです。セットのフォルダーに `badge-style.json`（`{ "nightVeil": true, "reducedPalette": false }`）を置くと、
 国旗の夜色のベールや縮小パレットをバッジに適用できます（`flat` はベールのみ、`classic` はどちらも無効）。同梱の 2 セットには全キーを明記したこのファイルが入っており、新しいセットのひな形になります。
 
@@ -233,7 +274,7 @@ Riot が提供するすべての言語が `locales.json` にあり、インス�
 `RiotClientInstalls.json` から読み取り）を参照するだけで、プロジェクトにコピーも配布もしません：
 - `original`：アイコンそのまま（`IconLocation` が実行ファイルを指す）。ショートカットは名前でしか区別できません。
 - `original-badges`：アイコンの上に国バッジ（小さな国旗、公式の色をそのまま）、その下に補助アプリバッジを重ねます。32 px 未満では
-  国バッジだけが残ります。合成した `.ico` は `app/ico/original-badges/companion/` に書き出され、この PC 限りでリリースには含まれません。
+  国バッジだけが残ります。合成した `.ico` は 設定フォルダーの `icons\original-badges\companion\` に書き出され、この PC 限りでリリースには含まれません。
 こうしたセットは `.ico` を持たないフォルダーで、`icon-source.json`（`{ "source": "league-client", "badges": true }`）が目印です。
 `LeagueClient.exe` が見つからなければ、ショートカットには既定セットのアイコンが使われます。
 
@@ -271,7 +312,7 @@ Riot が署名したオリジナルのファイルで、その言語でプレイ
 - それより早く配置しても意味がありません：クライアントは検証時に変更されたファイルをすべて修復します；
 - Hex Launcher のショートカットを使わずに LoL を起動した場合（Riot クライアントから「プレイ」）：LoL クライアントが
   起動時にファイルを検証して元のファイルに戻すため、試合はすべてボイスの言語で行われます；
-- オフラインやエラーの場合、試合はボイスの言語で行われます（`launch.log` の `TEXT` 行）；
+- オフラインやエラーの場合、試合はボイスの言語で行われます（設定フォルダーの `launch.log` の `TEXT` 行）；
 - 手動起動では、**プレイ** を押した時点でテキストが配置されます（最大 10 分）。
 
 スクリプトモード：`create-shortcuts.ps1 -Locales ja_JP -TextLocale fr_FR`（ランチャーには
@@ -334,6 +375,7 @@ Riot Client の「言語」設定はランチャーの言語を変えるだけ�
 | `flat` アイコンセットの再生成（`tools/make-flag-icons.ps1`） | `resvg`（SVG → PNG） | `scoop install resvg` |
 | `logo-badges` セットのアイコンの再生成（`tools/make-logo-icon.ps1`） | `resvg`（SVG → PNG） | `scoop install resvg` |
 | ロゴ SVG の再生成（`tools/logo/make-logo-svg.py`） | Python 3 ＋ Pillow ＋ numpy、`potrace`（PNG → SVG）、`resvg` | `pip install pillow numpy` · `scoop install potrace resvg` |
+| インストーラーのビルド（`tools/make-release.ps1`） | Inno Setup 6 | `winget install --id JRSoftware.InnoSetup --exact` |
 | リリースの公開（`tools/make-release.ps1 -Publish`） | GitHub CLI `gh`（ログイン済み） | `scoop install gh` または https://cli.github.com |
 | `libzstd.dll` のバージョン変更（`tools/fetch-libzstd.ps1`） | なし（PowerShell） | 公式リリース https://github.com/facebook/zstd/releases |
 
@@ -357,7 +399,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-Pester -Path test
 - **スプラッシュやダイアログの文字化け**（`Ã©`、`â€¦`）：`.ps1` が BOM なしで保存し直されています。
   すべてのスクリプト（`launch-lol.ps1`、`manage-companion-app.ps1`、`create-shortcuts.ps1`、`lib\*.ps1`）は
   **BOM 付き UTF-8** である必要があります（VS Code：ステータスバー → エンコード → 「エンコード付きで保存」）。
-- **テキストが強制した言語になっていない**：`app\launch.log` の `TEXT` 行を確認してください（オフライン、パッチ適用中、
+- **テキストが強制した言語になっていない**：設定フォルダーの `launch.log` の `TEXT` 行を確認してください（オフライン、パッチ適用中、
   ボイスの言語がまだインストールされていないなど）。
 - **ショートカットのアイコンが更新されない**：Windows のアイコンキャッシュです。フォルダーで右クリック → 最新の情報に更新、
   それでもだめならサインアウト／サインインしてください。

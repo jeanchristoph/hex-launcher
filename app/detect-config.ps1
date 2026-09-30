@@ -27,6 +27,7 @@ $ProductSettings = Join-Path $env:ProgramData 'Riot Games\Metadata\league_of_leg
 
 . (Join-Path $PSScriptRoot 'lib\i18n.lib.ps1')
 . (Join-Path $PSScriptRoot 'lib\companion-app.lib.ps1')
+. (Join-Path $PSScriptRoot 'lib\app-data.lib.ps1')
 . (Join-Path $PSScriptRoot 'lib\riot-install.lib.ps1')   # Find-RiotClientPath : RiotClientInstalls.json, fichier officiel de Riot
 $CompanionCatalogPath = Join-Path $PSScriptRoot 'companion-apps.json'
 
@@ -67,6 +68,6 @@ function Invoke-ConfigDetection([string]$OutputPath, [bool]$Force) {
 
 if ($MyInvocation.InvocationName -ne '.') {
     Initialize-Translation (Resolve-UiLanguage $Language (Get-UICulture).Name) | Out-Null
-    if (-not $OutputPath) { $OutputPath = Join-Path $PSScriptRoot 'config.json' }
+    if (-not $OutputPath) { $OutputPath = Join-Path (Initialize-AppDataFolder $PSScriptRoot) 'config.json' }
     Invoke-ConfigDetection $OutputPath ([bool]$Force)
 }

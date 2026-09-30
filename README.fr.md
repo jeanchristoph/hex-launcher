@@ -15,24 +15,27 @@ installe, et on obtient un raccourci par langue × appli compagnon
 (`League of Legends JP - Blitz`, `League of Legends JP - Porofessor`…).
 
 > **Aucune donnée collectée, aucune télémétrie, aucun compte.** L'outil ne parle qu'au Riot Client de votre PC, ne va sur
-> Internet que pour une appli compagnon que vous avez cochée, refuse le mode administrateur et n'installe rien sans votre
-> clic sur *Appliquer*. `setup.bat` tient en une ligne, tout le code est en clair. Détails : [Confiance](#confiance--ce-que-fait-setupbat-ce-quil-ne-fait-pas).
+> Internet que pour une appli compagnon que vous avez cochée et pour vérifier s'il existe une nouvelle version
+> (désactivable), refuse le mode administrateur et n'installe rien sans votre clic sur *Appliquer*. `setup.bat` tient en une ligne, tout le code est en clair. Détails : [Confiance](#confiance--ce-que-fait-setupbat-ce-quil-ne-fait-pas).
 
 ## Contenu du dossier
 
 | Fichier | Rôle |
 |---|---|
-| `setup.bat` | **À double-cliquer** (ex-`install.bat`) : ouvre l'assistant de configuration (une fenêtre : détection, applis compagnon, raccourcis) |
+| `setup.bat` | **À double-cliquer** (ex-`install.bat`) : ouvre l'assistant de configuration (une fenêtre : détection, applis compagnon, raccourcis). Version installée : raccourci **Hex Launcher** du menu Démarrer |
+| `data/` | Version portable seulement : les réglages (`config.json`, journal, icônes composées), à côté de `setup.bat`. Version installée : `%LOCALAPPDATA%\hex-launcher\` |
 | `LISEZMOI.txt` | Démarrage rapide en trois lignes (FR/EN) |
 | `app/` | Le moteur — rien à y modifier |
 | `app/setup.ps1` | L'assistant de configuration (fenêtre unique au thème LoL) |
-| `app/config.json` | Chemins Riot + liste des applis compagnon. Généré par `setup.bat` ; les chemins Riot se corrigent sur sa page *Bienvenue* (saisie ou *Parcourir…*), jamais à la main |
 | `app/locales.json` | Catalogue des langues proposées à l'install (code Riot + libellé affiché) |
 | `app/companion-apps.json` | Catalogue des applis compagnon : comment détecter, installer, désinstaller et lancer chacune, et qui signe ses binaires |
 | `app/launch-lol.ps1` | Le lanceur : ferme le client Riot, force la langue, relance le jeu (+ l'appli compagnon donnée par `-Companion`) |
 | `app/detect-config.ps1` | Appelé par `setup.bat` : détecte Riot et les applis compagnon déjà installées |
 | `app/manage-companion-app.ps1` | Appelé par `setup.bat` : choix des applis compagnon, installation des manquantes, désinstallation sur demande |
-| `app/create-shortcuts.ps1` | Appelé par `setup.bat` : choix des langues et des compagnons, puis un `.lnk` par combinaison sur le Bureau (repli dans ce dossier si le Bureau est inaccessible) |
+| `app/create-shortcuts.ps1` | Appelé par `setup.bat` : choix des langues et des compagnons, puis un `.lnk` par combinaison sur le Bureau (repli dans le dossier des réglages si le Bureau est inaccessible) |
+| `app/remove-shortcuts.ps1` | Appelé par le désinstalleur : retire du Bureau les raccourcis de cette copie |
+| `app/lib/app-data.lib.ps1` | Dossier des réglages (installée ou portable), nature de la copie, reprise d'un `config.json` laissé dans `app\` par une version antérieure |
+| `app/lib/update.lib.ps1` / `update-prompt.lib.ps1` / `update-install.lib.ps1` | Mises à jour : dernière release GitHub, fenêtre « Mise à jour disponible », téléchargement vérifié par SHA-256 puis installation |
 | `app/lib/companion-app.lib.ps1` | Fonctions partagées : catalogue, détection via le registre (lecture seule), commande de désinstallation, vérification de signature Authenticode |
 | `app/lib/icon.lib.ps1` / `icon-badge.lib.ps1` | Lecture/écriture des `.ico`, icône d'un binaire lue en mémoire, composition des pastilles compagnon et pays |
 | `app/lib/flag.lib.ps1` / `riot-install.lib.ps1` | Drapeaux dessinés en GDI+ (une seule définition pour les icônes et les pastilles pays) ; Riot Client et `LeagueClient.exe` lus dans `RiotClientInstalls.json` |
@@ -44,7 +47,7 @@ installe, et on obtient un raccourci par langue × appli compagnon
 | `app/lib/icon-split.lib.ps1` | Icône coupée en diagonale des raccourcis à texte forcé |
 | `tests/` | Tests Pester (`Invoke-Pester -Path tests`) |
 | `tools/` | Développement uniquement, hors release : `make-release.ps1`, `fetch-libzstd.ps1` (retélécharge `libzstd.dll` depuis la release officielle et vérifie ses empreintes), `make-flag-icons.ps1` (régénère toutes les icônes de `app/ico/` depuis le logo vectoriel), `make-logo-icon.ps1` (régénère l'icône du jeu `logo-badges`), `watch-launch.ps1` (essai réel : lance le jeu et relève les écritures sur les fichiers texte), `logo/make-logo-svg.py` + `logo/hex-launcher-logo-drawing.png` → `logo/hex-launcher-logo.svg` (logo HL original, source de vérité) |
-| `app/ico/` | Jeux d'icônes, un dossier chacun : `flat/` (défaut : drapeau plat derrière le logo HL) et `classic/` (les anciennes icônes en relief) ; chacun contient l'icône de base + une variante drapeau par langue (`hex-launcher-xx.ico`) et un sous-dossier généré `companion/` avec les icônes drapeau + pastille composées sur ce poste. `original/` et `original-badges/` ne contiennent qu'un marqueur `icon-source.json` : l'icône officielle du jeu, référencée depuis `LeagueClient.exe` installé — nue, ou avec pastilles pays et compagnon composées sur ce poste ; `logo-badges/` : une icône de base seule (logo HL sans cadre ni drapeau), sur laquelle les pastilles pays et compagnon sont composées sur ce poste |
+| `app/ico/` | Jeux d'icônes, un dossier chacun : `flat/` (défaut : drapeau plat derrière le logo HL) et `classic/` (les anciennes icônes en relief) ; chacun contient l'icône de base + une variante drapeau par langue (`hex-launcher-xx.ico`); les icônes drapeau + pastille composées sur ce poste vont dans le dossier des réglages (`icons\<jeu>\companion\`). `original/` et `original-badges/` ne contiennent qu'un marqueur `icon-source.json` : l'icône officielle du jeu, référencée depuis `LeagueClient.exe` installé — nue, ou avec pastilles pays et compagnon composées sur ce poste ; `logo-badges/` : une icône de base seule (logo HL sans cadre ni drapeau), sur laquelle les pastilles pays et compagnon sont composées sur ce poste |
 
 ## Confiance — ce que fait `setup.bat`, ce qu'il ne fait pas
 
@@ -55,12 +58,15 @@ Cliquer sur un `.bat` inconnu fait peur, à juste titre. Voici de quoi vérifier
 - **Aucune donnée collectée, aucune télémétrie, aucun compte, aucun serveur.** Hex Launcher ne parle qu'au Riot Client
   de *votre* PC (`127.0.0.1`, son API locale) et ne contacte Internet que pour télécharger une appli compagnon *que
   vous avez cochée*, depuis le site de son éditeur ou winget, et, en mode texte forcé, les fichiers texte de la langue
-  choisie depuis le CDN officiel de Riot. Le journal `app\launch.log` reste dans le dossier.
+  choisie depuis le CDN officiel de Riot, et, pour vérifier les mises à jour (désactivable), l'API publique des releases
+  GitHub. Le journal `launch.log` reste sur votre PC, dans le dossier des réglages.
 - **Jamais administrateur** : lancé « en tant qu'administrateur », il refuse. Registre Windows lu seulement (pour
-  détecter les applis déjà installées), jamais écrit. Il n'écrit que dans son propre dossier (`config.json`, icônes
-  composées), sur le Bureau (les raccourcis), le temps d'une installation que vous avez demandée, l'installeur de
-  l'appli compagnon dans le dossier temporaire de Windows et, en mode texte forcé, les deux fichiers texte du jeu et un
-  cache dans `%LOCALAPPDATA%\hex-launcher\`.
+  détecter les applis déjà installées), jamais écrit. Il n'écrit que dans son dossier de réglages
+  (`%LOCALAPPDATA%\hex-launcher\`, ou `data\` en portable : `config.json`, journal, icônes composées), sur le Bureau
+  (les raccourcis), le temps d'une installation que vous avez demandée, l'installeur de l'appli compagnon ou de la mise à
+  jour dans le dossier temporaire de Windows et, en mode texte forcé, les deux fichiers texte du jeu et un cache dans
+  `%LOCALAPPDATA%\hex-launcher\`. Le dossier du programme n'est modifié que par une installation ou une mise à jour.
+  L'entrée *Applications installées* est écrite par l'installeur (Inno Setup), pas par les scripts.
 - **Une seule dépendance binaire** : `app\lib\native\libzstd.dll`, la bibliothèque officielle de décompression zstd
   (Meta, licence BSD, v1.5.7), nécessaire au mode texte forcé. Son empreinte SHA-256 est vérifiée avant chaque
   chargement ; `tools\fetch-libzstd.ps1` la retélécharge depuis la release officielle.
@@ -70,15 +76,26 @@ Cliquer sur un `.bat` inconnu fait peur, à juste titre. Voici de quoi vérifier
   (ce que fait son propre réglage). Aucun fichier de League of Legends n'est touché, sauf si vous activez le mode
   texte forcé : les fichiers texte de la langue choisie remplacent alors ceux de la langue des voix (voir la section
   dédiée).
-- **Vérifiable.** Chaque release publie l'empreinte SHA-256 de son zip ; comparez avec
-  `Get-FileHash hex-launcher-x.y.z.zip` dans PowerShell. Le code source est ce dépôt.
+- **Vérifiable.** Chaque release publie l'empreinte SHA-256 de l'installeur et du zip portable ; comparez avec
+  `Get-FileHash <fichier>` dans PowerShell. La mise à jour automatique refuse tout fichier dont l'empreinte diffère.
+  Le code source est ce dépôt.
 
 ## Mise en route sur une nouvelle machine
 
-0. **[Télécharger la dernière version](https://github.com/jeanchristoph/hex-launcher/releases/latest)** (`hex-launcher-x.y.z.zip`) et la décompresser — ou cloner le dépôt.
-1. Copier ce dossier où on veut (ex. `Documents\hex-launcher`) — **sans** `config.json` s'il vient
-   d'une autre machine, pour que la détection se fasse.
-2. Double-cliquer sur **`setup.bat`** (jamais « Exécuter en tant qu'administrateur » : l'outil refuse, volontairement). Une fenêtre, trois étapes :
+0. **[Télécharger la dernière version](https://github.com/jeanchristoph/hex-launcher/releases/latest)**, au choix :
+   - **Installeur** `hex-launcher-setup-x.y.z.exe` (recommandé) : installe dans `%LOCALAPPDATA%\Programs\hex-launcher`
+     sans droits administrateur, ajoute **Hex Launcher** au menu Démarrer et une entrée dans *Applications installées*.
+     Windows SmartScreen peut afficher « Windows a protégé votre ordinateur » : l'installeur n'est pas signé (un
+     certificat de signature est payant). Vérifiez son empreinte SHA-256, puis *Informations complémentaires* →
+     *Exécuter quand même* ;
+   - **Version portable** `hex-launcher-portable-x.y.z.zip` : à décompresser où l'on veut (Documents, clé USB). Rien
+     n'est installé ; les réglages restent dans `data\`, à côté de `setup.bat`, et voyagent avec le dossier.
+
+   Ou cloner le dépôt.
+1. Version portable : copier le dossier où on veut — **sans** son dossier `data\` s'il vient d'une autre machine, pour
+   que la détection se fasse.
+2. Double-cliquer sur **`setup.bat`**, ou sur **Hex Launcher** dans le menu Démarrer (version installée) — jamais
+   « Exécuter en tant qu'administrateur » : l'outil refuse, volontairement. Une fenêtre, trois étapes :
    - **[1/3] Détection** — trouve le Riot Client (via `RiotClientInstalls.json`, le fichier officiel de Riot) et toutes
      les applis compagnon du catalogue déjà installées, puis écrit `config.json` (jamais écrasé s'il existe déjà :
      les réglages manuels sont conservés). Les deux chemins Riot sont affichés dans des champs modifiables avec un
@@ -92,7 +109,7 @@ Cliquer sur un `.bat` inconnu fait peur, à juste titre. Voici de quoi vérifier
      les applis compagnon à combiner. Un raccourci par langue × appli est créé sur le Bureau
      (`League of Legends JP - Blitz`) ; sans compagnon coché, simplement `League of Legends JP`. Les raccourcis
      obsolètes de ce lanceur sont retirés. Si le Bureau est inaccessible (dossier protégé, OneDrive…), ils sont
-     créés dans ce dossier à la place. Un raccourci **Hex Launcher** (icône engrenage) est posé
+     créés dans le dossier des réglages à la place. Un raccourci **Hex Launcher** (icône engrenage) est posé
      au même endroit : il rouvre cet assistant.
 3. Double-cliquer sur le raccourci de la langue et du compagnon voulus.
 
@@ -105,10 +122,30 @@ perdre ce qui est coché. Pour forcer une langue : `powershell -File app\setup.p
 (même paramètre `-Language fr|en|ja` sur `detect-config.ps1`, `manage-companion-app.ps1` et `create-shortcuts.ps1`).
 
 Si la détection s'est trompée : relancer `setup.bat` et corriger le chemin sur la page *Bienvenue* — il n'y a
-jamais besoin d'ouvrir `config.json`. Pour forcer une nouvelle détection : supprimer `app\config.json` puis relancer.
+jamais besoin d'ouvrir `config.json`. Pour forcer une nouvelle détection : supprimer `config.json` du dossier des réglages puis relancer.
 
 Au premier lancement dans une nouvelle langue, le Riot Client télécharge le pack de textes + voix
 (quelques centaines de Mo). C'est normal.
+
+## Mises à jour
+
+À chaque lancement (raccourci de jeu ou assistant), Hex Launcher demande à GitHub la dernière version publiée : une
+seule requête à `api.github.com`, sans aucune donnée envoyée, 2 secondes au plus, pendant l'écran de chargement. Si une
+version plus récente existe, une fenêtre propose de l'installer. *Installer* la télécharge, vérifie son empreinte
+SHA-256 publiée par GitHub, l'installe, puis reprend le lancement. *Plus tard* lance le jeu tel quel. La case « Ne plus
+me demander jusqu'à la prochaine version » fait taire cette version-là ; la suivante sera proposée.
+
+La version installée se met à jour par son installeur. La version portable remplace ses fichiers sur place sans toucher
+à `data\` ; si son dossier n'est pas modifiable, un bouton ouvre la page de téléchargement.
+
+Pour ne plus rien vérifier : décocher « Vérifier les mises à jour au lancement » sur la page *Bienvenue*. Sans réseau,
+rien ne s'affiche. Un clone du dépôt ne vérifie rien.
+
+## Désinstaller
+
+Version installée : *Paramètres → Applications installées → Hex Launcher → Désinstaller*. Les raccourcis du Bureau sont
+retirés ; les réglages (`%LOCALAPPDATA%\hex-launcher\`) restent, pour une réinstallation. Version portable : supprimer
+le dossier et les raccourcis.
 
 ## Applications compagnon
 
@@ -184,7 +221,10 @@ Une entrée dans `companion-apps.json` ; l'ordre de la liste est la priorité de
 | `uninstall.dialogProcessNames` | Mode interactif : process du dialogue de l'éditeur à attendre (Overwolf : `OWUninstallMenu`) |
 | `uninstall.notice` | Texte affiché dans la confirmation avant désinstallation (ex. l'avertissement Overwolf) |
 
-## `app\config.json`
+## `config.json`
+
+Dans le dossier des réglages : `%LOCALAPPDATA%\hex-launcher\config.json` (version installée), `data\config.json`
+(version portable). Une version antérieure le gardait dans `app\` : il est repris au premier lancement.
 
 ```json
 {
@@ -211,6 +251,7 @@ automatiquement à la prochaine lecture.
 | `companionApps[].name` | Nom affiché dans le splash. Cosmétique. |
 | `companionApps[].path` | Exécutable à lancer. |
 | `companionApps[].arguments` | Arguments de lancement. Chaîne vide `""` si aucun. |
+| `checkForUpdates` | Vérification des mises à jour au lancement (case de la page *Bienvenue*). Absent → `true`. |
 | `forcedTextLocale` | Langue du texte forcé choisie dans `setup.bat` (ex. `fr_FR`), vide sinon. Sert à la présélection de la page *Raccourcis* ; ce sont les raccourcis qui portent le choix (`-TextLocale`). |
 
 Si un `path` n'existe pas sur la machine, le lanceur l'ignore et affiche un avertissement dans le splash —
@@ -234,7 +275,7 @@ traduit (« LoL officielle + pastilles », « LoL officielle, nue », « Logo HL
 un jeu ajouté s'affiche après, sous le nom de son dossier. Installation neuve : `original-badges` est présélectionné ;
 `flat` reste le jeu de repli (icône de fenêtre, drapeau manquant, LoL introuvable).
 Un raccourci avec appli compagnon porte en plus une pastille de couleur en haut à droite — P Porofessor, B Blitz,
-O OP.GG, M Mobalytics, D DPM — composée à l'installation dans `app/ico/<jeu>/companion/` (la lettre disparaît sous 32 px, la couleur reste).
+O OP.GG, M Mobalytics, D DPM — composée à l'installation dans le dossier des réglages (`icons\<jeu>\companion\`) (la lettre disparaît sous 32 px, la couleur reste).
 Les couleurs de pastille sont celles du catalogue ; un jeu peut les styler par un `badge-style.json` dans son dossier :
 `{ "nightVeil": true, "reducedPalette": false }` — voile nuit des drapeaux et/ou leur palette réduite (`flat` prend le
 voile, `classic` ni l'un ni l'autre). Les deux jeux livrés portent le fichier avec toutes les clés explicites, modèle pour un nouveau jeu.
@@ -244,7 +285,7 @@ Deux jeux « externes » utilisent l'icône officielle de League of Legends, ré
 - `original` : l'icône nue (`IconLocation` pointe sur le binaire). Les raccourcis ne se distinguent alors que par leur nom.
 - `original-badges` : l'icône surmontée d'une pastille pays (drapeau miniature, couleurs officielles brutes) puis, en dessous,
   de la pastille compagnon ; sous 32 px seule la pastille pays subsiste. Le `.ico` composé est écrit dans
-  `app/ico/original-badges/companion/`, propre à ce poste et hors release.
+  `icons\original-badges\companion\` du dossier des réglages, propre à ce poste et hors release.
 Un tel jeu est un dossier sans `.ico`, marqué par `icon-source.json` : `{ "source": "league-client", "badges": true }`.
 Si `LeagueClient.exe` est introuvable, les raccourcis reçoivent les icônes du jeu par défaut.
 
@@ -283,7 +324,7 @@ Limites :
 - poser plus tôt est inutile : le client répare tout fichier modifié lors de sa vérification ;
 - LoL lancé sans raccourci Hex Launcher (Riot Client, puis Jouer) : à son ouverture, le client LoL vérifie ses fichiers
   et remet ceux d'origine ; la partie se joue alors entièrement dans la langue des voix ;
-- hors ligne ou en cas d'erreur, la partie se joue dans la langue des voix (ligne `TEXT` dans `launch.log`) ;
+- hors ligne ou en cas d'erreur, la partie se joue dans la langue des voix (ligne `TEXT` dans `launch.log`, dossier des réglages) ;
 - en démarrage manuel, le texte est posé dès que vous appuyez sur **Jouer** (10 min au plus).
 
 En mode script : `create-shortcuts.ps1 -Locales ja_JP -TextLocale fr_FR` (le lanceur reçoit alors
@@ -350,6 +391,7 @@ Utiliser le lanceur ne demande rien de plus que Windows 10/11. Contribuer, si :
 | Régénérer le jeu d'icônes `flat` (`tools/make-flag-icons.ps1`) | `resvg` (SVG → PNG) | `scoop install resvg` |
 | Régénérer l'icône du jeu `logo-badges` (`tools/make-logo-icon.ps1`) | `resvg` (SVG → PNG) | `scoop install resvg` |
 | Régénérer le logo SVG (`tools/logo/make-logo-svg.py`) | Python 3 avec Pillow et numpy, `potrace` (PNG → SVG), `resvg` | `pip install pillow numpy` · `scoop install potrace resvg` |
+| Construire l'installeur (`tools/make-release.ps1`) | Inno Setup 6 | `winget install --id JRSoftware.InnoSetup --exact` |
 | Publier une release (`tools/make-release.ps1 -Publish`) | GitHub CLI `gh`, authentifié | `scoop install gh` ou https://cli.github.com |
 | Changer de version de `libzstd.dll` (`tools/fetch-libzstd.ps1`) | aucun (PowerShell) | release officielle https://github.com/facebook/zstd/releases |
 
@@ -374,7 +416,7 @@ Installeurs, désinstalleurs, réseau et registre sont mockés : les tests ne to
 - **Caractères bizarres dans le splash ou les dialogues** (`Ã©`, `â€¦`) : un `.ps1` a été réenregistré sans BOM.
   Tous les scripts (`launch-lol.ps1`, `manage-companion-app.ps1`, `create-shortcuts.ps1`, `lib\*.ps1`) doivent
   être en **UTF-8 avec BOM** (VS Code : barre d'état → encodage → « Enregistrer avec l'encodage »).
-- **Le texte n'est pas dans la langue forcée** : lire les lignes `TEXT` de `app\launch.log` (hors ligne, patch en
+- **Le texte n'est pas dans la langue forcée** : lire les lignes `TEXT` de `launch.log` (dossier des réglages) (hors ligne, patch en
   cours, langue des voix pas encore installée…).
 - **L'icône du raccourci n'est pas à jour** : cache d'icônes Windows. Clic droit → Actualiser dans le
   dossier, sinon se déconnecter/reconnecter.

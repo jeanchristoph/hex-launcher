@@ -138,15 +138,15 @@ Describe 'Read-CompanionBadges' {
 }
 
 Describe 'Get-CompanionIconPath' {
-    It 'nomme l''icône composée par le pays, l''identifiant du compagnon et l''empreinte de la pastille, dans ico\<jeu>\companion' {
+    It 'nomme l''icône composée par le pays, l''identifiant du compagnon et l''empreinte de la pastille, dans le dossier des données, icons\<jeu>\companion' {
         $badge = [pscustomobject]@{ glyph = 'B'; color = '#E4103F' }
-        Get-CompanionIconPath 'ja_JP' ([pscustomobject]@{ id = 'blitz' }) $badge | Should Be (Join-Path $folder "ico\flat\companion\hex-launcher-jp-blitz-$(Get-BadgeSignature $badge).ico")
+        Get-CompanionIconPath 'ja_JP' ([pscustomobject]@{ id = 'blitz' }) $badge | Should Be (Join-Path (Get-AppDataFolder $folder) "icons\flat\companion\hex-launcher-jp-blitz-$(Get-BadgeSignature $badge).ico")
     }
 
     It 'suit le dossier du jeu courant' {
         $badge = [pscustomobject]@{ glyph = 'B'; color = '#E4103F' }
         Set-ActiveIconSet 'classic' | Out-Null
-        try { Get-CompanionIconPath 'ja_JP' ([pscustomobject]@{ id = 'blitz' }) $badge | Should Match 'ico\\classic\\companion\\hex-launcher-jp-blitz' }
+        try { Get-CompanionIconPath 'ja_JP' ([pscustomobject]@{ id = 'blitz' }) $badge | Should Match 'icons\\classic\\companion\\hex-launcher-jp-blitz' }
         finally { Set-ActiveIconSet '' | Out-Null }
     }
 
@@ -238,11 +238,11 @@ Describe 'Resolve-ShortcutIconPath sur un jeu externe' {
         Mock New-Item {}
         Mock Add-StackedBadgesToExecutableIcon { param($ExecutablePath, $Codes, $Badge, $DestinationIco, $Style) $DestinationIco }
 
-        It 'compose pays + compagnon dans ico\original-badges\companion' {
+        It 'compose pays + compagnon dans icons\original-badges\companion' {
             try {
                 $combination = New-ShortcutCombination 'ja_JP' $blitz
                 Resolve-ShortcutIconPath $combination | Should Be (Get-StackedIconPath $combination $badge)
-                Get-StackedIconPath $combination $badge | Should Match 'ico\\original-badges\\companion\\hex-launcher-jp-blitz-[0-9a-f]{8}\.ico$'
+                Get-StackedIconPath $combination $badge | Should Match 'icons\\original-badges\\companion\\hex-launcher-jp-blitz-[0-9a-f]{8}\.ico$'
                 Assert-MockCalled Add-StackedBadgesToExecutableIcon -Scope It -Exactly 1 -ParameterFilter { $ExecutablePath -eq $exe -and ($Codes -join ',') -eq 'ja_JP' -and $Badge.glyph -eq 'B' }
             } finally { Set-ActiveIconSet '' | Out-Null; $script:LeagueClientPath = $null }
         }
@@ -251,7 +251,7 @@ Describe 'Resolve-ShortcutIconPath sur un jeu externe' {
             Set-ActiveIconSet 'original-badges' | Out-Null; $script:LeagueClientPath = $exe
             try {
                 $combination = New-ShortcutCombination 'fr_FR' $null
-                Resolve-ShortcutIconPath $combination | Should Match 'ico\\original-badges\\companion\\hex-launcher-fr-[0-9a-f]{8}\.ico$'
+                Resolve-ShortcutIconPath $combination | Should Match 'icons\\original-badges\\companion\\hex-launcher-fr-[0-9a-f]{8}\.ico$'
                 Assert-MockCalled Add-StackedBadgesToExecutableIcon -Scope It -Exactly 1 -ParameterFilter { ($Codes -join ',') -eq 'fr_FR' -and $null -eq $Badge }
             } finally { Set-ActiveIconSet '' | Out-Null; $script:LeagueClientPath = $null }
         }
@@ -307,7 +307,7 @@ Describe 'Resolve-ShortcutIconPath, texte forcé' {
         It 'compose drapeau des voix en haut, drapeau du texte en bas, puis la pastille compagnon' {
             try {
                 $path = Resolve-ShortcutIconPath (New-ShortcutCombination 'ja_JP' $blitz 'fr_FR')
-                $path | Should Match 'ico\\flat\\companion\\hex-launcher-jp-fr-blitz-[0-9a-f]{8}\.ico$'
+                $path | Should Match 'icons\\flat\\companion\\hex-launcher-jp-fr-blitz-[0-9a-f]{8}\.ico$'
                 Assert-MockCalled Merge-DiagonalSplitIco -Scope It -Exactly 1 -ParameterFilter {
                     $Split.Upper -match 'hex-launcher-jp\.ico$' -and $Split.Lower -match 'hex-launcher-fr\.ico$' -and $Split.Destination -eq $path
                 }
@@ -368,7 +368,7 @@ Describe 'Resolve-ShortcutIconPath, texte forcé' {
 
         It 'passe les deux langues, voix d''abord, à la pastille pays' {
             try {
-                Resolve-ShortcutIconPath (New-ShortcutCombination 'ja_JP' $blitz 'fr_FR') | Should Match 'ico\\original-badges\\companion\\hex-launcher-jp-fr-blitz-[0-9a-f]{8}\.ico$'
+                Resolve-ShortcutIconPath (New-ShortcutCombination 'ja_JP' $blitz 'fr_FR') | Should Match 'icons\\original-badges\\companion\\hex-launcher-jp-fr-blitz-[0-9a-f]{8}\.ico$'
                 Assert-MockCalled Add-StackedBadgesToExecutableIcon -Scope It -Exactly 1 -ParameterFilter { ($Codes -join ',') -eq 'ja_JP,fr_FR' }
             } finally { Set-ActiveIconSet '' | Out-Null; $script:LeagueClientPath = $null }
         }
@@ -384,7 +384,7 @@ Describe 'Resolve-ShortcutIconPath, texte forcé' {
         It 'compose la pastille pays coupée et la pastille compagnon sur hex-launcher.ico du jeu' {
             Set-ActiveIconSet 'logo-badges' | Out-Null
             try {
-                Resolve-ShortcutIconPath (New-ShortcutCombination 'ja_JP' $blitz 'fr_FR') | Should Match 'ico\\logo-badges\\companion\\hex-launcher-jp-fr-blitz-[0-9a-f]{8}\.ico$'
+                Resolve-ShortcutIconPath (New-ShortcutCombination 'ja_JP' $blitz 'fr_FR') | Should Match 'icons\\logo-badges\\companion\\hex-launcher-jp-fr-blitz-[0-9a-f]{8}\.ico$'
                 Assert-MockCalled Add-StackedBadgesToIco -Scope It -Exactly 1 -ParameterFilter {
                     $SourceIco -match 'ico\\logo-badges\\hex-launcher\.ico$' -and ($Codes -join ',') -eq 'ja_JP,fr_FR' -and $Badge.glyph -eq 'B'
                 }
@@ -462,7 +462,7 @@ Describe 'Resolve-ShortcutIconPath' {
         Mock New-Item {}
         Mock Add-CompanionBadge { param($SourceIco, $Badge, $DestinationIco, $Style) $DestinationIco }
 
-        It 'compose drapeau + pastille dans ico\<jeu>\companion, avec le style du jeu (flat livré sans voile)' {
+        It 'compose drapeau + pastille dans icons\<jeu>\companion, avec le style du jeu (flat livré sans voile)' {
             Resolve-ShortcutIconPath (New-ShortcutCombination 'ja_JP' $blitz) | Should Be (Get-CompanionIconPath 'ja_JP' $blitz $badge)
             Assert-MockCalled Add-CompanionBadge -Scope It -Exactly 1 -ParameterFilter { $SourceIco -eq (Get-FlagIconPath 'ja_JP') -and $Badge.glyph -eq 'B' -and $Style.NightVeil -eq $false }
         }
@@ -563,9 +563,9 @@ Describe 'New-ShortcutWithFallback' {
         Assert-MockCalled Write-Warning -Scope It -Exactly 0
     }
 
-    It 'replie dans le dossier du lanceur avec un avertissement quand la destination refuse' {
+    It 'replie dans le dossier des données, jamais celui du code, avec un avertissement quand la destination refuse' {
         $result = New-ShortcutWithFallback { param([string]$Directory) if ($Directory -eq $Destination) { throw 'accès refusé' }; "créé dans $Directory" }
-        $result | Should Be "créé dans $folder"
+        $result | Should Be "créé dans $(Get-AppDataFolder $folder)"
         Assert-MockCalled Write-Warning -Scope It -Exactly 1
     }
 }

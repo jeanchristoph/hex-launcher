@@ -15,12 +15,12 @@
     reflète toujours le dernier choix.
 
     Un raccourci avec compagnon reçoit l'icône drapeau surmontée de la pastille du compagnon (couleur + lettre
-    déclarées dans companion-apps.json), composée dans ico\<jeu>\companion\ à chaque exécution. Sans pastille ou en
+    déclarées dans companion-apps.json), composée dans icons\<jeu>\companion\ à chaque exécution. Sans pastille ou en
     cas d'échec de composition, le raccourci garde l'icône drapeau seule.
 
     Jeux externes (ico\<jeu>\icon-source.json) : l'icône officielle du jeu, référencée depuis LeagueClient.exe installé
     (jamais copiée dans le projet) — nue (« original »), ou surmontée de la pastille pays puis de la pastille compagnon,
-    composées dans ico\<jeu>\companion\ (« original-badges »). Binaire introuvable → icônes du jeu par défaut.
+    composées dans icons\<jeu>\companion\ (« original-badges »). Binaire introuvable → icônes du jeu par défaut.
 
     L'assistant (setup.ps1) pose en plus « Hex Launcher », un raccourci vers setup.bat avec l'icône
     engrenage ico\hex-launcher-setup.ico (repli sur l'icône de base du jeu) : toujours recréé, jamais retiré.
@@ -62,11 +62,12 @@ Add-Type -AssemblyName System.Drawing
 . (Join-Path $PSScriptRoot 'lib\icon-badge.lib.ps1')
 . (Join-Path $PSScriptRoot 'lib\icon-set.lib.ps1')
 . (Join-Path $PSScriptRoot 'lib\riot-install.lib.ps1')
+. (Join-Path $PSScriptRoot 'lib\app-data.lib.ps1')
 
 $folder      = $PSScriptRoot
 $launcher    = Join-Path $folder 'launch-lol.ps1'
 $setupBatch  = Join-Path (Split-Path $folder -Parent) 'setup.bat'
-$configPath  = Join-Path $folder 'config.json'
+$configPath  = Get-AppDataFilePath $folder 'config.json'
 $localesPath = Join-Path $folder 'locales.json'
 $powershell  = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 $icoRoot     = Join-Path $folder 'ico'
@@ -74,7 +75,7 @@ $setupIcon   = Join-Path $icoRoot 'hex-launcher-setup.ico'   # engrenage du racc
 $catalogPath = Join-Path $folder 'companion-apps.json'
 $CompanionBadges     = $null   # pastilles par identifiant, lues du catalogue à la première demande
 $LeagueClientPath    = $null   # LeagueClient.exe installé, cherché à la première demande ('' = introuvable, déjà signalé)
-$ActiveIconSet       = $null   # jeu d'icônes courant et son dossier ico\<jeu>\companion, posés par Set-ActiveIconSet (ci-dessous, après les fonctions)
+$ActiveIconSet       = $null   # jeu d'icônes courant et son dossier icons\<jeu>\companion, posés par Set-ActiveIconSet (ci-dessous, après les fonctions)
 $companionIconFolder = $null
 $shell       = New-Object -ComObject WScript.Shell
 
@@ -121,7 +122,7 @@ function Get-ActiveIconSet { return $script:ActiveIconSet }
 # Change le jeu courant ; nom inconnu ou vide → jeu par défaut (Resolve-IconSet avertit)
 function Set-ActiveIconSet([string]$Name) {
     $script:ActiveIconSet       = Resolve-IconSet $icoRoot $Name
-    $script:companionIconFolder = Join-Path (Get-IconSetFolder $script:ActiveIconSet) 'companion'
+    $script:companionIconFolder = Get-CompanionIconFolder $folder (Get-IconSetFolderOrDefault $script:ActiveIconSet $icoRoot).Name
     return $script:ActiveIconSet
 }
 
@@ -189,7 +190,7 @@ function Get-CompanionIconStem([string]$Code, $Companion) {
     return "hex-launcher-$($Code.Split('_')[1].ToLower())-$($Companion.id)"
 }
 
-# ja_JP + blitz → ico\<jeu>\companion\hex-launcher-jp-blitz-3f9a12c4.ico : l'empreinte du rendu dans le nom change le chemin
+# ja_JP + blitz → icons\<jeu>\companion\hex-launcher-jp-blitz-3f9a12c4.ico : l'empreinte du rendu dans le nom change le chemin
 # dès que la pastille change, sinon Explorer garde l'ancienne image dans son cache d'icônes
 function Get-CompanionIconPath([string]$Code, $Companion, $Badge) {
     return Join-Path $companionIconFolder "$(Get-CompanionIconStem $Code $Companion)-$(Get-BadgeSignature $Badge (Get-ActiveBadgeStyle)).ico"
@@ -291,7 +292,7 @@ function Get-CombinationCountryCodes($Combination) {
     return @($Combination.Code)
 }
 
-# ico\<jeu>\companion\hex-launcher-jp-blitz-<empreinte>.ico : l'empreinte (pays, dessin du drapeau, pastille, style)
+# icons\<jeu>\companion\hex-launcher-jp-blitz-<empreinte>.ico : l'empreinte (pays, dessin du drapeau, pastille, style)
 # change le chemin dès que le rendu change, pour contourner le cache d'icônes d'Explorer
 function Get-StackedIconPath($Combination, $Badge) {
     return Join-Path $companionIconFolder "$(Get-CombinationIconStem $Combination)-$(Get-StackedBadgeSignature (Get-CombinationCountryCodes $Combination) $Badge (Get-ActiveBadgeStyle)).ico"
@@ -322,7 +323,7 @@ function Resolve-StackedIconPath($Combination, $Background) {
 
 # ---------------------------------------------------------------- Icône coupée (texte forcé, jeux de fichiers)
 
-# ico\<jeu>\companion\hex-launcher-jp-fr[-blitz]-<empreinte>.ico : l'empreinte suit le trait et la pastille compagnon
+# icons\<jeu>\companion\hex-launcher-jp-fr[-blitz]-<empreinte>.ico : l'empreinte suit le trait et la pastille compagnon
 function Get-SplitIconPath($Combination, $Badge) {
     $companion = if ($Badge) { Get-BadgeSignature $Badge (Get-ActiveBadgeStyle) } else { 'none' }
     $signature = ConvertTo-RenderSignature "$($Combination.Code)|$($Combination.TextCode)|$companion|$(Get-DiagonalSplitKey)"
@@ -547,13 +548,15 @@ function Get-ForcedTextShortcutDescription($Combination) {
 }
 
 # Bureau en priorité ; si l'écriture y échoue (dossier protégé, OneDrive verrouillé, chemin absent),
-# repli dans le dossier du script pour que l'installation aboutisse quand même. $Create reçoit le dossier.
+# repli dans le dossier des données (jamais celui du code) pour que l'installation aboutisse quand même.
+# $Create reçoit le dossier.
 function New-ShortcutWithFallback([scriptblock]$Create) {
     try {
         return & $Create $Destination
     } catch {
-        Write-Warning (Get-Text 'shortcuts.destinationFallback' $Destination, $_.Exception.Message, $folder)
-        return & $Create $folder
+        $fallback = Get-AppDataFolder $folder
+        Write-Warning (Get-Text 'shortcuts.destinationFallback' $Destination, $_.Exception.Message, $fallback)
+        return & $Create $fallback
     }
 }
 
@@ -602,6 +605,7 @@ function Split-ListArgument([string[]]$Values) {
 
 if ($MyInvocation.InvocationName -ne '.') {
     Initialize-Translation (Resolve-UiLanguage $Language (Get-UICulture).Name) | Out-Null
+    Initialize-AppDataFolder $folder | Out-Null
     $catalog = Read-LocaleCatalog $localesPath
     $config  = Read-LaunchConfig $configPath
     Test-LaunchConfig $config

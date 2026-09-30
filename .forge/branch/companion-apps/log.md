@@ -1,3 +1,13 @@
+- [2026-09-30] T30 faite : README ×3 + LISEZMOI + project.md. Relevé hors périmètre : « icône officielle » / « LoL officielle » subsistent dans les README (section Langues, libellés des jeux d'icônes) — à trancher.
+- [2026-09-30] T29 faite : update-install.lib (digest obligatoire, installeur /VERYSILENT ou remplacement portable, data\ intact), relance du lanceur avec ses arguments et de setup.bat — 1020 tests.
+- [2026-09-30] Piège trouvé : WebClient *TaskAsync sous WinForms poste sa fin dans la file de messages → Task.Wait bloqué jusqu'au délai ; requêtes démarrées hors SynchronizationContext (Start-DetachedWebTask), test de non-régression.
+- [2026-09-30] Copie « source » (dépôt, zip ≤ 0.3.2, sans marqueur ni unins000.exe) : aucune vérification de mise à jour.
+- [2026-09-30] T28 faite : textes FR validés (fenêtre, case, écran de chargement T29) puis EN/JA ; case placée page 1 (Détection) ; langue du lanceur = celle de Windows (la langue de l'assistant n'est pas mémorisée).
+- [2026-09-30] T31 faite : marqueur app\portable.json, zip renommé hex-launcher-portable-x.y.z.zip.
+- [2026-09-30] T27 faite : installeur Inno Setup compilé (winget JRSoftware.InnoSetup 6.7.3 --scope user, sur autorisation) ; texte FR « Ouvrir l'assistant Hex Launcher » validé ; désinstallation = retrait des raccourcis de ce dossier, données gardées.
+- [2026-09-30] T26 faite : données dans %LOCALAPPDATA%\hex-launcher (ou data\ en portable) ; cache/état du texte forcé restent par poste même en portable ; README regroupés en T30 — 931 tests.
+- [2026-09-30] T31 ajoutée : version portable en zip (données dans data\, MAJ sur place depuis le zip) ; T26 et T29 ajustées, T29 passe en L.
+- [2026-09-30] T26–T30 ajoutées (v0.4.0) : installeur .exe par utilisateur (Inno Setup, retenu face à l'auto-installation et au zip seul), vérification des MAJ activée par défaut et désactivable.
 - [2026-09-29] Langue par défaut = celle de l'assistant (en bas à gauche), FR à défaut : liste du texte forcé et voix pré-cochées (JP + cette langue, fr_FR n'est plus "default"), suit un changement de langue si la liste n'a pas été touchée ; README ×3 — 921 tests. Gravé dev + master.
 - [2026-09-29] Release v0.3.2 publiée (e65750e, notes EN, dev/master à jour) ; message Discord 0.3.2 validé : output/20260929-discord-release-0-3-2.txt.
 - [2026-09-29] Règle ajoutée à coding-standards.md : un post Discord d'annonce généré à chaque release.

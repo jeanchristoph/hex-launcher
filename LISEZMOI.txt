@@ -1,32 +1,40 @@
 Hex Launcher — lanceur League of Legends multi-langue + applis compagnon (Windows)
 =================================================================================
 
-  1. Double-cliquez sur  setup.bat  (jamais « en tant qu'administrateur »).
+  1. Version installée : lancez  Hex Launcher  depuis le menu Démarrer.
+     Version portable : double-cliquez sur  setup.bat  — vos réglages restent dans  data\, à côté.
+     Jamais « en tant qu'administrateur ».
   2. Suivez l'assistant : détection, applis compagnon, raccourcis.
   3. Lancez le jeu depuis les raccourcis « League of Legends XX » créés sur le Bureau.
 
 Le dossier  app\  contient le moteur (scripts, icônes, catalogues) : rien à y toucher.
-Pour changer de langue ou d'appli compagnon plus tard : relancez setup.bat.
+Pour changer de langue ou d'appli compagnon plus tard : relancez l'assistant (Hex Launcher ou setup.bat).
+Mises à jour : une nouvelle version est proposée au lancement (Installer / Plus tard) — désactivable dans l'assistant.
 L'assistant s'affiche en français, anglais ou japonais selon Windows — sélecteur en bas à gauche.
 Documentation complète : README.fr.md (français), README.md (English), README.ja.md (日本語).
 
 Confiance : setup.bat tient en une ligne (ouvrez-le dans le Bloc-notes), tout le code est en clair dans app\.
 Aucune donnée collectée, aucune télémétrie, aucun compte : l'outil ne parle qu'au Riot Client de votre PC et ne
-va sur Internet que pour installer une appli compagnon que vous avez cochée et, en mode texte forcé, télécharger les
-fichiers texte depuis le CDN officiel de Riot. Jamais administrateur, registre jamais écrit, rien d'installé sans
-votre clic sur Appliquer. Empreinte SHA-256 du zip publiée avec chaque release.
+va sur Internet que pour installer une appli compagnon que vous avez cochée, en mode texte forcé pour télécharger
+les fichiers texte depuis le CDN officiel de Riot, et pour vérifier les mises à jour sur GitHub (désactivable).
+Il n'écrit que dans son dossier de réglages (%LOCALAPPDATA%\hex-launcher\, ou data\ en portable).
+Jamais administrateur, registre jamais écrit par les scripts, rien d'installé sans votre clic sur Appliquer.
+Empreinte SHA-256 de l'installeur et du zip portable publiée avec chaque release.
 
 Utilisation à vos risques : l'auteur n'est pas responsable d'une éventuelle sanction (suspension, bannissement) de
 votre compte Riot.
 Projet non affilié à Riot Games — voir la mention légale dans les README.
 
 -----------------------------------------------------------------------------------
-EN — Double-click setup.bat (never as administrator), follow the wizard, then use the
-"League of Legends XX" desktop shortcuts. The app\ folder is the engine: nothing to edit there.
+EN — Installed version: start Hex Launcher from the Start menu. Portable version: double-click
+setup.bat — your settings stay in data\, next to it. Never as administrator. Follow the wizard,
+then use the "League of Legends XX" desktop shortcuts. The app\ folder is the engine: nothing to edit there.
+Updates: a new version is offered at launch (Install / Later) — can be turned off in the wizard.
 The wizard follows the Windows language (FR / EN / JA) — selector at the bottom left.
 Trust: setup.bat is one line (open it in Notepad), all code is plain text in app\. No data collected, no
 telemetry, no account; it only talks to the Riot Client on your PC and only goes online to install a companion
-app you ticked and, in forced text mode, to download the text files from Riot's official CDN. Never as
-administrator, registry never written, nothing installed without your click on Apply.
-The SHA-256 of the zip is published with every release.
+app you ticked, in forced text mode to download the text files from Riot's official CDN, and to check GitHub for
+updates (can be turned off). It only writes to its settings folder (%LOCALAPPDATA%\hex-launcher\, or data\ when
+portable). Never as administrator, registry never written by the scripts, nothing installed without your click on Apply.
+The SHA-256 of the installer and of the portable zip is published with every release.
 Use at your own risk: the author is not liable for any sanction (suspension, ban) applied to your Riot account.

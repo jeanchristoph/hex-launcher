@@ -10,7 +10,8 @@
         riotClientPath, productSettingsPath (détectés, corrigeables dans setup.bat),
         companionApps = [ { id, name, path, arguments }, … ],
         iconSet = nom du jeu d'icônes choisi dans setup.bat (dossier de app\ico ; absent → jeu par défaut),
-        useLocalApi = chemin de lancement choisi dans setup.bat (absent → vrai : API locale du Riot Client)
+        useLocalApi = chemin de lancement choisi dans setup.bat (absent → vrai : API locale du Riot Client),
+        checkForUpdates = vérification des mises à jour au lancement (absent → vrai)
 
     Un config.json antérieur (bloc unique companionApp { enabled, name, path, arguments }) est migré à la lecture :
     l'entrée activée devient la seule ligne de companionApps, avec un id dérivé de son nom.
@@ -81,6 +82,20 @@ function Set-LaunchUseLocalApi($Config, [bool]$UseLocalApi) {
 function Save-LaunchUseLocalApi($Config, [string]$ConfigPath, [bool]$UseLocalApi) {
     if ((Get-LaunchUseLocalApi $Config) -eq $UseLocalApi) { return $false }
     Set-LaunchUseLocalApi $Config $UseLocalApi
+    Write-LaunchConfig $Config $ConfigPath
+    return $true
+}
+
+# Vérification des mises à jour au lancement (case de setup.bat). Absent, ou config.json pas encore créé → vrai.
+function Get-LaunchCheckForUpdates($Config) {
+    if ($null -ne $Config -and $null -ne $Config.checkForUpdates) { return [bool]$Config.checkForUpdates }
+    return $true
+}
+
+# N'écrit config.json que si le choix a changé ; rend vrai dans ce cas
+function Save-LaunchCheckForUpdates($Config, [string]$ConfigPath, [bool]$CheckForUpdates) {
+    if ((Get-LaunchCheckForUpdates $Config) -eq $CheckForUpdates) { return $false }
+    $Config | Add-Member -NotePropertyName checkForUpdates -NotePropertyValue $CheckForUpdates -Force
     Write-LaunchConfig $Config $ConfigPath
     return $true
 }

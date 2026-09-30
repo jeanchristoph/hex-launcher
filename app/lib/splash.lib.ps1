@@ -187,6 +187,16 @@ function Hide-SplashAction($Splash) {
     return $true
 }
 
+# Retire le bouton du bas, pour qu'un autre puisse prendre sa place ; rend vrai s'il existait
+function Remove-SplashAction($Splash) {
+    $button = Get-SplashAction $Splash
+    if ($null -eq $button) { return $false }
+    Hide-SplashAction $Splash | Out-Null
+    $Splash.Controls.Remove($button)
+    $button.Dispose()
+    return $true
+}
+
 function Close-SplashWindow($Splash) {
     if ($null -eq $Splash) { return }
     $Splash.Close()
