@@ -26,7 +26,20 @@ GOLD, CHAMFER, DARK, GEM, STUD = '#FDC92E', '#D9960F', '#010512', '#0185FD', '#D
 SIZE, MARGIN, RADIUS, THICK = 256, 7, 40, 13
 LOGO_REGION = (46, 150, 466, 466)          # zone du logo dans l'image 512 (hors cadre)
 
-im = np.array(Image.open(SRC).convert('RGBA')).astype(int)
+# Barre du L raccourcie de 10 px (demande utilisateur, 2026-10-01 : le L débordait à droite) : la bande à droite de la
+# colonne 345 — pied du L et sa pointe, lignes 290 à 436 — glisse vers la gauche. Le haut du L (serif jusqu'à 360,
+# lignes < 200), le H et le cadre (colonne 467 et au-delà) restent en place.
+L_FOOT_BAND = {'rows': (290, 437), 'columns': (345, 461)}
+L_FOOT_SHORTENING = 10
+
+def shorten_l_foot(image):
+    (top, bottom), (left, right) = L_FOOT_BAND['rows'], L_FOOT_BAND['columns']
+    shortened = image.copy()
+    shortened[top:bottom, left:right - L_FOOT_SHORTENING] = image[top:bottom, left + L_FOOT_SHORTENING:right]
+    shortened[top:bottom, right - L_FOOT_SHORTENING:right] = 0
+    return shortened
+
+im = shorten_l_foot(np.array(Image.open(SRC).convert('RGBA')).astype(int))
 H, W = im.shape[:2]
 rgb, alpha = im[:, :, :3], im[:, :, 3]
 names = list(PALETTE)

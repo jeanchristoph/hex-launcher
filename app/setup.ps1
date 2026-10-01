@@ -47,9 +47,9 @@ Initialize-Translation (Resolve-UiLanguage $Language (Get-UICulture).Name) | Out
 $SetupConfigPath  = Get-AppDataFilePath $PSScriptRoot 'config.json'
 $SetupCatalogPath = Join-Path $PSScriptRoot 'companion-apps.json'
 
-# « Hex Launcher 0.4.0 », identique dans toutes les langues ; sans version lisible, « Hex Launcher »
+# « Hex Launcher Configuration 0.4.0 », identique dans toutes les langues ; sans version lisible, « Hex Launcher Configuration »
 function Get-SetupWindowTitle {
-    return "Hex Launcher $(Get-InstalledVersion $PSScriptRoot)".Trim()
+    return "Hex Launcher Configuration $(Get-InstalledVersion $PSScriptRoot)".Trim()
 }
 
 # Même icône que le raccourci « Hex Launcher » : l'engrenage ; repli sur l'icône du projet s'il manque

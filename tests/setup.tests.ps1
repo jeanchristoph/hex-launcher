@@ -1545,14 +1545,22 @@ Describe 'Start-SetupWizard et mise à jour' {
 }
 
 Describe 'Numéro de version de l''assistant' {
-    It 'titre la fenêtre « Hex Launcher <version> », sans « configuration »' {
+    It 'titre la fenêtre « Hex Launcher Configuration <version> »' {
         Mock Get-InstalledVersion { '0.4.1' }
-        Get-SetupWindowTitle | Should Be 'Hex Launcher 0.4.1'
+        Get-SetupWindowTitle | Should Be 'Hex Launcher Configuration 0.4.1'
     }
 
-    It 'garde « Hex Launcher » seul quand la version est illisible' {
+    It 'garde le même titre dans toutes les langues' {
+        Mock Get-InstalledVersion { '0.4.1' }
+        Initialize-Translation 'ja' | Out-Null
+        $title = Get-SetupWindowTitle
+        Initialize-Translation 'fr' | Out-Null
+        $title | Should Be 'Hex Launcher Configuration 0.4.1'
+    }
+
+    It 'garde « Hex Launcher Configuration » sans numéro quand la version est illisible' {
         Mock Get-InstalledVersion { '' }
-        Get-SetupWindowTitle | Should Be 'Hex Launcher'
+        Get-SetupWindowTitle | Should Be 'Hex Launcher Configuration'
         Get-SetupVersionText | Should Be ''
     }
 

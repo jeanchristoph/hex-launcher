@@ -10,19 +10,25 @@
     Le jeu logo-badges n'a pas de drapeau : create-shortcuts.ps1 pose sur cette icône la pastille pays et la pastille
     compagnon (icon-source.json, source « set-base »).
 
-    L'installeur prend le même logo, centré : tools\installer\installer-logo.ico (icône du .exe, image de l'assistant).
+    L'installeur prend le même logo, centré et entouré d'une marge (-LogoFill 0.90) : tools\installer\installer-logo.ico
+    (icône du .exe, images de l'assistant).
 
     Prérequis (outil de développement, hors release) : resvg dans le PATH — `scoop install resvg`.
 
 .EXAMPLE
     powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-logo-icon.ps1
     powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-logo-icon.ps1 -Placement centered -PreviewDir tmp\preview
-    powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-logo-icon.ps1 -Placement centered -OutDir tools\installer -FileName installer-logo.ico
+    powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-logo-icon.ps1 -Placement centered -LogoFill 0.90 -OutDir tools\installer -FileName installer-logo.ico
 #>
 param(
     # bottom (défaut, choix utilisateur) : calé en bas, la place libre en haut reçoit la pastille pays ; centered : centré
     [ValidateSet('centered', 'bottom')]
     [string]$Placement = 'bottom',
+
+    # Part du côté occupée par le logo : 0.98 (défaut) = pleine largeur, marge anti-rognage de l'anticrénelage seule ;
+    # 0.90 pour l'icône de l'installeur, qui paraissait trop grosse sur le .exe (retours utilisateur : 0.80 trop de marge)
+    [ValidateRange(0.1, 1.0)]
+    [double]$LogoFill = 0.98,
 
     # Dossier de sortie (défaut : app\ico\logo-badges)
     [string]$OutDir,
@@ -46,7 +52,6 @@ Add-Type -AssemblyName System.Drawing
 $IconSizes          = @(256, 128, 64, 48, 32, 16)
 $MeasureSize        = 1024   # rendu de mesure de l'emprise
 $SvgSide            = 256    # côté du viewBox d'origine
-$LogoFill           = 0.98   # part du côté occupée par le logo (marge anti-rognage de l'anticrénelage)
 $OpaqueAlphaMinimum = 8      # alpha au-dessous duquel un pixel ne compte pas dans l'emprise
 
 # ---------------------------------------------------------------- SVG (fonctions pures)

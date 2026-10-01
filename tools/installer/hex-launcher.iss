@@ -1,5 +1,5 @@
 ﻿; Installeur par utilisateur de hex-launcher (Inno Setup 6) — compilé par tools\make-release.ps1, jamais à la main :
-;   ISCC.exe /DAppVersion=0.4.0 /DSourceDir=<dossier préparé> /DOutputDir=<dist> /DWizardImage=<png> hex-launcher.iss
+;   ISCC.exe /DAppVersion=0.4.0 /DSourceDir=<dossier préparé> /DOutputDir=<dist> hex-launcher.iss
 ;
 ; Sans droits administrateur : installe dans %LOCALAPPDATA%\Programs\hex-launcher, comme Blitz ou DPM. Le lanceur refuse
 ; le mode administrateur, Program Files lui est donc fermé. Les données (config.json, journal, icônes composées) vivent
@@ -12,9 +12,6 @@
 #endif
 #ifndef SourceDir
   #error Passer /DSourceDir=<dossier préparé par make-release>
-#endif
-#ifndef WizardImage
-  #error Passer /DWizardImage=<png du logo HL> (tools\make-release.ps1 l'extrait de l'icône)
 #endif
 #ifndef OutputDir
   #define OutputDir "..\..\dist"
@@ -38,11 +35,14 @@ DisableReadyPage=yes
 UsePreviousAppDir=yes
 OutputDir={#OutputDir}
 OutputBaseFilename=hex-launcher-setup-{#AppVersion}
-; Logo HL nu, sans pastille, centré : icône du fichier d'installation et de sa fenêtre (image de l'assistant tirée du
-; même .ico par make-release)
+; Logo HL = Hex Launcher lui-même (installation, désinstallation) ; l'engrenage reste à la configuration (setup.bat).
+; Logo HL nu, sans pastille, centré : icône du fichier d'installation, de sa fenêtre et du désinstalleur (qui reprend
+; SetupIconFile) ; images de l'assistant (coin haut-droit, panneau gauche) tirées du même .ico par
+; tools\make-installer-images.ps1, versionnées ici
 SetupIconFile=installer-logo.ico
-WizardSmallImageFile={#WizardImage}
-UninstallDisplayIcon={app}\app\ico\hex-launcher-setup.ico
+WizardSmallImageFile=wizard-corner.png
+WizardImageFile=wizard-side.png
+UninstallDisplayIcon={uninstallexe}
 UninstallDisplayName=Hex Launcher
 LicenseFile={#SourceDir}\LICENSE
 Compression=lzma2

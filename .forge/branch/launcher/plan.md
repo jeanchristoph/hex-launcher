@@ -1,4 +1,4 @@
-﻿# Plan — launcher
+# Plan — launcher
 **Objective:** Lancer League of Legends sans clic sur Play, en pilotant le Riot Client par son API locale, repli sur le rejeu de `--launch-product`.
 **Date:** 2026-09-19
 
@@ -424,6 +424,14 @@ comportement, retrait documenté. Textes FR validés avant traduction.
 create-shortcuts (`Remove-OwnShortcuts`, `Remove-EmptyShortcutFolder`), ligne de cases sur la page Raccourcis (fenêtre
 688 px), résumé de la page Terminé à hauteur mesurée, `.iss` ; README ×3, LISEZMOI ; rendu fr/en/ja vérifié par capture.
 
+### T36 — Titre de la fenêtre de l'assistant
+**Effort:** S
+**Files:** `app/setup.ps1`, `tests/setup.tests.ps1`
+**Description:** `Get-SetupWindowTitle` rend « Hex Launcher Configuration <version> » (« Hex Launcher Configuration »
+sans version lisible) au lieu de « Hex Launcher <version> » ; mot fixe dans toutes les langues, comme le nom du
+produit (choix utilisateur parmi Config / Configs / Configuration / Setup). Titre doré de la colonne inchangé.
+[x] 2026-10-01 — titre posé, 3 tests (avec / sans version, identique en japonais) ; 1061 verts.
+
 ## Risks
 - Endpoint non documenté par Riot : relevé sur `swagger/v3/openapi.json` à l'exécution, et le repli rend l'échec non bloquant.
 - `ServerCertificateValidationCallback` est global à .NET : posé puis restauré dans un `finally`.
@@ -470,4 +478,5 @@ None
 | T33 — Réveil de Riot sans limite, relance périodique | S | [x] |
 | T34 — make-release : notes par fichier | S | [x] |
 | T35 — Raccourcis dans le menu Démarrer | M | [x] |
+| T36 — Titre « Hex Launcher Configuration » | S | [x] |
 | **Total** | **~L (5-8 h)** | |

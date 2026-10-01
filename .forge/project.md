@@ -1,4 +1,4 @@
-﻿# Project — hex-launcher (ex LoL Lang Switcher, ex Hextech Launcher)
+# Project — hex-launcher (ex LoL Lang Switcher, ex Hextech Launcher)
 **Generated:** 2026-09-13
 
 ## Stack
@@ -18,7 +18,7 @@ lol/  (dépôt hex-launcher)
 ├── LICENSE, .gitignore, .gitattributes
 ├── tests/                       # Pester 3.4 : *.tests.ps1 + companion-test-helpers.ps1 — Invoke-Pester -Path tests (dev, hors release)
 ├── data/                        # Version portable seulement (gitignoré) : dossier des données à côté de setup.bat
-├── tools/                       # Dev, hors release : make-release.ps1 (installeur via installer/hex-launcher.iss + zip portable, SHA-256 de chacun) ; make-logo-icon.ps1 (icône de base du jeu logo-badges : SVG sans groupe frame, viewBox resserré, calé en bas, resvg ; -Placement centered -OutDir tools\installer -FileName installer-logo.ico → icône de l'installeur, HL centré ; make-release en tire l'image de l'assistant, logo à 50 % centré) ; watch-launch.ps1 (essai réel : lance le jeu et relève les écritures sur les .wad.client texte, horodatage TimeGenerated) ; fetch-libzstd.ps1 (libzstd.dll de la release officielle facebook/zstd, SHA-256 du zip et de la DLL épinglés) ; make-flag-icons.ps1 (29 .ico de app/ico depuis le SVG, resvg + drapeaux GDI+) ; logo/make-logo-svg.py + logo/hex-launcher-logo-drawing.png → logo/hex-launcher-logo.svg (logo HL, source de vérité ; Python, potrace, resvg) ; logo/hex_launcher_gear_multisize.ico + settings.png (engrenage, source fournie par l'utilisateur, copié tel quel en app/ico/hex-launcher-setup.ico)
+├── tools/                       # Dev, hors release : make-release.ps1 (installeur via installer/hex-launcher.iss + zip portable, SHA-256 de chacun) ; make-logo-icon.ps1 (icône de base du jeu logo-badges : SVG sans groupe frame, viewBox resserré, calé en bas, resvg ; -Placement centered -OutDir tools\installer -FileName installer-logo.ico → icône de l'installeur, HL centré ; -LogoFill 0.90 : marge autour du HL) ; make-installer-images.ps1 (images de l'assistant d'installation tirées de installer-logo.ico : wizard-corner.png, wizard-side.png, versionnées dans tools\installer\ et lues par le .iss) ; watch-launch.ps1 (essai réel : lance le jeu et relève les écritures sur les .wad.client texte, horodatage TimeGenerated) ; fetch-libzstd.ps1 (libzstd.dll de la release officielle facebook/zstd, SHA-256 du zip et de la DLL épinglés) ; make-flag-icons.ps1 (29 .ico de app/ico depuis le SVG, resvg + drapeaux GDI+) ; logo/make-logo-svg.py + logo/hex-launcher-logo-drawing.png → logo/hex-launcher-logo.svg (logo HL, source de vérité ; Python, potrace, resvg) ; logo/hex_launcher_gear_multisize.ico + settings.png (engrenage, source fournie par l'utilisateur, copié tel quel en app/ico/hex-launcher-setup.ico)
 └── app/                         # Tout le moteur — les scripts sont relatifs à $PSScriptRoot
     ├── setup.ps1              # Assistant de configuration unique (WinForms thème LoL, machine à états pure testée, hooks CompanionUi ; chemins Riot corrigeables page 1 avec Parcourir…)
     ├── detect-config.ps1        # Génère config.json (Riot Client, yaml, applis compagnon détectées via le catalogue) — Main gardé
@@ -103,6 +103,7 @@ lol/  (dépôt hex-launcher)
 
 ## Tools & access
 - Available MCPs: ClickUp, claude-in-chrome, phpstorm (non pertinent ici)
+- Icônes : engrenage (`hex-launcher-setup.ico`) = configuration (raccourci et fenêtre de setup.bat) ; logo HL = Hex Launcher lui-même (installeur, désinstalleur, « Applications installées ») — règle utilisateur, 2026-10-01
 - Identité visuelle : nom `hex-launcher`, mention de non-affiliation Riot en tête des README ; logo HL vectoriel original (tools/logo/hex-launcher-logo.svg, dessin utilisateur vectorisé) et icônes générées par tools/make-flag-icons.ps1 (dépendance dev : resvg via scoop)
 - Registre et configuration Windows : lecture seule, interdiction d'écrire (règle utilisateur, CLAUDE.md global)
 - Installation LoL de l'utilisateur : lecture seule pendant le développement (jamais copier, écrire, changer la langue ni lancer) ; tests sur TestDrive / mocks, essai réel par l'utilisateur
