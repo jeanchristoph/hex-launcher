@@ -42,7 +42,7 @@ Describe 'Get-LogoViewBox' {
     # Logo plus large que haut, comme le HL : 200 × 100 à partir de (28, 78)
     $bounds = [pscustomobject]@{ X = 28; Y = 78; Width = 200; Height = 100 }
 
-    It 'fait un carré dont le logo occupe toute la largeur (à la marge près)' {
+    It 'fait un carré dont le logo occupe la part -LogoFill de la largeur, centré' {
         $box = Get-LogoViewBox $bounds 'centered'
         [Math]::Round($box.Side, 3) | Should Be ([Math]::Round(200 / $LogoFill, 3))
         [Math]::Round($box.X + $box.Side / 2, 3) | Should Be 128
@@ -79,5 +79,15 @@ Describe 'ConvertTo-SvgBounds' {
     It 'ramène une emprise mesurée à 1024 px aux unités du viewBox 256' {
         $bounds = ConvertTo-SvgBounds ([pscustomobject]@{ X = 136; Y = 326; Width = 760; Height = 544 }) 1024
         "$($bounds.X),$($bounds.Y),$($bounds.Width),$($bounds.Height)" | Should Be '34,81.5,190,136'
+    }
+}
+
+Describe 'Icônes du logo livrées' {
+    $root = Split-Path $here -Parent
+
+    It 'donne au jeu logo la même icône que le .exe de l''installeur' {
+        $set       = [IO.File]::ReadAllBytes((Join-Path $root 'app\ico\logo\hex-launcher.ico'))
+        $installer = [IO.File]::ReadAllBytes((Join-Path $root 'tools\installer\installer-logo.ico'))
+        [Convert]::ToBase64String($set) | Should Be ([Convert]::ToBase64String($installer))
     }
 }

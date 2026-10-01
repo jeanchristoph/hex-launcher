@@ -1,24 +1,27 @@
 ﻿<#
 .SYNOPSIS
-    Génère l'icône de base du jeu « logo-badges » : le logo HL seul (sans cadre ni fond), agrandi, fond transparent.
+    Génère l'icône du logo HL seul (sans cadre ni fond, fond transparent) : icône de base du jeu « logo-badges »
+    (défaut : calé en bas, pleine largeur) et icône de l'installeur (centré, 90 %).
 
 .DESCRIPTION
     Source : le logo vectoriel tools\logo\hex-launcher-logo.svg, dont le groupe `frame` est retiré. Le viewBox est
-    resserré sur l'emprise du logo (mesurée sur un rendu 1024 px), en carré : le logo prend toute la largeur, centré
+    resserré sur l'emprise du logo (mesurée sur un rendu 1024 px), en carré : le logo en occupe -LogoFill, centré
     en hauteur ou calé en bas (-Placement). Chaque taille du .ico est rendue par resvg depuis ce SVG, nette à 16 px.
 
     Le jeu logo-badges n'a pas de drapeau : create-shortcuts.ps1 pose sur cette icône la pastille pays et la pastille
     compagnon (icon-source.json, source « set-base »).
 
-    L'installeur prend le même logo, centré et entouré d'une marge (-LogoFill 0.90) : tools\installer\installer-logo.ico
-    (icône du .exe, images de l'assistant).
+    L'installeur prend le même logo, centré et entouré d'une marge : tools\installer\installer-logo.ico (icône du .exe,
+    source des images de l'assistant), identique à app\ico\logo\hex-launcher.ico (jeu « Logo HL », nu). Le jeu
+    logo-badges garde le logo calé en bas : centré, les pastilles pays et compagnon recouvraient le L (essayé le
+    2026-10-01, écarté par l'utilisateur).
 
     Prérequis (outil de développement, hors release) : resvg dans le PATH — `scoop install resvg`.
 
 .EXAMPLE
     powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-logo-icon.ps1
-    powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-logo-icon.ps1 -Placement centered -PreviewDir tmp\preview
     powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-logo-icon.ps1 -Placement centered -LogoFill 0.90 -OutDir tools\installer -FileName installer-logo.ico
+    powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-logo-icon.ps1 -Placement centered -LogoFill 0.90 -OutDir app\ico\logo
 #>
 param(
     # bottom (défaut, choix utilisateur) : calé en bas, la place libre en haut reçoit la pastille pays ; centered : centré

@@ -171,12 +171,14 @@ Describe 'Get-IconSetSource' {
         Assert-MockCalled Write-Warning -Scope It -Exactly 2
     }
 
-    It 'reconnaît les jeux à source livrés : original nu, original-badges et logo-badges avec pastilles' {
+    It 'reconnaît les jeux à source livrés : original et logo nus, original-badges et logo-badges avec pastilles' {
         $sets = @(Get-IconSets (Join-Path $here '..\app\ico'))
         (Get-IconSetSource (Find-IconSet $sets 'original')).Badges | Should Be $false
         (Get-IconSetSource (Find-IconSet $sets 'original-badges')).Badges | Should Be $true
         (Get-IconSetSource (Find-IconSet $sets 'logo-badges')).Source | Should Be 'set-base'
         (Get-IconSetSource (Find-IconSet $sets 'logo-badges')).Badges | Should Be $true
+        (Get-IconSetSource (Find-IconSet $sets 'logo')).Source | Should Be 'set-base'
+        (Get-IconSetSource (Find-IconSet $sets 'logo')).Badges | Should Be $false
         Test-IconSetExternal (Find-IconSet $sets 'flat') | Should Be $false
     }
 }
@@ -189,11 +191,11 @@ Describe 'Get-IconSetFilePath' {
 }
 
 Describe 'jeux livrés dans app\ico' {
-    It 'propose flat (défaut), classic, original, original-badges et logo-badges ; les jeux de drapeaux ont les 27 drapeaux du catalogue' {
+    It 'propose flat (défaut), classic, original, original-badges, logo-badges et logo ; les jeux de drapeaux ont les 27 drapeaux du catalogue' {
         . (Join-Path $here '..\app\lib\launch-config.lib.ps1')
         $root  = Join-Path $here '..\app\ico'
         $sets  = @(Get-IconSets $root)
-        ($sets | ForEach-Object { $_.Name }) -join ',' | Should Be 'original-badges,original,logo-badges,classic,flat'
+        ($sets | ForEach-Object { $_.Name }) -join ',' | Should Be 'original-badges,original,logo-badges,logo,classic,flat'
         (Get-DefaultIconSet $sets).Name | Should Be 'flat'
         $codes = @(Read-JsonCatalog (Join-Path $here '..\app\locales.json') | ForEach-Object { $_.code })
         foreach ($set in @($sets | Where-Object { -not (Test-IconSetExternal $_) })) {

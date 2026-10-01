@@ -21,7 +21,7 @@ param(
 Add-Type -AssemblyName System.Drawing
 . (Join-Path (Split-Path $PSScriptRoot -Parent) 'app\lib\icon.lib.ps1')
 
-# Part de la largeur de installer-logo.ico occupée par le logo (make-logo-icon -LogoFill 0.90, centré)
+# Part de la largeur de installer-logo.ico occupée par le logo (make-logo-icon -Placement centered -LogoFill 0.90)
 $InstallerIconLogoFill = 0.90
 
 # Coin haut-droit : Inno étire l'image jusqu'au bord droit de la fenêtre, le logo s'en écarte donc davantage à droite

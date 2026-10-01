@@ -219,7 +219,7 @@ e.g. `hex-launcher-jp.ico` for `ja_JP`); missing flag → the set's base icon, t
 the *Shortcuts* page of `setup.bat` (with a preview of its base icon) and remembered in `config.json` (`iconSet`);
 in script mode: `create-shortcuts.ps1 -IconSet classic`. Any folder dropped in `app/ico/` that contains a
 `hex-launcher.ico` becomes a selectable set. Shipped sets are listed in a fixed order under a translated label
-("Official LoL + badges", "Official LoL, plain", "HL logo + badges", "Classic (embossed)", "Flat flag + HL logo"); an added set comes after,
+("Official LoL + badges", "Official LoL, plain", "HL logo + badges", "HL logo", "Classic (embossed)", "Flat flag + HL logo"); an added set comes after,
 under its folder name. On a fresh install `original-badges` is preselected; `flat` remains the fallback set (window
 icon, missing flag, LoL not found).
 A shortcut with a companion app also carries a coloured badge in the top-right corner — P Porofessor, B Blitz,
@@ -241,6 +241,8 @@ The `logo-badges` set has no flag: its base icon is the HL logo alone, without a
 Each shortcut gets the country badge (split diagonally in forced text mode) and the companion badge, composed on this
 machine as for `original-badges`; marker `{ "source": "set-base", "badges": true }`. Rebuild the icon with
 `powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-logo-icon.ps1` (`resvg` required).
+The `logo` set is its plain version: the installer icon (HL logo centred, without a frame), no badge; shortcuts differ by
+their name only. Marker `{ "source": "set-base", "badges": false }`.
 
 For a language missing from the catalogue (new Riot locale):
 1. add a line to `locales.json` with the exact code as it appears in `available_locales` of the yaml file;
@@ -388,7 +390,7 @@ tick "Manual start" (Riot compatibility section) in `setup.bat` — the launcher
 | `app/lib/icon-split.lib.ps1` | Diagonally split icon of forced text shortcuts |
 | `tests/` | Pester tests (`Invoke-Pester -Path tests`) |
 | `tools/` | Development only, not shipped: `make-release.ps1`, `fetch-libzstd.ps1` (downloads `libzstd.dll` again from the official release and checks its hashes), `make-flag-icons.ps1` (rebuilds the `flat` icon set from the vector logo), `make-logo-icon.ps1` (rebuilds the icon of the `logo-badges` set), `watch-launch.ps1` (real-world test: launches the game and records writes to the text files), `logo/make-logo-svg.py` + `logo/hex-launcher-logo-drawing.png` → `logo/hex-launcher-logo.svg` (the original HL logo, source of truth) |
-| `app/ico/` | Icon sets, one folder each: `flat/` (default: flat flag behind the HL logo) and `classic/` (the former embossed icons); each holds the base icon + one flag variant per language (`hex-launcher-xx.ico`); the flag + badge icons composed on this machine go to the settings folder (`icons\<set>\companion\`). `original/` and `original-badges/` hold only an `icon-source.json` marker: the official game icon, referenced from the installed `LeagueClient.exe` — bare, or with country and companion badges composed on this machine; `logo-badges/`: a single base icon (HL logo without frame or flag), onto which the country and companion badges are composed on this machine |
+| `app/ico/` | Icon sets, one folder each: `flat/` (default: flat flag behind the HL logo) and `classic/` (the former embossed icons); each holds the base icon + one flag variant per language (`hex-launcher-xx.ico`); the flag + badge icons composed on this machine go to the settings folder (`icons\<set>\companion\`). `original/` and `original-badges/` hold only an `icon-source.json` marker: the official game icon, referenced from the installed `LeagueClient.exe` — bare, or with country and companion badges composed on this machine; `logo-badges/`: a single base icon (HL logo without frame or flag), onto which the country and companion badges are composed on this machine; `logo/`: the same icon as the installer, no badge |
 
 ## Developing
 

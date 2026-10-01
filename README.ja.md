@@ -214,7 +214,7 @@ Riot が提供するすべての言語が `locales.json` にあり、インス�
 セットは `setup.bat` の「ショートカット」ページで選び（基本アイコンのプレビュー付き）、`config.json`（`iconSet`）に記憶されます。
 スクリプトモード：`create-shortcuts.ps1 -IconSet classic`。`hex-launcher.ico` を含むフォルダーを `app/ico/` に置けば、
 セットとして選べるようになります。同梱のセットは固定の順序で、翻訳されたラベル（「LoL 公式＋バッジ」「LoL 公式（バッジなし）」
-「HL ロゴ＋バッジ」「クラシック（立体）」「フラット国旗＋HL ロゴ」）で表示され、追加したセットはその後にフォルダー名で表示されます。
+「HL ロゴ＋バッジ」「HL ロゴ」「クラシック（立体）」「フラット国旗＋HL ロゴ」）で表示され、追加したセットはその後にフォルダー名で表示されます。
 新規インストールでは `original-badges` が選択済みです。`flat` は引き続きフォールバック用のセットです（ウィンドウアイコン、
 国旗がない場合、LoL が見つからない場合）。
 補助アプリ付きのショートカットには右上に色付きバッジが加わります — P Porofessor、B Blitz、O OP.GG、M Mobalytics、D DPM —
@@ -234,6 +234,8 @@ Riot が提供するすべての言語が `locales.json` にあり、インス�
 各ショートカットには国バッジ（テキスト強制モードでは対角線で分割）と補助アプリバッジが付き、`original-badges` と同じく
 この PC で合成されます。マーカーは `{ "source": "set-base", "badges": true }` です。アイコンの再生成は
 `powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-logo-icon.ps1`（`resvg` が必要）。
+`logo` セットはそのバッジなし版です。インストーラーと同じアイコン（枠のない HL ロゴを中央に配置）で、バッジは付きません。
+ショートカットは名前でしか区別できません。マーカーは `{ "source": "set-base", "badges": false }` です。
 
 カタログにない言語（Riot の新しいロケール）を追加するには：
 1. yaml ファイルの `available_locales` にある正確なコードで `locales.json` に 1 行追加；
@@ -377,7 +379,7 @@ Riot Client の「言語」設定はランチャーの言語を変えるだけ�
 | `app/lib/icon.lib.ps1` / `icon-badge.lib.ps1` | `.ico` の読み書き、実行ファイルのアイコンのメモリ上での読み取り、補助アプリバッジと国バッジの合成 |
 | `app/lib/flag.lib.ps1` / `riot-install.lib.ps1` | GDI+ で描く国旗（アイコンと国バッジで共通の定義）；`RiotClientInstalls.json` から読む Riot Client と `LeagueClient.exe` の場所 |
 | `app/lib/i18n.lib.ps1` / `app/i18n/` | アシスタントとコンソールの翻訳：言語ごとの辞書 `fr.json` / `en.json` / `ja.json`（すべて同じキー） |
-| `app/ico/` | アイコンセット（フォルダーごとに 1 セット）：`flat/`（既定：HL ロゴの背後にフラットな国旗）と `classic/`（以前の立体アイコン）。各セットに基本アイコン＋言語ごとの国旗バージョン（`hex-launcher-xx.ico`）が入ります。この PC で合成された国旗＋バッジのアイコンは設定フォルダー（`icons\<セット>\companion\`）に置かれます。`original/` と `original-badges/` にはマーカー `icon-source.json` しかありません：インストール済みの `LeagueClient.exe` から参照するゲームの公式アイコンで、そのまま、または国と補助アプリのバッジをこの PC で合成して使います。`logo-badges/` には基本アイコン（枠も国旗もない HL ロゴ）だけが入り、その上に国と補助アプリのバッジをこの PC で合成します |
+| `app/ico/` | アイコンセット（フォルダーごとに 1 セット）：`flat/`（既定：HL ロゴの背後にフラットな国旗）と `classic/`（以前の立体アイコン）。各セットに基本アイコン＋言語ごとの国旗バージョン（`hex-launcher-xx.ico`）が入ります。この PC で合成された国旗＋バッジのアイコンは設定フォルダー（`icons\<セット>\companion\`）に置かれます。`original/` と `original-badges/` にはマーカー `icon-source.json` しかありません：インストール済みの `LeagueClient.exe` から参照するゲームの公式アイコンで、そのまま、または国と補助アプリのバッジをこの PC で合成して使います。`logo-badges/` には基本アイコン（枠も国旗もない HL ロゴ）だけが入り、その上に国と補助アプリのバッジをこの PC で合成します。`logo/` にはインストーラーと同じアイコンがバッジなしで入ります |
 
 ## 開発するには
 

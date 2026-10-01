@@ -47,9 +47,10 @@ Initialize-Translation (Resolve-UiLanguage $Language (Get-UICulture).Name) | Out
 $SetupConfigPath  = Get-AppDataFilePath $PSScriptRoot 'config.json'
 $SetupCatalogPath = Join-Path $PSScriptRoot 'companion-apps.json'
 
-# « Hex Launcher Configuration 0.4.0 », identique dans toutes les langues ; sans version lisible, « Hex Launcher Configuration »
+# « Configuration - Hex Launcher 0.4.0 », sur le modèle du titre de l'installeur (« Installation - Hex Launcher… »),
+# identique dans toutes les langues ; sans version lisible, « Configuration - Hex Launcher »
 function Get-SetupWindowTitle {
-    return "Hex Launcher Configuration $(Get-InstalledVersion $PSScriptRoot)".Trim()
+    return "Configuration - Hex Launcher $(Get-InstalledVersion $PSScriptRoot)".Trim()
 }
 
 # Même icône que le raccourci « Hex Launcher » : l'engrenage ; repli sur l'icône du projet s'il manque
@@ -234,7 +235,8 @@ function Read-IconSetPreviewEntries($Set, [int]$Size) {
     return @(Read-IcoEntries (Get-IconSetFilePath $Set $IconSetBaseIcon))
 }
 
-# Image d'aperçu d'un jeu : l'entrée de la taille demandée (ou la plus grande en dessous) ; $null si illisible
+# Image d'aperçu d'un jeu : l'entrée de la taille demandée (ou la plus grande en dessous), avec les pastilles d'exemple
+# si le jeu en porte ; $null si illisible
 function New-IconSetPreviewImage($Set, [int]$Size) {
     if (-not $Set) { return $null }
     try {
@@ -243,8 +245,25 @@ function New-IconSetPreviewImage($Set, [int]$Size) {
         if ($chosen.Count -eq 0) { $chosen = @($entries | Sort-Object Size | Select-Object -First 1) }
         $image = $chosen[0].Bitmap.Clone()
         $entries | ForEach-Object { $_.Bitmap.Dispose() }
+        if (Test-IconSetWithBadges $Set) { Add-IconSetPreviewBadges $image }
         return $image
     } catch { return $null }
+}
+
+function Test-IconSetWithBadges($Set) {
+    $source = Get-IconSetSource $Set
+    return [bool]$source -and $source.Badges
+}
+
+# Pastilles d'exemple : disques blancs vides, anneau habituel, aux emplacements pays (haut-droite) et compagnon
+# (dessous) — l'aperçu montre où elles se posent sans annoncer une langue ni une appli (demande utilisateur)
+$IconSetPreviewBadgeColor = '#FFFFFF'
+
+function Add-IconSetPreviewBadges([System.Drawing.Bitmap]$Image) {
+    $g = [System.Drawing.Graphics]::FromImage($Image)
+    $g.SmoothingMode = 'AntiAlias'
+    foreach ($slot in 0, 1) { Draw-BadgeDisc $g (Get-BadgeMetrics $Image.Width $slot) $IconSetPreviewBadgeColor $BadgeDefaultStyle }
+    $g.Dispose()
 }
 
 # Note sous la liste des jeux : ce qu'implique un jeu à source (icône nue → raccourcis distingués par leur nom seul ;
@@ -252,7 +271,8 @@ function New-IconSetPreviewImage($Set, [int]$Size) {
 function Get-IconSetNoteText($Set) {
     $source = Get-IconSetSource $Set
     if (-not $source) { return '' }
-    if ($source.Source -eq $IconSourceSetBase) { return Get-Text 'setup.shortcuts.iconSetNote.setBase' }
+    if ($source.Source -eq $IconSourceSetBase -and $source.Badges) { return Get-Text 'setup.shortcuts.iconSetNote.setBase' }
+    if ($source.Source -eq $IconSourceSetBase) { return Get-Text 'setup.shortcuts.iconSetNote.setBaseBare' }
     if ($source.Badges) { return Get-Text 'setup.shortcuts.iconSetNote.badges' }
     return Get-Text 'setup.shortcuts.iconSetNote.bare'
 }

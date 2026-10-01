@@ -24,14 +24,15 @@
     source → d'où vient l'icône de fond de tous les raccourcis :
         league-client : le binaire installé de League of Legends (LeagueClient.exe, référencée, jamais copiée dans
                         le projet ; dossier sans aucun .ico) — jeux livrés original (nue) et original-badges ;
-        set-base      : l'icône de base du jeu lui-même (hex-launcher.ico), sans drapeau — jeu livré logo-badges.
+        set-base      : l'icône de base du jeu lui-même (hex-launcher.ico), sans drapeau — jeux livrés logo-badges et
+                        logo (nu, même icône que le .exe de l'installeur).
     badges → pastilles pays et compagnon composées dessus, dans icons\<jeu>\companion (fichier dérivé local au poste,
     hors dépôt et hors release).
 #>
 
 $DefaultIconSetName    = 'flat'                 # repli technique : seul jeu garanti d'avoir tous ses .ico
 $PreferredIconSetName  = 'original-badges'      # présélection d'une installation neuve (choix utilisateur, 2026-09-20)
-$IconSetDisplayOrder   = @('original-badges', 'original', 'logo-badges', 'classic', 'flat')
+$IconSetDisplayOrder   = @('original-badges', 'original', 'logo-badges', 'logo', 'classic', 'flat')
 $IconSetBaseIcon       = 'hex-launcher.ico'
 $IconSetGreenBaseIcon  = 'hex-launcher-green.ico'   # même logo sur fond vert : la paire isole le logo (icône coupée)
 $IconSetBadgeStyleFile = 'badge-style.json'

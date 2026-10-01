@@ -415,6 +415,19 @@ Describe 'Resolve-ShortcutIconPath, texte forcé' {
         }
     }
 
+    Context 'logo : icône de base du jeu, nue' {
+        Mock Add-StackedBadgesToIco { throw 'ne doit pas être appelé' }
+        Mock Find-LeagueClientPath { throw 'ne doit pas être appelé' }
+
+        It 'rend hex-launcher.ico du jeu pour toute langue, sans pastille ni binaire LoL' {
+            Set-ActiveIconSet 'logo' | Out-Null
+            try {
+                Resolve-ShortcutIconPath (New-ShortcutCombination 'ja_JP' $blitz 'fr_FR') | Should Match 'ico\\logo\\hex-launcher\.ico$'
+                Resolve-ShortcutIconPath (New-ShortcutCombination 'fr_FR' $null) | Should Match 'ico\\logo\\hex-launcher\.ico$'
+            } finally { Set-ActiveIconSet '' | Out-Null }
+        }
+    }
+
     Context 'original : icône nue' {
         Set-ActiveIconSet 'original' | Out-Null
         $script:LeagueClientPath = $exe

@@ -292,10 +292,22 @@ Describe 'Jeu d''icônes de la page Raccourcis' {
         Get-SetupSelectedIconSetName $null | Should Be ''
     }
 
+    # Couleur au centre des deux emplacements de pastille (pays, compagnon) d'un aperçu
+    function Get-PreviewBadgeCenters([System.Drawing.Bitmap]$Image) {
+        return @(0, 1 | ForEach-Object { $m = Get-BadgeMetrics $Image.Width $_; $Image.GetPixel([int]$m.Cx, [int]$m.Cy).ToArgb() })
+    }
+    $white = [System.Drawing.Color]::White.ToArgb()
+
     It 'donne en aperçu l''entrée 64 px de hex-launcher.ico du jeu livré' {
         $flat  = Find-IconSet @(Get-IconSets (Join-Path $here '..\app\ico')) 'flat'
         $image = New-IconSetPreviewImage $flat 64
         try { $image.Width | Should Be 64 } finally { if ($image) { $image.Dispose() } }
+    }
+
+    It 'ne pose aucune pastille d''exemple sur un jeu de drapeaux' {
+        $flat  = Find-IconSet @(Get-IconSets (Join-Path $here '..\app\ico')) 'flat'
+        $image = New-IconSetPreviewImage $flat 64
+        try { (Get-PreviewBadgeCenters $image) -contains $white | Should Be $false } finally { $image.Dispose() }
     }
 
     It 'rend null sans jeu ou avec une icône illisible' {
@@ -311,6 +323,17 @@ Describe 'Jeu d''icônes de la page Raccourcis' {
             Mock Find-LeagueClientPath { Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe' }
             $image = New-IconSetPreviewImage $original 64
             try { $image.Width | Should Be 64 } finally { if ($image) { $image.Dispose() } }
+        }
+
+        It 'pose deux pastilles d''exemple blanches sur original-badges, aucune sur original' {
+            Mock Find-LeagueClientPath { Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe' }
+            $badges = New-IconSetPreviewImage $originalBadges 64
+            $bare   = New-IconSetPreviewImage $original 64
+            try {
+                (Get-PreviewBadgeCenters $badges) -join "," | Should Be "$white,$white"
+                (Get-PreviewBadgeCenters $bare) -contains $white | Should Be $false
+            }
+            finally { $badges.Dispose(); $bare.Dispose() }
         }
 
         It 'laisse l''aperçu vide quand le binaire est introuvable' {
@@ -335,9 +358,28 @@ Describe 'Jeu d''icônes de la page Raccourcis' {
             try { $image.Width | Should Be 64 } finally { if ($image) { $image.Dispose() } }
         }
 
+        It 'pose deux pastilles d''exemple blanches, pays en haut à droite et compagnon dessous' {
+            $image = New-IconSetPreviewImage $logoBadges 64
+            try { (Get-PreviewBadgeCenters $image) -join "," | Should Be "$white,$white" } finally { $image.Dispose() }
+        }
+
         It 'a son libellé et sa note : logo sans drapeau, pastilles composées sur ce poste' {
             Get-IconSetLabel $logoBadges | Should Be 'Logo HL + pastilles'
             Get-IconSetNoteText $logoBadges | Should Be (Get-Text 'setup.shortcuts.iconSetNote.setBase')
+        }
+    }
+
+    Context 'logo (icône du .exe, nue)' {
+        $logo = Find-IconSet @(Get-IconSets (Join-Path $here '..\app\ico')) 'logo'
+
+        It 'donne en aperçu le logo seul, sans pastille d''exemple' {
+            $image = New-IconSetPreviewImage $logo 64
+            try { (Get-PreviewBadgeCenters $image) -contains $white | Should Be $false } finally { $image.Dispose() }
+        }
+
+        It 'a son libellé et sa note : logo seul, raccourcis distingués par leur nom' {
+            Get-IconSetLabel $logo | Should Be 'Logo HL'
+            Get-IconSetNoteText $logo | Should Be 'Logo HL seul, sans pastille : les raccourcis ne diffèrent que par leur nom.'
         }
     }
 }
@@ -1545,9 +1587,9 @@ Describe 'Start-SetupWizard et mise à jour' {
 }
 
 Describe 'Numéro de version de l''assistant' {
-    It 'titre la fenêtre « Hex Launcher Configuration <version> »' {
+    It 'titre la fenêtre « Configuration - Hex Launcher <version> », comme l''installeur' {
         Mock Get-InstalledVersion { '0.4.1' }
-        Get-SetupWindowTitle | Should Be 'Hex Launcher Configuration 0.4.1'
+        Get-SetupWindowTitle | Should Be 'Configuration - Hex Launcher 0.4.1'
     }
 
     It 'garde le même titre dans toutes les langues' {
@@ -1555,12 +1597,12 @@ Describe 'Numéro de version de l''assistant' {
         Initialize-Translation 'ja' | Out-Null
         $title = Get-SetupWindowTitle
         Initialize-Translation 'fr' | Out-Null
-        $title | Should Be 'Hex Launcher Configuration 0.4.1'
+        $title | Should Be 'Configuration - Hex Launcher 0.4.1'
     }
 
-    It 'garde « Hex Launcher Configuration » sans numéro quand la version est illisible' {
+    It 'garde « Configuration - Hex Launcher » sans numéro quand la version est illisible' {
         Mock Get-InstalledVersion { '' }
-        Get-SetupWindowTitle | Should Be 'Hex Launcher Configuration'
+        Get-SetupWindowTitle | Should Be 'Configuration - Hex Launcher'
         Get-SetupVersionText | Should Be ''
     }
 

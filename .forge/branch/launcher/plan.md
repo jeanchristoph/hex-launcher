@@ -430,7 +430,16 @@ create-shortcuts (`Remove-OwnShortcuts`, `Remove-EmptyShortcutFolder`), ligne de
 **Description:** `Get-SetupWindowTitle` rend « Hex Launcher Configuration <version> » (« Hex Launcher Configuration »
 sans version lisible) au lieu de « Hex Launcher <version> » ; mot fixe dans toutes les langues, comme le nom du
 produit (choix utilisateur parmi Config / Configs / Configuration / Setup). Titre doré de la colonne inchangé.
-[x] 2026-10-01 — titre posé, 3 tests (avec / sans version, identique en japonais) ; 1061 verts.
+[x] 2026-10-01 — titre posé, 3 tests (avec / sans version, identique en japonais) ; 1061 verts. Révisé le même jour :
+« Configuration - Hex Launcher <version> », sur le modèle du titre de l'installeur.
+
+### T37 — Jeu d'icônes « Logo HL » (nu)
+**Effort:** S
+**Files:** `app/ico/logo/`, `app/lib/icon-set.lib.ps1`, `app/setup.ps1`, `app/i18n/{fr,en,ja}.json`, tests, README ×3
+**Description:** Jeu `logo` : l'icône du .exe de l'installeur (logo HL centré, 90 %), marqueur `set-base` sans
+pastille, placé après « Logo HL + pastilles ». Note : « Logo HL seul, sans pastille : les raccourcis ne diffèrent
+que par leur nom. » Demande utilisateur (2026-10-01), livré en 0.4.3.
+[x] 2026-10-01 — icône identique à installer-logo.ico (test), note `setBaseBare`, i18n ×3, README ×3 ; 1068 verts.
 
 ## Risks
 - Endpoint non documenté par Riot : relevé sur `swagger/v3/openapi.json` à l'exécution, et le repli rend l'échec non bloquant.
@@ -478,5 +487,6 @@ None
 | T33 — Réveil de Riot sans limite, relance périodique | S | [x] |
 | T34 — make-release : notes par fichier | S | [x] |
 | T35 — Raccourcis dans le menu Démarrer | M | [x] |
-| T36 — Titre « Hex Launcher Configuration » | S | [x] |
+| T36 — Titre « Configuration - Hex Launcher » | S | [x] |
+| T37 — Jeu d'icônes « Logo HL » (nu) | S | [x] |
 | **Total** | **~L (5-8 h)** | |

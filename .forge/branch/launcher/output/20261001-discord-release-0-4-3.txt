@@ -1,0 +1,12 @@
+🔧 **Hex Launcher 0.4.3 est dispo !**
+
+Nouveau look : le logo HL s'affiche partout, de l'installeur à tes raccourcis. Et si tu préfères des icônes sobres, le nouveau jeu « Logo HL » met juste le logo, sans pastille.
+
+**Comment mettre à jour** :
+• En 0.4.x : accepte la mise à jour proposée au lancement, puis rouvre **Hex Launcher** (menu Démarrer) pour choisir ton jeu d'icônes.
+• Première fois : télécharge `hex-launcher-setup-0.4.3.exe` en bas de la page de la release (rubrique *Assets*) et double-clique dessus.
+
+⚠️ L'installeur n'est pas signé : si Windows affiche « Windows a protégé votre ordinateur », clique sur *Informations complémentaires* → *Exécuter quand même*.
+
+Gratuit, open source, Windows.
+👉 https://github.com/jeanchristoph/hex-launcher/releases/tag/v0.4.3
